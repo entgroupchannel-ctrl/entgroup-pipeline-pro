@@ -20,9 +20,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadProfile = async (uid: string) => {
-    const { data } = await crmDb().from("user_profiles").select("*").eq("id", uid).maybeSingle();
+    const { data, error } = await crmDb().from("user_profiles").select("*").eq("id", uid).maybeSingle();
+    if (error) {
+      console.error("[auth] failed to load crm.user_profiles:", error);
+    }
     setProfile((data as UserProfile) ?? null);
   };
+
 
   useEffect(() => {
     let mounted = true;
