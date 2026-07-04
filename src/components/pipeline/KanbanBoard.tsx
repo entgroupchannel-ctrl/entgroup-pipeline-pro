@@ -44,6 +44,8 @@ export function KanbanBoard() {
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [overdueCount, setOverdueCount] = useState(0);
+  const [lastSync, setLastSync] = useState<string | null>(null);
+  const refreshSync = () => fetchFALastSync().then(setLastSync).catch(() => {});
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
