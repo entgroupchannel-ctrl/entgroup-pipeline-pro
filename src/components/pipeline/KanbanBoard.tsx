@@ -17,6 +17,7 @@ import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type Lead, type L
 import { formatBaht } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { KanbanCard } from "./KanbanCard";
+import { toast } from "sonner";
 import { NewLeadDialog } from "./NewLeadDialog";
 import { FAImportModal } from "@/components/flowaccount/FAImportModal";
 import { fetchFALastSync } from "@/lib/flowaccount-client";
@@ -48,6 +49,24 @@ export function KanbanBoard() {
   const refreshSync = () => fetchFALastSync().then(setLastSync).catch(() => {});
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const deleteLead = async (id: string) => {
+    if (!confirm("ลบดีลนี้?")) return;
+    const { error } = await crmDb().from("leads").delete().eq("id", id);
+    if (error) { toast.error("ลบไม่สำเร็จ"); return; }
+    toast.success("ลบแล้ว"); loadLeads();
+  };
+
+  const duplicateLead = async (lead: LeadWithRelations) => {
+    const { error } = await crmDb().from("leads").insert({
+      title: `${lead.title} (สำเนา)`, stage: "new",
+      expected_value: lead.expected_value, account_id: lead.account_id,
+      contact_id: lead.contact_id, source: lead.source, owner_id: lead.owner_id,
+      created_by: user?.id,
+    });
+    if (error) { toast.error("สร้างซ้ำไม่สำเร็จ"); return; }
+    toast.success("สร้างซ้ำแล้ว"); loadLeads();
+  };
 
   const loadLeads = async () => {
     const [leadsRes, accountsRes, profilesRes] = await Promise.all([
@@ -366,7 +385,13 @@ function Column({
         ) : (
           leads.map((l) => (
             <div key={l.id} className={activeId === l.id ? "opacity-30" : ""}>
-              <KanbanCard lead={l} onClick={() => onCardClick(l.id)} draggable />
+              <KanbanCard
+                lead={l}
+                onClick={() => onCardClick(l.id)}
+                draggable
+                onDelete={() => deleteLead(l.id)}
+                onDuplicate={() => duplicateLead(l)}
+              />
             </div>
           ))
         )}

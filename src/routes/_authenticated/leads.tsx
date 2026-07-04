@@ -12,6 +12,8 @@ import { crmDb, STAGE_LABEL_TH, ACTIVE_STAGES, OUTCOME_STAGES, type Lead, type L
 import { formatBaht, formatThaiDate } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { NewLeadDialog } from "@/components/pipeline/NewLeadDialog";
+import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const searchSchema = z.object({
   stage: z.string().optional(),
@@ -46,6 +48,7 @@ function LeadsPage() {
   const [accountsMap, setAccountsMap] = useState<Map<string, string>>(new Map());
   const [profilesMap, setProfilesMap] = useState<Map<string, { name: string; initials: string }>>(new Map());
   const [newOpen, setNewOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const stageFilter = (search.stage ?? "active") as LeadStage | "active" | "all";
   const ownerFilter = search.owner ?? "all";
@@ -70,6 +73,40 @@ function LeadsPage() {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [user?.id, isManager]);
+
+  const toggleSelect = (id: string) => setSelected(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const selectAll = () => setSelected(new Set((filtered ?? []).map(l => l.id)));
+  const clearAll  = () => setSelected(new Set());
+
+  const duplicateLead = async (l: Lead) => {
+    const { error } = await crmDb().from("leads").insert({
+      title: `${l.title} (สำเนา)`, stage: "new",
+      expected_value: l.expected_value, expected_close_date: l.expected_close_date,
+      account_id: l.account_id, contact_id: l.contact_id,
+      source: l.source, owner_id: l.owner_id, created_by: user?.id,
+    });
+    if (error) { toast.error("สร้างซ้ำไม่สำเร็จ"); return; }
+    toast.success("สร้างซ้ำแล้ว"); load();
+  };
+
+  const deleteLead = async (id: string) => {
+    if (!confirm("ลบดีลนี้?")) return;
+    const { error } = await crmDb().from("leads").delete().eq("id", id);
+    if (error) { toast.error("ลบไม่สำเร็จ"); return; }
+    toast.success("ลบแล้ว"); load();
+  };
+
+  const bulkDelete = async () => {
+    if (!confirm(`ลบ ${selected.size} รายการ?`)) return;
+    const ids = Array.from(selected);
+    const { error } = await crmDb().from("leads").delete().in("id", ids);
+    if (error) { toast.error("ลบไม่สำเร็จ"); return; }
+    toast.success(`ลบ ${ids.length} รายการแล้ว`); clearAll(); load();
+  };
 
   const profiles = useMemo(() => Array.from(profilesMap.entries()).map(([id, v]) => ({ id, ...v })), [profilesMap]);
 
@@ -181,6 +218,17 @@ function LeadsPage() {
       </div>
 
       {/* Table */}
+      {/* Bulk action bar */}
+      <BulkActionBar
+        count={selected.size}
+        total={filtered?.length ?? 0}
+        onSelectAll={selectAll}
+        onClearAll={clearAll}
+        actions={[
+          { label: "ลบที่เลือก", icon: <span>🗑</span>, onClick: bulkDelete, variant: "danger" },
+        ]}
+      />
+
       {filtered === null ? (
         <div className="flex justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -196,6 +244,12 @@ function LeadsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                  <th className="px-3 py-2.5 w-8">
+                    <Checkbox
+                      checked={!!filtered?.length && selected.size === filtered.length}
+                      onCheckedChange={(v) => v ? selectAll() : clearAll()}
+                    />
+                  </th>
                   <th className="px-4 py-2.5 text-left font-medium">ชื่อดีล</th>
                   <th className="px-4 py-2.5 text-left font-medium">บริษัท</th>
                   <th className="px-4 py-2.5 text-center font-medium">Stage</th>
@@ -204,6 +258,7 @@ function LeadsPage() {
                   <th className="px-4 py-2.5 text-left font-medium">ที่มา</th>
                   <th className="px-4 py-2.5 text-left font-medium">Sales</th>
                   <th className="px-4 py-2.5 text-left font-medium">อัปเดต</th>
+                  <th className="px-2 py-2.5 w-8" />
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -216,7 +271,10 @@ function LeadsPage() {
                     new Date(l.expected_close_date).getTime() < Date.now();
 
                   return (
-                    <tr key={l.id} className="hover:bg-muted/30 transition-colors">
+                    <tr key={l.id} className={`hover:bg-muted/30 transition-colors ${selected.has(l.id) ? "bg-primary/5" : ""}`}>
+                      <td className="px-3 py-3">
+                        <Checkbox checked={selected.has(l.id)} onCheckedChange={() => toggleSelect(l.id)} />
+                      </td>
                       <td className="px-4 py-3 max-w-[220px]">
                         <Link
                           to="/leads/$leadId"
@@ -264,6 +322,13 @@ function LeadsPage() {
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
                         {formatThaiDate(l.updated_at)}
+                      </td>
+                      <td className="px-2 py-3">
+                        <RowActions actions={[
+                          stdOpen(() => navigate({ to: "/leads/$leadId", params: { leadId: l.id } })),
+                          stdDupe(() => duplicateLead(l)),
+                          stdDelete(() => deleteLead(l.id)),
+                        ]} />
                       </td>
                     </tr>
                   );
