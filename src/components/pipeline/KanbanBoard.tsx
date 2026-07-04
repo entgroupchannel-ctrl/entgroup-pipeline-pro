@@ -35,16 +35,24 @@ export function KanbanBoard() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const loadLeads = async () => {
-    const { data, error } = await crmDb()
-      .from("leads")
-      .select("*, account:accounts(id,name,industry), owner:user_profiles(id,full_name)")
-      .order("updated_at", { ascending: false });
-    if (error) {
-      toast.error("โหลดข้อมูลไม่สำเร็จ", { description: error.message });
+    const [leadsRes, accountsRes, profilesRes] = await Promise.all([
+      crmDb().from("leads").select("*").order("updated_at", { ascending: false }),
+      crmDb().from("accounts").select("id,name,industry"),
+      crmDb().from("user_profiles").select("id,full_name,role"),
+    ]);
+    if (leadsRes.error) {
+      toast.error("โหลดข้อมูลไม่สำเร็จ", { description: leadsRes.error.message });
       setLoading(false);
       return;
     }
-    setLeads((data ?? []) as LeadWithRelations[]);
+    const accountsMap = new Map((accountsRes.data ?? []).map((a: any) => [a.id, a]));
+    const profilesMap = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p]));
+    const merged = (leadsRes.data ?? []).map((l: any) => ({
+      ...l,
+      account: l.account_id ? accountsMap.get(l.account_id) ?? null : null,
+      owner: l.owner_id ? profilesMap.get(l.owner_id) ?? null : null,
+    }));
+    setLeads(merged as LeadWithRelations[]);
     setLoading(false);
   };
 
