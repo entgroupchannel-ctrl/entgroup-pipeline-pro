@@ -40,8 +40,7 @@ const managerItems = [
 ] as const;
 
 export function AppSidebar() {
-  const { toggleSidebar, state } = useSidebar();
-  const collapsed = state === "collapsed";
+  const { toggleSidebar } = useSidebar();
   const { profile, role, signOut } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isActive = (url: string) => pathname === url || pathname.startsWith(url + "/");
