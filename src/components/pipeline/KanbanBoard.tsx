@@ -17,7 +17,6 @@ import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type Lead, type L
 import { formatBaht } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { KanbanCard } from "./KanbanCard";
-import { toast } from "sonner";
 import { NewLeadDialog } from "./NewLeadDialog";
 import { FAImportModal } from "@/components/flowaccount/FAImportModal";
 import { fetchFALastSync } from "@/lib/flowaccount-client";
