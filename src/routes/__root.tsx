@@ -79,6 +79,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "ระบบจัดการลูกค้าและ Pipeline สำหรับทีมขาย ENTGROUP" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "ENTGROUP CRM" },
+      { name: "twitter:description", content: "ระบบจัดการลูกค้าและ Pipeline สำหรับทีมขาย ENTGROUP" },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/11ba2854-b949-420f-9dbb-81144763af58" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/11ba2854-b949-420f-9dbb-81144763af58" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
