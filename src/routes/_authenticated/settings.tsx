@@ -19,8 +19,9 @@ export const Route = createFileRoute("/_authenticated/settings")({
 function SettingsPage() {
   const { role } = useAuth();
   const isAdmin = role === "admin";
+  const isManager = role === "manager" || role === "admin";
   return (
-    <div className="p-6">
+    <div className="p-6 page-fade-in">
       <div className="mb-6">
         <h1 className="text-xl font-semibold">ตั้งค่า</h1>
         <p className="text-xs text-muted-foreground">จัดการโปรไฟล์ ทีม และการแสดงผล</p>
@@ -31,6 +32,7 @@ function SettingsPage() {
           <TabsTrigger value="profile">โปรไฟล์</TabsTrigger>
           {isAdmin && <TabsTrigger value="team">ทีมขาย</TabsTrigger>}
           <TabsTrigger value="stages">Pipeline Stages</TabsTrigger>
+          {isManager && <TabsTrigger value="script">Sales Script</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="mt-6 max-w-lg">
@@ -44,6 +46,11 @@ function SettingsPage() {
         <TabsContent value="stages" className="mt-6 max-w-lg">
           <StagesTab />
         </TabsContent>
+        {isManager && (
+          <TabsContent value="script" className="mt-6">
+            <SalesScriptTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
