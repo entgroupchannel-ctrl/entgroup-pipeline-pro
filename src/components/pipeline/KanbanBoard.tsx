@@ -291,7 +291,7 @@ export function KanbanBoard() {
 
       
       <NewLeadDialog open={newLeadOpen} onOpenChange={setNewLeadOpen} onCreated={loadLeads} />
-      <FlowAccountImportDialog open={importOpen} onOpenChange={setImportOpen} onCreated={loadLeads} />
+      <FAImportModal open={importOpen} onOpenChange={setImportOpen} onImported={() => { loadLeads(); refreshSync(); }} />
     </div>
   );
 }
