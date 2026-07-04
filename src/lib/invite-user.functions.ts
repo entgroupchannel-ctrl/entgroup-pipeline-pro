@@ -102,11 +102,10 @@ export const inviteCrmUser = createServerFn({ method: "POST" })
     if (!actionLink) throw new Error("ไม่สามารถสร้างลิงก์ได้");
 
     // send email via Resend
-    const RESEND_API_KEY = process.env.RESEND_API_KEY;
-    const FROM_EMAIL = process.env.FROM_EMAIL;
-    const COMPANY_NAME = process.env.COMPANY_NAME ?? "ENTGROUP";
-    if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY ยังไม่ได้ตั้งค่า");
-    if (!FROM_EMAIL) throw new Error("FROM_EMAIL ยังไม่ได้ตั้งค่า");
+    const cfg = await loadEmailConfig(supabaseAdmin);
+    if (!cfg.key)       throw new Error("ยังไม่ได้ตั้งค่า Resend API Key — ไปที่ Settings > อีเมล");
+    if (!cfg.fromEmail) throw new Error("ยังไม่ได้ตั้งค่า From Email");
+    if (!cfg.isActive)  throw new Error("ระบบอีเมลยังไม่ได้เปิดใช้งาน");
 
     const displayName = data.full_name ?? data.email;
     const subject = mode === "invite"
