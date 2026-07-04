@@ -235,6 +235,8 @@ export function LeadDetailSheet({ leadId, onClose, onChanged }: Props) {
                 บันทึก
               </Button>
             </div>
+
+            <LeadActivities leadId={lead.id} />
           </div>
         )}
       </SheetContent>
