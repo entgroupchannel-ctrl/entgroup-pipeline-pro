@@ -14,6 +14,7 @@ import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type LeadStage, t
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABEL, type ActivityType } from "@/lib/activities";
 import { Plus, UserPlus } from "lucide-react";
 import { InviteUserModal } from "@/components/InviteUserModal";
+import { FlowAccountTab } from "@/components/settings/FlowAccountTab";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -36,6 +37,7 @@ function SettingsPage() {
           {isAdmin && <TabsTrigger value="team">ทีมขาย</TabsTrigger>}
           <TabsTrigger value="stages">Pipeline Stages</TabsTrigger>
           {isManager && <TabsTrigger value="script">Sales Script</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="flowaccount">FlowAccount</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="mt-6 max-w-lg">
@@ -52,6 +54,11 @@ function SettingsPage() {
         {isManager && (
           <TabsContent value="script" className="mt-6">
             <SalesScriptTab />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="flowaccount" className="mt-6">
+            <FlowAccountTab />
           </TabsContent>
         )}
       </Tabs>
