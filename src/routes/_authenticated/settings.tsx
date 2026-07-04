@@ -174,3 +174,168 @@ function StagesTab() {
     </div>
   );
 }
+
+interface Template {
+  id: string;
+  stage: string;
+  step_order: number;
+  activity_type: string;
+  subject: string;
+  body_template: string | null;
+  due_hours: number;
+  is_active: boolean;
+}
+
+function SalesScriptTab() {
+  const [rows, setRows] = useState<Template[] | null>(null);
+  const [editing, setEditing] = useState<Record<string, { subject: string; due_hours: number }>>({});
+
+  const load = async () => {
+    const { data, error } = await crmDb()
+      .from("activity_templates")
+      .select("*")
+      .order("stage")
+      .order("step_order");
+    if (error) return toast.error("โหลดไม่สำเร็จ", { description: error.message });
+    setRows((data ?? []) as Template[]);
+  };
+  useEffect(() => { load(); }, []);
+
+  const saveRow = async (id: string) => {
+    const patch = editing[id];
+    if (!patch) return;
+    const { error } = await crmDb().from("activity_templates").update(patch).eq("id", id);
+    if (error) return toast.error("บันทึกไม่สำเร็จ", { description: error.message });
+    toast.success("บันทึกแล้ว");
+    setEditing((e) => { const n = { ...e }; delete n[id]; return n; });
+    load();
+  };
+
+  const toggleActive = async (t: Template) => {
+    const { error } = await crmDb().from("activity_templates").update({ is_active: !t.is_active }).eq("id", t.id);
+    if (error) return toast.error("อัปเดตไม่สำเร็จ", { description: error.message });
+    load();
+  };
+
+  const addStep = async (stage: string) => {
+    const inStage = (rows ?? []).filter((r) => r.stage === stage);
+    const nextOrder = inStage.length ? Math.max(...inStage.map((r) => r.step_order)) + 1 : 1;
+    const { error } = await crmDb().from("activity_templates").insert({
+      stage,
+      step_order: nextOrder,
+      activity_type: "call",
+      subject: "งานใหม่",
+      due_hours: 24,
+      is_active: true,
+    });
+    if (error) return toast.error("เพิ่มไม่สำเร็จ", { description: error.message });
+    load();
+  };
+
+  if (!rows) {
+    return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+  }
+
+  const allStages = [...ACTIVE_STAGES, ...OUTCOME_STAGES];
+  const byStage: Record<string, Template[]> = {};
+  for (const s of allStages) byStage[s] = [];
+  for (const r of rows) {
+    if (!byStage[r.stage]) byStage[r.stage] = [];
+    byStage[r.stage].push(r);
+  }
+
+  return (
+    <div className="space-y-5">
+      {allStages.map((stage) => {
+        const list = byStage[stage] ?? [];
+        return (
+          <div key={stage} className="rounded-xl border bg-card">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className={`stage-badge-${stage as LeadStage} text-[10px]`}>
+                  {STAGE_LABEL_TH[stage as LeadStage]}
+                </Badge>
+                <span className="text-xs text-muted-foreground">{list.length} step</span>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => addStep(stage)}>
+                <Plus className="mr-1 h-4 w-4" /> เพิ่ม step
+              </Button>
+            </div>
+            {list.length === 0 ? (
+              <div className="px-4 py-6 text-center text-xs text-muted-foreground">ยังไม่มี step</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-muted-foreground">
+                    <th className="px-4 py-2 font-medium">#</th>
+                    <th className="px-4 py-2 font-medium">ประเภท</th>
+                    <th className="px-4 py-2 font-medium">หัวข้อ</th>
+                    <th className="px-4 py-2 font-medium">กำหนด (ชม.)</th>
+                    <th className="px-4 py-2 font-medium">ใช้งาน</th>
+                    <th className="px-4 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map((t) => {
+                    const draft = editing[t.id];
+                    const isEditing = !!draft;
+                    return (
+                      <tr key={t.id} className="border-b last:border-0">
+                        <td className="px-4 py-2 text-xs text-muted-foreground">{t.step_order}</td>
+                        <td className="px-4 py-2 text-xs">
+                          {ACTIVITY_TYPE_LABEL[t.activity_type as ActivityType] ?? t.activity_type}
+                        </td>
+                        <td className="px-4 py-2">
+                          {isEditing ? (
+                            <Input
+                              className="h-8"
+                              value={draft.subject}
+                              onChange={(e) => setEditing((s) => ({ ...s, [t.id]: { ...draft, subject: e.target.value } }))}
+                            />
+                          ) : (
+                            <button
+                              onClick={() => setEditing((s) => ({ ...s, [t.id]: { subject: t.subject, due_hours: t.due_hours } }))}
+                              className="text-left text-sm hover:underline"
+                            >
+                              {t.subject}
+                            </button>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              className="h-8 w-20"
+                              value={draft.due_hours}
+                              onChange={(e) => setEditing((s) => ({ ...s, [t.id]: { ...draft, due_hours: Number(e.target.value) } }))}
+                            />
+                          ) : (
+                            <span className="text-xs">{t.due_hours}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          <Switch checked={t.is_active} onCheckedChange={() => toggleActive(t)} />
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          {isEditing && (
+                            <div className="flex justify-end gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => setEditing((s) => { const n = { ...s }; delete n[t.id]; return n; })}>ยกเลิก</Button>
+                              <Button size="sm" onClick={() => saveRow(t.id)}>บันทึก</Button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        );
+      })}
+      {/* Suppress unused warning */}
+      <span className="hidden">{ACTIVITY_TYPES.length}</span>
+    </div>
+  );
+}
+
