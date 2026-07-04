@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -12,11 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/lib/auth-context";
 import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type LeadStage, type UserProfile } from "@/lib/crm";
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABEL, type ActivityType } from "@/lib/activities";
-import { Plus, UserPlus } from "lucide-react";
+import { Plus, UserPlus, Trash2 } from "lucide-react";
 import { InviteUserModal } from "@/components/InviteUserModal";
 import { FlowAccountTab } from "@/components/settings/FlowAccountTab";
 import { EmailConfigTab } from "@/components/settings/EmailConfigTab";
 import { LineOATab } from "@/components/settings/LineOATab";
+import { deactivateCrmUser } from "@/lib/invite-user.functions";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -124,6 +127,9 @@ function ProfileTab() {
 function TeamTab() {
   const [rows, setRows] = useState<UserProfile[] | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const { user } = useAuth();
+  const confirm = useConfirm();
+  const deactivate = useServerFn(deactivateCrmUser);
 
   const load = async () => {
     const { data } = await crmDb().from("user_profiles").select("*").order("full_name");
@@ -136,6 +142,24 @@ function TeamTab() {
     if (error) return toast.error("อัปเดตไม่สำเร็จ", { description: error.message });
     toast.success("อัปเดตแล้ว");
     load();
+  };
+
+  const handleDelete = async (u: UserProfile) => {
+    if (u.id === user?.id) return;
+    const confirmed = await confirm({
+      title: `ยืนยันลบ ${u.full_name ?? "ผู้ใช้"} ออกจากระบบ?`,
+      variant: "danger",
+      confirmLabel: "ลบ",
+      cancelLabel: "ยกเลิก",
+    });
+    if (!confirmed) return;
+    try {
+      await deactivate({ data: { user_id: u.id } });
+      toast.success("ลบผู้ใช้แล้ว");
+      load();
+    } catch (err: any) {
+      toast.error("ลบไม่สำเร็จ", { description: err?.message ?? "ลองใหม่อีกครั้ง" });
+    }
   };
 
   if (!rows) {
@@ -180,6 +204,17 @@ function TeamTab() {
                 <div className="flex items-center gap-2">
                   <Switch checked={u.is_active} onCheckedChange={(v) => updateRow(u.id, { is_active: v })} />
                   <span className="text-xs text-muted-foreground">{u.is_active ? "ใช้งาน" : "ปิด"}</span>
+                  {user?.id !== u.id && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="ml-1 h-7 w-7 text-muted-foreground hover:text-red-600"
+                      onClick={() => handleDelete(u)}
+                      title="ลบผู้ใช้"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </td>
             </tr>
