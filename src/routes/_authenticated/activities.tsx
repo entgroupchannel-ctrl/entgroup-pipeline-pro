@@ -158,7 +158,7 @@ function ActivitiesPage() {
         </ul>
       )}
 
-      <LeadDetailSheet leadId={selectedLeadId} onClose={() => setSelectedLeadId(null)} onChanged={load} />
+      
     </div>
   );
 }
