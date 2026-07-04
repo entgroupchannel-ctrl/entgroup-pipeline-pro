@@ -395,8 +395,8 @@ function Column({
                 lead={l}
                 onClick={() => onCardClick(l.id)}
                 draggable
-                onDelete={() => deleteLead(l.id)}
-                onDuplicate={() => duplicateLead(l)}
+                onDelete={() => onDelete(l.id)}
+                onDuplicate={() => onDuplicate(l)}
               />
             </div>
           ))
