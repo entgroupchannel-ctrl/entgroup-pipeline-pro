@@ -454,8 +454,8 @@ export function LineOATab() {
                     <p className="text-xs text-muted-foreground font-mono">{m.line_uid}</p>
                   </td>
                   <td className="px-5 py-3">
-                    <p>{m.contact?.company_name ?? "—"}</p>
-                    <p className="text-xs text-muted-foreground">{m.contact?.contact_name}</p>
+                    <p>{m.contact?.contact_name ?? "—"}</p>
+                    <p className="text-xs text-muted-foreground font-mono text-[10px]">{m.contact?.id?.slice(0, 8)}…</p>
                   </td>
                   <td className="px-5 py-3 text-xs text-muted-foreground">
                     {m.mapper?.full_name ?? "—"}
