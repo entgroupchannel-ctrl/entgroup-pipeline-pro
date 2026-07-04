@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { MonthlyKpiSection } from "@/components/kpi/MonthlyKpiSection";
+import { KpiTemplateManager } from "@/components/kpi/KpiTemplateManager";
 
 export const Route = createFileRoute("/_authenticated/kpi")({
   component: KpiPage,
@@ -144,7 +145,6 @@ function KpiPage() {
   const [loading, setLoading] = useState(true);
   const [setTargetOpen, setSetTargetOpen] = useState(false);
   const [targetUserId, setTargetUserId] = useState<string>("");
-  const [targetSelf, setTargetSelf] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -210,7 +210,7 @@ function KpiPage() {
             <p className="text-xs text-muted-foreground">วันนี้ / สัปดาห์นี้ / เดือนนี้</p>
           </div>
           {isManager && (
-            <Button size="sm" variant="outline" onClick={() => { setTargetSelf(true); setSetTargetOpen(true); }}>
+            <Button size="sm" variant="outline" onClick={() => { setTargetUserId(user?.id ?? ""); setSetTargetOpen(true); }}>
               ตั้งเป้าหมายตัวเอง
             </Button>
           )}
@@ -245,7 +245,7 @@ function KpiPage() {
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Trophy className="h-5 w-5 text-amber-500" /> Leaderboard ทีม
             </h2>
-            <Button size="sm" onClick={() => { setTargetSelf(false); setTargetUserId(""); setSetTargetOpen(true); }}>
+            <Button size="sm" onClick={() => { setTargetUserId(""); setSetTargetOpen(true); }}>
               ตั้งเป้าหมายพนักงาน
             </Button>
           </div>
@@ -361,6 +361,13 @@ function KpiPage() {
         </section>
       )}
 
+      {/* ── Templates (Manager only) ── */}
+      {isManager && (
+        <section className="rounded-xl border bg-card p-5">
+          <KpiTemplateManager />
+        </section>
+      )}
+
       {/* ── Monthly KPI ── */}
       <section className="rounded-xl border bg-card p-5">
         <MonthlyKpiSection focusUserId={isManager ? null : user?.id} />
@@ -370,10 +377,10 @@ function KpiPage() {
       <SetTargetDialog
         open={setTargetOpen}
         onOpenChange={setSetTargetOpen}
-        userId={targetSelf ? user?.id ?? "" : targetUserId}
+        userId={targetUserId}
         profiles={profiles}
-        existing={targets.find((t) => t.user_id === (targetSelf ? user?.id ?? "" : targetUserId)) ?? null}
-        onSaved={() => { setSetTargetOpen(false); setTargetSelf(false); load(); }}
+        existing={targets.find((t) => t.user_id === targetUserId) ?? null}
+        onSaved={() => { setSetTargetOpen(false); load(); }}
       />
     </div>
   );
