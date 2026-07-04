@@ -147,7 +147,7 @@ function TeamTab() {
   const handleDelete = async (u: UserProfile) => {
     if (u.id === user?.id) return;
     const confirmed = await confirm({
-      title: `ยืนยันลบ ${u.full_name ?? u.email ?? "ผู้ใช้"} ออกจากระบบ?`,
+      title: `ยืนยันลบ ${u.full_name ?? "ผู้ใช้"} ออกจากระบบ?`,
       variant: "danger",
       confirmLabel: "ลบ",
       cancelLabel: "ยกเลิก",
