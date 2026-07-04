@@ -2,15 +2,35 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Mail, Sparkles, Send, Loader2, RotateCcw, Search } from "lucide-react";
+import { Mail, Sparkles, Send, Loader2, RotateCcw, Search, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenuSeparator, DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { draftLeadEmail, sendLeadEmail } from "@/lib/lead-email.functions";
+
+const TEMPLATES_KEY = "email_templates";
+type SavedTemplate = { id: string; name: string; subject: string; body: string; created_at: string };
+
+function loadTemplates(): SavedTemplate[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(window.localStorage.getItem(TEMPLATES_KEY) || "[]"); }
+  catch { return []; }
+}
+function saveTemplates(list: SavedTemplate[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list));
+}
 
 export const Route = createFileRoute("/_authenticated/emails")({
   component: EmailsPage,
@@ -48,6 +68,36 @@ function EmailsPage() {
 
   // history
   const [logs, setLogs] = useState<any[]>([]);
+
+  // templates
+  const [templates, setTemplates] = useState<SavedTemplate[]>([]);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [tplName, setTplName] = useState("");
+  useEffect(() => { setTemplates(loadTemplates()); }, []);
+
+  const applyTemplate = (t: SavedTemplate) => {
+    setSubject(t.subject);
+    setBody(t.body);
+    setStep("preview");
+    toast.success(`โหลด template: ${t.name}`);
+  };
+  const deleteTemplate = (id: string) => {
+    const next = templates.filter((t) => t.id !== id);
+    setTemplates(next); saveTemplates(next);
+    toast.success("ลบ template แล้ว");
+  };
+  const confirmSaveTemplate = () => {
+    const name = tplName.trim();
+    if (!name) { toast.error("กรุณาระบุชื่อ template"); return; }
+    if (!subject.trim() || !body.trim()) { toast.error("ยังไม่มีเนื้อหาให้บันทึก"); return; }
+    const next: SavedTemplate[] = [
+      ...templates,
+      { id: crypto.randomUUID(), name, subject: subject.trim(), body: body.trim(), created_at: new Date().toISOString() },
+    ];
+    setTemplates(next); saveTemplates(next);
+    setSaveOpen(false); setTplName("");
+    toast.success("บันทึก template แล้ว ✓");
+  };
 
   const searchContacts = async (q: string) => {
     if (!q.trim()) { setContacts([]); return; }
@@ -262,6 +312,48 @@ function EmailsPage() {
             {/* Step preview */}
             {step === "preview" && (
               <>
+                {/* Template picker */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">Template ที่บันทึกไว้</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-7 text-xs">
+                        📋 เลือก Template
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-72">
+                      <DropdownMenuLabel className="text-xs">Templates ({templates.length})</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {templates.length === 0 ? (
+                        <div className="px-2 py-3 text-xs text-muted-foreground">ยังไม่มี template ที่บันทึก</div>
+                      ) : (
+                        templates.map((t) => (
+                          <DropdownMenuItem
+                            key={t.id}
+                            onSelect={(e) => e.preventDefault()}
+                            className="flex items-center justify-between gap-2"
+                          >
+                            <button
+                              className="flex-1 text-left min-w-0"
+                              onClick={() => applyTemplate(t)}
+                            >
+                              <div className="text-sm truncate">{t.name}</div>
+                              <div className="text-[10px] text-muted-foreground truncate">{t.subject}</div>
+                            </button>
+                            <button
+                              className="text-muted-foreground hover:text-destructive shrink-0"
+                              onClick={() => deleteTemplate(t.id)}
+                              aria-label="ลบ template"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
                 <div className="space-y-1.5">
                   <Label>หัวเรื่อง</Label>
                   <Input value={subject} onChange={(e) => setSubject(e.target.value)} className="text-sm" />
@@ -269,12 +361,21 @@ function EmailsPage() {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <Label>เนื้อหา</Label>
-                    <button
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                      onClick={() => setStep("compose")}
-                    >
-                      <RotateCcw className="h-3 w-3" /> ร่างใหม่
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setSaveOpen(true)}
+                        disabled={!subject.trim() || !body.trim()}
+                      >
+                        <Save className="h-3 w-3" /> 💾 บันทึกเป็น Template
+                      </button>
+                      <button
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setStep("compose")}
+                      >
+                        <RotateCcw className="h-3 w-3" /> ร่างใหม่
+                      </button>
+                    </div>
                   </div>
                   <Textarea
                     value={body}
@@ -337,6 +438,30 @@ function EmailsPage() {
           )}
         </div>
       </div>
+
+      {/* Save template dialog */}
+      <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>บันทึกเป็น Template</DialogTitle>
+            <DialogDescription>ตั้งชื่อ template เพื่อเรียกใช้ในภายหลัง</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label className="text-xs">ชื่อ Template</Label>
+            <Input
+              value={tplName}
+              onChange={(e) => setTplName(e.target.value)}
+              placeholder="เช่น ติดตามหลังนำเสนอ"
+              onKeyDown={(e) => { if (e.key === "Enter") confirmSaveTemplate(); }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveOpen(false)}>ยกเลิก</Button>
+            <Button onClick={confirmSaveTemplate}>บันทึก</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
