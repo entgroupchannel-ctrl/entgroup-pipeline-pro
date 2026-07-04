@@ -69,6 +69,36 @@ function EmailsPage() {
   // history
   const [logs, setLogs] = useState<any[]>([]);
 
+  // templates
+  const [templates, setTemplates] = useState<SavedTemplate[]>([]);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [tplName, setTplName] = useState("");
+  useEffect(() => { setTemplates(loadTemplates()); }, []);
+
+  const applyTemplate = (t: SavedTemplate) => {
+    setSubject(t.subject);
+    setBody(t.body);
+    setStep("preview");
+    toast.success(`โหลด template: ${t.name}`);
+  };
+  const deleteTemplate = (id: string) => {
+    const next = templates.filter((t) => t.id !== id);
+    setTemplates(next); saveTemplates(next);
+    toast.success("ลบ template แล้ว");
+  };
+  const confirmSaveTemplate = () => {
+    const name = tplName.trim();
+    if (!name) { toast.error("กรุณาระบุชื่อ template"); return; }
+    if (!subject.trim() || !body.trim()) { toast.error("ยังไม่มีเนื้อหาให้บันทึก"); return; }
+    const next: SavedTemplate[] = [
+      ...templates,
+      { id: crypto.randomUUID(), name, subject: subject.trim(), body: body.trim(), created_at: new Date().toISOString() },
+    ];
+    setTemplates(next); saveTemplates(next);
+    setSaveOpen(false); setTplName("");
+    toast.success("บันทึก template แล้ว ✓");
+  };
+
   const searchContacts = async (q: string) => {
     if (!q.trim()) { setContacts([]); return; }
     setSearching(true);
