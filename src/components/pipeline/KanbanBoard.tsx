@@ -424,6 +424,10 @@ function Column({
   onDuplicate,
   lineUnreadCounts,
   onLineBadgeClear,
+  showClaimButton,
+  currentUserId,
+  onClaim,
+  linePreviews,
 }: {
   stage: LeadStage;
   leads: LeadWithRelations[];
@@ -435,7 +439,12 @@ function Column({
   onDuplicate: (lead: LeadWithRelations) => void;
   lineUnreadCounts?: Record<string, number>;
   onLineBadgeClear?: (leadId: string) => void;
+  showClaimButton?: boolean;
+  currentUserId?: string;
+  onClaim?: () => void;
+  linePreviews?: Record<string, string>;
 }) {
+
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 10;
