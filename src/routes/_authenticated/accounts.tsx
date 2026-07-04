@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Search, Plus, Building2, Star, Crown , Trash2} from "lucide-react";
+import { Loader2, Search, Plus, Building2, Star, Crown, Trash2, Download } from "lucide-react";
 import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
 import { exportToCsv, accountsToRows } from "@/lib/export-csv";
 import { Checkbox } from "@/components/ui/checkbox";
