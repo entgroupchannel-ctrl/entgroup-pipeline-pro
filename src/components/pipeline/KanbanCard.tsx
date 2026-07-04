@@ -88,17 +88,16 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
   return (
     <div
       ref={setNodeRef}
+      {...attributes}
+      {...listeners}
       onClick={onClick}
-      className="group cursor-pointer rounded-lg border bg-card p-3 shadow-sm transition-all hover:shadow-md hover:border-primary/30 select-none"
+      className="group cursor-pointer rounded-lg border bg-card p-3 shadow-sm transition-all hover:shadow-md hover:border-primary/30 select-none touch-none"
     >
       {/* Title row with drag handle + 3-dot menu */}
       <div className="flex items-start justify-between gap-1 -mr-1">
-        {/* Drag handle — only this area triggers drag */}
+        {/* Drag handle visual affordance (whole card is draggable) */}
         <div
-          {...attributes}
-          {...listeners}
-          onClick={(e) => e.stopPropagation()}
-          className="mt-0.5 shrink-0 cursor-grab touch-none text-muted-foreground/40 hover:text-muted-foreground active:cursor-grabbing"
+          className="mt-0.5 shrink-0 cursor-grab text-muted-foreground/40 hover:text-muted-foreground active:cursor-grabbing"
           title="ลาก"
         >
           <GripVertical className="h-4 w-4" />
