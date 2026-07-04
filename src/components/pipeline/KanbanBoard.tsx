@@ -36,9 +36,16 @@ interface LeadWithRelations extends Lead {
   nextActivity?: Activity | null;
 }
 
-export function KanbanBoard() {
+interface KanbanBoardProps {
+  sourceFilter?: "all" | "line";
+  showClaimButton?: boolean;
+}
+
+export function KanbanBoard({ sourceFilter = "all", showClaimButton = false }: KanbanBoardProps = {}) {
   const { user } = useAuth();
   const [leads, setLeads] = useState<LeadWithRelations[]>([]);
+  const [linePreviews, setLinePreviews] = useState<Record<string, string>>({});
+  const [lineSubFilter, setLineSubFilter] = useState<"all" | "unclaimed" | "mine">("all");
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -50,6 +57,7 @@ export function KanbanBoard() {
   const [lastSync, setLastSync] = useState<string | null>(null);
   const refreshSync = () => fetchFALastSync().then(setLastSync).catch(() => {});
   const { unreadCounts, latestMessage, clearBadge } = useLineRealtime();
+
 
   useEffect(() => {
     if (!latestMessage) return;
