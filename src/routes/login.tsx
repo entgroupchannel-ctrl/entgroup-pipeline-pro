@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import fujiHero from "@/assets/fuji-hero.jpg";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
