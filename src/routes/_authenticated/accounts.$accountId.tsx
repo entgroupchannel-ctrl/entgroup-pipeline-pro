@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft, Building2, Loader2, Plus, Save, ExternalLink, Phone, Mail, MessageCircle, Trash2,
+  ArrowLeft, Building2, Loader2, Plus, Save, ExternalLink, Phone, Mail, MessageCircle, Trash2, Crown,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,8 @@ interface Account {
   phone: string | null;
   address: string | null;
   owner_id: string | null;
+  is_key_account: boolean;
+  key_account_note: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -66,6 +69,7 @@ function AccountDetailPage() {
 
   const [form, setForm] = useState({
     name: "", industry: "", website: "", phone: "", address: "",
+    is_key_account: false, key_account_note: "",
   });
 
   const load = async () => {
@@ -90,6 +94,8 @@ function AccountDetailPage() {
       website: acc.website ?? "",
       phone: acc.phone ?? "",
       address: acc.address ?? "",
+      is_key_account: acc.is_key_account ?? false,
+      key_account_note: acc.key_account_note ?? "",
     });
     setLoading(false);
   };
@@ -105,6 +111,8 @@ function AccountDetailPage() {
       website: form.website.trim() || null,
       phone: form.phone.trim() || null,
       address: form.address.trim() || null,
+      is_key_account: form.is_key_account,
+      key_account_note: form.key_account_note.trim() || null,
     }).eq("id", accountId);
     setSaving(false);
     if (error) return toast.error("บันทึกไม่สำเร็จ", { description: error.message });
@@ -141,6 +149,11 @@ function AccountDetailPage() {
           <div className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-muted-foreground" />
             <h1 className="text-lg font-semibold">{account.name}</h1>
+            {form.is_key_account && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                <Crown className="h-3 w-3" /> Key Account
+              </span>
+            )}
           </div>
           {account.industry && (
             <Badge variant="secondary" className="text-xs">{account.industry}</Badge>
@@ -202,6 +215,25 @@ function AccountDetailPage() {
             <div>
               <Label className="text-xs">ที่อยู่</Label>
               <Input placeholder="ที่อยู่บริษัท" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} onBlur={save} />
+            </div>
+            <div className="border-t pt-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <Crown className="h-3.5 w-3.5 text-amber-500" /> Key Account (VIP)
+                </Label>
+                <Switch
+                  checked={form.is_key_account}
+                  onCheckedChange={(v) => { setForm({ ...form, is_key_account: v }); }}
+                />
+              </div>
+              {form.is_key_account && (
+                <input
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                  placeholder="หมายเหตุ Key Account (optional)"
+                  value={form.key_account_note}
+                  onChange={(e) => setForm({ ...form, key_account_note: e.target.value })}
+                />
+              )}
             </div>
             <div className="pt-1 text-[11px] text-muted-foreground">
               สร้างเมื่อ {formatThaiDate(account.created_at)}
