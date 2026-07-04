@@ -19,6 +19,10 @@ import {
   ACTIVITY_TYPES, ACTIVITY_TYPE_LABEL, activityIcon, formatThaiDate,
   type Activity, type ActivityType,
 } from "@/lib/activities";
+import { formatThaiDate as formatThaiDay } from "@/lib/format";
+import { fetchFADocument, type FADocument } from "@/lib/flowaccount-client";
+import { FAImportModal } from "@/components/flowaccount/FAImportModal";
+import { X as XIcon, FileDown } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/leads/$leadId")({
   component: LeadDetailPage,
@@ -45,6 +49,8 @@ function LeadDetailPage() {
   const [qtEditing, setQtEditing] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [chatterText, setChatterText] = useState("");
+  const [faDoc, setFaDoc] = useState<FADocument | null>(null);
+  const [faImportOpen, setFaImportOpen] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
@@ -96,7 +102,20 @@ function LeadDetailPage() {
       owner_id: leadData.owner_id ?? "",
       stage_changed_at: leadData.updated_at ?? leadData.created_at ?? "",
     });
+    if (leadData.fa_inbound_id) {
+      fetchFADocument(leadData.fa_inbound_id).then(setFaDoc);
+    } else {
+      setFaDoc(null);
+    }
     setLoading(false);
+  };
+
+  const unlinkFA = async () => {
+    if (!lead) return;
+    const { error } = await crmDb().from("leads").update({ fa_inbound_id: null }).eq("id", lead.id);
+    if (error) return toast.error("ยกเลิก link ไม่สำเร็จ", { description: error.message });
+    toast.success("ยกเลิก link แล้ว");
+    load();
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [leadId]);
@@ -364,12 +383,41 @@ function LeadDetailPage() {
           {/* FlowAccount */}
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
             <div className="mb-2 flex items-center justify-between">
-              <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">FlowAccount ใบเสนอราคา</div>
-              {!qtEditing && (
-                <Button variant="ghost" size="sm" onClick={() => setQtEditing(true)}>แก้ไข</Button>
+              <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">FlowAccount</div>
+              {!lead.fa_inbound_id && !qtEditing && (
+                <Button variant="ghost" size="sm" onClick={() => setQtEditing(true)}>แก้ไขด้วยตนเอง</Button>
               )}
             </div>
-            {qtEditing ? (
+
+            {lead.fa_inbound_id && faDoc ? (
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-sm font-semibold text-amber-900 dark:text-amber-100">
+                      {faDoc.document_serial}
+                    </div>
+                    <div className="text-xs text-amber-800/80 dark:text-amber-300/80">
+                      {faDoc.contact_name ?? "-"} · {formatBaht(Number(faDoc.grand_total ?? 0))}
+                      {faDoc.published_on ? ` · ${formatThaiDay(faDoc.published_on)}` : ""}
+                      {faDoc.status_string ? ` · สถานะ: ${faDoc.status_string}` : ""}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`https://app.flowaccount.com/document/${faDoc.document_serial}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-700"
+                  >
+                    ดูใน FlowAccount <ExternalLink className="h-3 w-3" />
+                  </a>
+                  <Button variant="ghost" size="sm" onClick={unlinkFA}>
+                    <XIcon className="mr-1 h-3 w-3" /> ยกเลิก link
+                  </Button>
+                </div>
+              </div>
+            ) : qtEditing ? (
               <div className="space-y-2">
                 <Input
                   value={form.flowaccount_quotation_no}
@@ -409,9 +457,16 @@ function LeadDetailPage() {
                 )}
               </div>
             ) : (
-              <p className="text-xs text-amber-800/80 dark:text-amber-300/80">ยังไม่มีใบเสนอราคา</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-amber-800/80 dark:text-amber-300/80">ยังไม่มีใบเสนอราคา</p>
+                <Button size="sm" variant="outline" onClick={() => setFaImportOpen(true)}>
+                  <FileDown className="mr-1 h-3.5 w-3.5" /> Import จาก FlowAccount
+                </Button>
+              </div>
             )}
           </div>
+
+          <FAImportModal open={faImportOpen} onOpenChange={setFaImportOpen} onImported={load} />
 
           <Section title="บริษัทและผู้ติดต่อ">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

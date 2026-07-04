@@ -18,9 +18,13 @@ import { formatBaht } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { KanbanCard } from "./KanbanCard";
 import { NewLeadDialog } from "./NewLeadDialog";
-import { FlowAccountImportDialog } from "./FlowAccountImportDialog";
+import { FAImportModal } from "@/components/flowaccount/FAImportModal";
+import { fetchFALastSync } from "@/lib/flowaccount-client";
+import { formatThaiDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { RefreshCw } from "lucide-react";
 
 import type { Activity } from "@/lib/activities";
 
@@ -40,6 +44,8 @@ export function KanbanBoard() {
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [overdueCount, setOverdueCount] = useState(0);
+  const [lastSync, setLastSync] = useState<string | null>(null);
+  const refreshSync = () => fetchFALastSync().then(setLastSync).catch(() => {});
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -81,6 +87,7 @@ export function KanbanBoard() {
 
   useEffect(() => {
     loadLeads();
+    refreshSync();
 
     const channel = supabase
       .channel("crm-leads-board")
@@ -161,6 +168,23 @@ export function KanbanBoard() {
         <div className="min-w-0">
           <h1 className="text-xl font-semibold">Pipeline</h1>
           <p className="text-xs text-muted-foreground">ลาก-วาง หรือกด <kbd className="rounded border bg-muted px-1 text-[10px]">N</kbd> เพื่อเพิ่มดีลใหม่</p>
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span>Last synced: {lastSync ? formatThaiDate(lastSync) : "—"}</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={refreshSync}
+                    className="inline-flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted"
+                  >
+                    <RefreshCw className="h-3 w-3" /> Refresh
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>ข้อมูลอัปเดตจาก floworder.me อัตโนมัติ</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
@@ -267,7 +291,7 @@ export function KanbanBoard() {
 
       
       <NewLeadDialog open={newLeadOpen} onOpenChange={setNewLeadOpen} onCreated={loadLeads} />
-      <FlowAccountImportDialog open={importOpen} onOpenChange={setImportOpen} onCreated={loadLeads} />
+      <FAImportModal open={importOpen} onOpenChange={setImportOpen} onImported={() => { loadLeads(); refreshSync(); }} />
     </div>
   );
 }
