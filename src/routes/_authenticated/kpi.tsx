@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
+import { MonthlyKpiSection } from "@/components/kpi/MonthlyKpiSection";
 
 export const Route = createFileRoute("/_authenticated/kpi")({
   component: KpiPage,
@@ -358,6 +359,11 @@ function KpiPage() {
           </div>
         </section>
       )}
+
+      {/* ── Monthly KPI ── */}
+      <section className="rounded-xl border bg-card p-5">
+        <MonthlyKpiSection focusUserId={isManager ? null : user?.id} />
+      </section>
 
       {/* ── Set Target Dialog ── */}
       <SetTargetDialog
