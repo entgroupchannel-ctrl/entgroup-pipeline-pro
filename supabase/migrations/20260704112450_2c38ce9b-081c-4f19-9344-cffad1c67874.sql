@@ -1,0 +1,1 @@
+ALTER VIEW crm.flowaccount_documents SET (security_invoker = true);
