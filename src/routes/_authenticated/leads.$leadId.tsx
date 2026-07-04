@@ -16,9 +16,13 @@ import { crmDb, ACTIVE_STAGES, STAGE_LABEL_TH, type LeadStage } from "@/lib/crm"
 import { formatBaht } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import {
-  ACTIVITY_TYPES, ACTIVITY_TYPE_LABEL, activityIcon, formatThaiDate,
+  ACTIVITY_TYPES, ACTIVITY_TYPE_LABEL, activityIcon, formatThaiDate as formatThaiDateTime,
   type Activity, type ActivityType,
 } from "@/lib/activities";
+import { formatThaiDate } from "@/lib/format";
+import { fetchFADocument, type FADocument } from "@/lib/flowaccount-client";
+import { FAImportModal } from "@/components/flowaccount/FAImportModal";
+import { X as XIcon } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/leads/$leadId")({
   component: LeadDetailPage,
