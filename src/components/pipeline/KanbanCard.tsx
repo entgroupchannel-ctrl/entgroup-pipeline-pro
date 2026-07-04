@@ -94,12 +94,20 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
     if (error) toast.error("บันทึก priority ไม่สำเร็จ");
   };
 
+  const dndPointerDown = (listeners as any)?.onPointerDown as
+    | ((e: any) => void)
+    | undefined;
+
+
   return (
     <div
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      onPointerDown={(e) => { downRef.current = { x: e.clientX, y: e.clientY }; }}
+      onPointerDown={(e) => {
+        downRef.current = { x: e.clientX, y: e.clientY };
+        dndPointerDown?.(e); // preserve dnd-kit activator
+      }}
       onPointerUp={(e) => {
         const d = downRef.current;
         downRef.current = null;
@@ -110,6 +118,7 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
       }}
       className="group cursor-pointer rounded-lg border bg-card p-3 shadow-sm transition-all hover:shadow-md hover:border-primary/30 select-none touch-none"
     >
+
       {/* Title row with drag handle + 3-dot menu */}
       <div className="flex items-start justify-between gap-1 -mr-1">
         {/* Drag handle visual affordance (whole card is draggable) */}
