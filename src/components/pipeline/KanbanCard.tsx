@@ -2,9 +2,9 @@ import { useDraggable } from "@dnd-kit/core";
 import { Clock, FileText } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { formatBaht, daysBetween } from "@/lib/format";
+import { formatBaht, daysBetween, timeFromNow, isOverdue } from "@/lib/format";
 import { STAGE_LABEL_TH, type Lead, type LeadStage } from "@/lib/crm";
-import { activityIcon, timeFromNow, type Activity } from "@/lib/activities";
+import { activityIcon, type Activity } from "@/lib/activities";
 
 interface Props {
   lead: Lead & {
