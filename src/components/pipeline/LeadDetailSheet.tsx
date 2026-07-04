@@ -38,29 +38,43 @@ export function LeadDetailSheet({ leadId, onClose, onChanged }: Props) {
       return;
     }
     setLoading(true);
-    crmDb()
-      .from("leads")
-      .select("*, account:accounts(id,name), contact:contacts(id,name,phone,line_id)")
-      .eq("id", leadId)
-      .maybeSingle()
-      .then(({ data, error }: any) => {
-        if (error) {
-          toast.error("โหลดดีลไม่สำเร็จ", { description: error.message });
-        } else if (data) {
-          setLead(data);
-          setForm({
-            title: data.title ?? "",
-            expected_value: data.expected_value != null ? String(data.expected_value) : "",
-            expected_close_date: data.expected_close_date ?? "",
-            flowaccount_quotation_no: data.flowaccount_quotation_no ?? "",
-            flowaccount_quotation_url: data.flowaccount_quotation_url ?? "",
-            stage: (data.stage as LeadStage) ?? "new",
-            lost_reason: data.lost_reason ?? "",
-            source: data.source ?? "",
-          });
-        }
+    (async () => {
+      const { data: leadData, error } = await crmDb()
+        .from("leads")
+        .select("*")
+        .eq("id", leadId)
+        .maybeSingle();
+      if (error) {
+        toast.error("โหลดดีลไม่สำเร็จ", { description: error.message });
         setLoading(false);
+        return;
+      }
+      if (!leadData) {
+        setLoading(false);
+        return;
+      }
+      const [accountRes, contactRes] = await Promise.all([
+        leadData.account_id
+          ? crmDb().from("accounts").select("id,name").eq("id", leadData.account_id).maybeSingle()
+          : Promise.resolve({ data: null } as any),
+        leadData.contact_id
+          ? crmDb().from("contacts").select("id,name,phone,line_id").eq("id", leadData.contact_id).maybeSingle()
+          : Promise.resolve({ data: null } as any),
+      ]);
+      const data: any = { ...leadData, account: accountRes.data ?? null, contact: contactRes.data ?? null };
+      setLead(data);
+      setForm({
+        title: data.title ?? "",
+        expected_value: data.expected_value != null ? String(data.expected_value) : "",
+        expected_close_date: data.expected_close_date ?? "",
+        flowaccount_quotation_no: data.flowaccount_quotation_no ?? "",
+        flowaccount_quotation_url: data.flowaccount_quotation_url ?? "",
+        stage: (data.stage as LeadStage) ?? "new",
+        lost_reason: data.lost_reason ?? "",
+        source: data.source ?? "",
       });
+      setLoading(false);
+    })();
   }, [leadId]);
 
   const save = async () => {
