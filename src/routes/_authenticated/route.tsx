@@ -45,14 +45,14 @@ function AuthenticatedLayout() {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-muted/20">
+      <div className="flex min-h-screen w-full min-w-0 bg-muted/20">
         <AppSidebar />
-        <SidebarInset className="flex flex-1 flex-col">
+        <SidebarInset className="flex min-w-0 flex-1 flex-col">
           <header className="flex h-14 items-center gap-2 border-b bg-background px-4">
             <SidebarTrigger />
             <div className="ml-2 text-sm font-medium text-muted-foreground">ENTGROUP CRM</div>
           </header>
-          <main className="flex-1 overflow-auto">
+          <main className="min-w-0 flex-1 overflow-auto">
             <Outlet />
           </main>
         </SidebarInset>
