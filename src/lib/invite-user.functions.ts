@@ -16,10 +16,12 @@ async function assertAdmin(userId: string) {
   } catch { /* fall through */ }
   // check crm.user_profiles role
   const { data, error } = await supabaseAdmin
+    .schema("crm" as any)
     .from("user_profiles" as any)
     .select("role")
     .eq("id", userId)
     .maybeSingle();
+
   if (error) throw new Error(error.message);
   const role = (data as any)?.role ?? "";
   if (role !== "admin") throw new Error("Forbidden: admin only");
@@ -62,7 +64,9 @@ export const inviteCrmUser = createServerFn({ method: "POST" })
 
     // upsert crm.user_profiles
     const { error: profileErr } = await supabaseAdmin
+      .schema("crm" as any)
       .from("user_profiles" as any)
+
       .upsert({
         id: existing.id,
         full_name: data.full_name ?? null,
@@ -171,7 +175,9 @@ export const deactivateCrmUser = createServerFn({ method: "POST" })
     if (data.user_id === context.userId) throw new Error("ปิดบัญชีตัวเองไม่ได้");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
+      .schema("crm" as any)
       .from("user_profiles" as any)
+
       .update({ is_active: false })
       .eq("id", data.user_id);
     if (error) throw new Error(error.message);
