@@ -246,7 +246,7 @@ export function KanbanBoard() {
                   {list.slice(0, 3).map((l) => (
                     <button
                       key={l.id}
-                      onClick={() => setSelectedLeadId(l.id)}
+                      onClick={() => openLead(l.id)}
                       className="w-full rounded-md bg-background/70 px-3 py-2 text-left text-sm hover:bg-background"
                     >
                       <div className="truncate font-medium">{l.title}</div>
