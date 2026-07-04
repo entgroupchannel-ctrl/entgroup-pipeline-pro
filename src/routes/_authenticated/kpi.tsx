@@ -370,10 +370,10 @@ function KpiPage() {
       <SetTargetDialog
         open={setTargetOpen}
         onOpenChange={setSetTargetOpen}
-        userId={targetUserId}
+        userId={targetSelf ? user?.id ?? "" : targetUserId}
         profiles={profiles}
-        existing={targets.find((t) => t.user_id === targetUserId) ?? null}
-        onSaved={() => { setSetTargetOpen(false); load(); }}
+        existing={targets.find((t) => t.user_id === (targetSelf ? user?.id ?? "" : targetUserId)) ?? null}
+        onSaved={() => { setSetTargetOpen(false); setTargetSelf(false); load(); }}
       />
     </div>
   );
