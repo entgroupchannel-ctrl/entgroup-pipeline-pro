@@ -109,11 +109,11 @@ export const inviteCrmUser = createServerFn({ method: "POST" })
 
     const displayName = data.full_name ?? data.email;
     const subject = mode === "invite"
-      ? `คำเชิญเข้าใช้งาน ${COMPANY_NAME} CRM`
-      : `เข้าใช้งาน ${COMPANY_NAME} CRM`;
+      ? `คำเชิญเข้าใช้งาน ${cfg.company} CRM`
+      : `เข้าใช้งาน ${cfg.company} CRM`;
     const html = `
       <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
-        <h2 style="margin:0 0 12px">คำเชิญเข้าใช้งาน ${COMPANY_NAME} CRM</h2>
+        <h2 style="margin:0 0 12px">คำเชิญเข้าใช้งาน ${cfg.company} CRM</h2>
         <p style="margin:0 0 8px">สวัสดี ${displayName}</p>
         <p style="margin:0 0 16px">คุณได้รับสิทธิ์เข้าใช้งานระบบ CRM ในบทบาท <strong>${data.role}</strong></p>
         <p style="margin:24px 0">
@@ -129,11 +129,11 @@ export const inviteCrmUser = createServerFn({ method: "POST" })
     const resendResp = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
+        Authorization: `Bearer ${cfg.key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: `${COMPANY_NAME} CRM <${FROM_EMAIL}>`,
+        from: `${cfg.company} CRM <${cfg.fromEmail}>`,
         to: [data.email],
         subject,
         html,
