@@ -1,23 +1,27 @@
-## Problem
-After making the entire card draggable (dnd-kit `listeners` on the root `<div>`), clicking a card no longer opens the lead detail page. Root cause: attaching drag `listeners` and `onClick` to the same element is unreliable — dnd-kit's `PointerSensor` activator captures pointer events on the root, and even below the 6px activation threshold the resulting click can be swallowed / not fire consistently (especially after any tiny pointer jitter). This is the classic dnd-kit "draggable + clickable on the same node" gotcha.
+## Root cause
+`src/routes/_authenticated/leads.tsx` is registered as the route `/_authenticated/leads`. Because of TanStack Router's dot-nesting, `leads.$leadId.tsx` becomes a **child** of `leads.tsx`. When navigating to `/leads/<id>`:
+
+1. Row click fires and URL updates to `/leads/<id>` (verified — this works).
+2. Router mounts the parent `leads.tsx` (the list page).
+3. Router tries to mount the child `leads.$leadId.tsx` inside the parent's `<Outlet />`.
+4. `leads.tsx` never renders `<Outlet />`, so the detail component never mounts and no lead fetch is issued.
+
+Net effect: the URL is right but the detail page never appears — looking exactly like "clicking rows does nothing". Confirmed by empty `document.body` text and zero network calls for `id=eq.<id>`.
 
 ## Fix
-Detect a real click (pointer up without a drag having started) at the pointer layer instead of relying on the DOM `onClick` event.
+Rename the list route so it stops being a layout for its siblings.
 
-Edit `src/components/pipeline/KanbanCard.tsx`:
+- `git mv src/routes/_authenticated/leads.tsx src/routes/_authenticated/leads.index.tsx`
+- Inside the renamed file, change `createFileRoute("/_authenticated/leads")` → `createFileRoute("/_authenticated/leads/")` (TanStack's convention for index routes is the trailing slash — required for the route string to match the generated file id).
 
-1. Keep `{...attributes} {...listeners}` on the root card `<div>` so the whole card remains draggable.
-2. Remove `onClick={onClick}` from the root.
-3. Track pointerdown coordinates with a `useRef<{ x: number; y: number } | null>(null)`.
-4. Add `onPointerDown={(e) => { downRef.current = { x: e.clientX, y: e.clientY } }}` to the root (this fires before dnd-kit consumes it since React synthetic handlers run on bubble).
-5. Add `onPointerUp={(e) => { const d = downRef.current; downRef.current = null; if (!d) return; const dx = e.clientX - d.x, dy = e.clientY - d.y; if (Math.hypot(dx, dy) < 6) onClick?.(); }}` — fires only when the pointer barely moved, matching the sensor's 6px activation threshold, so real drags don't trigger navigation.
-6. Keep the existing `onClick={(e) => e.stopPropagation()}` guards on the 3-dot menu wrapper. Add matching `onPointerUp={(e) => e.stopPropagation()}` on that wrapper (and on the priority chip wrapper if any) so clicking those inner controls does not bubble up and trigger `onClick`.
-7. Leave PointerSensor `activationConstraint: { distance: 6 }` in `KanbanBoard.tsx` unchanged.
+The Vite plugin will regenerate `src/routeTree.gen.ts` on next build/dev run:
+- `/leads` → renders the list page (unchanged behavior).
+- `/leads/$leadId` → renders the detail page as a top-level sibling with no parent-outlet dependency.
+
+No other files change; the `<Link to="/leads/$leadId" params={{ leadId }}>` and `navigate(...)` calls already target the correct URL.
 
 ## Verify
-- Drag a card body → moves between columns; toast confirms.
-- Click (no drag) on the card body → navigates to `/leads/$leadId`.
-- Click 3-dot menu → menu opens, no navigation.
-- Click grip icon → no navigation (it's decorative now; a small click stays under 6px so it will actually navigate — acceptable, same as clicking the card body).
-- Touch drag on mobile still works (`touch-none` already on root).
+- Reload `/pipeline`, click a card → detail page renders with lead title, stages, and activities.
+- Go to `/leads`, click a row → detail page renders (bodyText no longer empty).
+- Network shows `GET .../leads?select=*&id=eq.<id>` firing.
 - `bun run build:dev` passes.
