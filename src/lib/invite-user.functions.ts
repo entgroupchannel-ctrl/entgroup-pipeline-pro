@@ -125,21 +125,34 @@ export const inviteCrmUser = createServerFn({ method: "POST" })
       </div>
     `;
 
-    const resendResp = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${cfg.key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: `${cfg.company} CRM <${cfg.fromEmail}>`,
-        to: [data.email],
-        subject,
-        html,
-      }),
-    });
+    let resendResp: Response;
+
+    try {
+      resendResp = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${cfg.key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: `${cfg.company} CRM <${cfg.fromEmail}>`,
+          to: [data.email],
+          subject,
+          html,
+        }),
+      });
+    } catch (fetchErr: any) {
+      if (mode === "invite") {
+        await supabaseAdmin.auth.admin.deleteUser(existing.id).catch(() => {});
+      }
+      throw new Error(`ส่งเมลไม่สำเร็จ: ${fetchErr?.message ?? "network error"}`);
+    }
+
     if (!resendResp.ok) {
       const errText = await resendResp.text();
+      if (mode === "invite") {
+        await supabaseAdmin.auth.admin.deleteUser(existing.id).catch(() => {});
+      }
       throw new Error(`Resend error ${resendResp.status}: ${errText}`);
     }
 
