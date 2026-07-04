@@ -35,7 +35,8 @@ export function KanbanBoard() {
   const [leads, setLeads] = useState<LeadWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const openLead = (id: string) => navigate({ to: "/leads/$leadId", params: { leadId: id } });
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [overdueCount, setOverdueCount] = useState(0);
