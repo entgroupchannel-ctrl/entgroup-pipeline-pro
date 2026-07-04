@@ -115,6 +115,7 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
           <GripVertical className="h-4 w-4" />
         </div>
         <h3 className="line-clamp-2 text-sm font-semibold leading-snug flex-1">{lead.title}</h3>
+        <LineBadge count={lineUnread} />
         <div
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
