@@ -95,8 +95,9 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
   };
 
   const dndPointerDown = (listeners as any)?.onPointerDown as
-    | ((e: React.PointerEvent) => void)
+    | ((e: any) => void)
     | undefined;
+
 
   return (
     <div
