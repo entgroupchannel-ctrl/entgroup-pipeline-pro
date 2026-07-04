@@ -254,6 +254,8 @@ export function KanbanBoard() {
                 onCardClick={openLead}
                 activeId={activeId}
                 totalPipeline={totalPipeline}
+                onDelete={deleteLead}
+                onDuplicate={duplicateLead}
               />
             ))}
           </div>
