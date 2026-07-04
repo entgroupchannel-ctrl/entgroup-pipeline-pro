@@ -16,10 +16,12 @@ async function assertAdmin(userId: string) {
   } catch { /* fall through */ }
   // check crm.user_profiles role
   const { data, error } = await supabaseAdmin
+    .schema("crm" as any)
     .from("user_profiles" as any)
     .select("role")
     .eq("id", userId)
     .maybeSingle();
+
   if (error) throw new Error(error.message);
   const role = (data as any)?.role ?? "";
   if (role !== "admin") throw new Error("Forbidden: admin only");
