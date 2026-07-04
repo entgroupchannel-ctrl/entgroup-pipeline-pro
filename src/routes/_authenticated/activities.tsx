@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { z } from "zod";
@@ -8,7 +8,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { activityIcon, formatThaiDate, ACTIVITY_TYPE_LABEL, type Activity, type ActivityType } from "@/lib/activities";
-import { LeadDetailSheet } from "@/components/pipeline/LeadDetailSheet";
 
 const searchSchema = z.object({
   filter: z.enum(["all", "overdue", "today", "pending", "done"]).optional(),
