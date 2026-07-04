@@ -9,6 +9,7 @@ import {
   Settings,
   LogOut,
   Target,
+  Mail,
 } from "lucide-react";
 import {
   Sidebar,
@@ -31,6 +32,7 @@ const navItems = [
   { title: "รายการดีล", url: "/leads", icon: List },
   { title: "บริษัท", url: "/accounts", icon: Building2 },
   { title: "ใบเสนอราคา", url: "/quotations", icon: FileText },
+  { title: "ส่งอีเมล", url: "/emails", icon: Mail },
   { title: "กิจกรรม", url: "/activities", icon: CalendarCheck },
   { title: "KPI", url: "/kpi", icon: Target },
 ] as const;

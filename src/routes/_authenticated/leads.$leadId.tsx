@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, Phone, MessageCircle, Save, ExternalLink, Loader2, Check, Plus, Send,
+  ArrowLeft, Phone, MessageCircle, Save, ExternalLink, Loader2, Check, Plus, Send, Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import { formatThaiDate as formatThaiDay } from "@/lib/format";
 import { fetchFADocument, type FADocument } from "@/lib/flowaccount-client";
 import { FAImportModal } from "@/components/flowaccount/FAImportModal";
 import { LeadQuotationsSection } from "@/components/pipeline/LeadQuotationsSection";
+import { LeadEmailComposer } from "@/components/pipeline/LeadEmailComposer";
 import { X as XIcon, FileDown } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/leads/$leadId")({
@@ -52,6 +53,7 @@ function LeadDetailPage() {
   const [chatterText, setChatterText] = useState("");
   const [faDoc, setFaDoc] = useState<FADocument | null>(null);
   const [faImportOpen, setFaImportOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
@@ -282,6 +284,9 @@ function LeadDetailPage() {
           <Button variant="outline" size="sm" onClick={() => quickLog("line")}>
             <MessageCircle className="mr-1 h-4 w-4" /> ส่ง Line
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setEmailOpen(true)}>
+            <Mail className="mr-1 h-4 w-4" /> ส่งอีเมล
+          </Button>
           <Button size="sm" onClick={() => saveLead()} disabled={saving}>
             {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
             บันทึก
@@ -469,6 +474,19 @@ function LeadDetailPage() {
 
           <FAImportModal open={faImportOpen} onOpenChange={setFaImportOpen} onImported={load} />
 
+          <LeadEmailComposer
+            open={emailOpen}
+            onOpenChange={setEmailOpen}
+            leadId={leadId}
+            leadTitle={form.title}
+            stage={form.stage}
+            contactId={contact?.id}
+            contactName={contact?.contact_name ?? contact?.name}
+            contactEmail={contact?.email}
+            companyName={account?.name}
+            onSent={load}
+          />
+
           <LeadQuotationsSection leadId={leadId} accountId={lead.account_id} />
 
           <Section title="บริษัทและผู้ติดต่อ">
@@ -539,6 +557,9 @@ function LeadDetailPage() {
               </Button>
               <Button size="sm" variant="outline" onClick={() => quickLog("line")}>
                 <MessageCircle className="mr-1 h-3.5 w-3.5" /> ส่ง Line
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setEmailOpen(true)}>
+                <Mail className="mr-1 h-3.5 w-3.5" /> ส่งอีเมล
               </Button>
               <Button size="sm" variant={addOpen ? "default" : "outline"} onClick={() => setAddOpen((v) => !v)}>
                 <Plus className="mr-1 h-3.5 w-3.5" /> เพิ่ม
