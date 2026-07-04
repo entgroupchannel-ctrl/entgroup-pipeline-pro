@@ -175,7 +175,9 @@ export const deactivateCrmUser = createServerFn({ method: "POST" })
     if (data.user_id === context.userId) throw new Error("ปิดบัญชีตัวเองไม่ได้");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
+      .schema("crm" as any)
       .from("user_profiles" as any)
+
       .update({ is_active: false })
       .eq("id", data.user_id);
     if (error) throw new Error(error.message);
