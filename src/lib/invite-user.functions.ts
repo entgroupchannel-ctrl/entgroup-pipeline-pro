@@ -64,7 +64,9 @@ export const inviteCrmUser = createServerFn({ method: "POST" })
 
     // upsert crm.user_profiles
     const { error: profileErr } = await supabaseAdmin
+      .schema("crm" as any)
       .from("user_profiles" as any)
+
       .upsert({
         id: existing.id,
         full_name: data.full_name ?? null,
