@@ -142,3 +142,49 @@
     color: var(--color-foreground);
   }
 }
+
+/* --- Pipeline stage tokens --- */
+@utility stage-dot-new { background-color: oklch(0.7 0.02 260); }
+@utility stage-dot-qualified { background-color: oklch(0.62 0.18 255); }
+@utility stage-dot-proposal { background-color: oklch(0.58 0.22 300); }
+@utility stage-dot-negotiation { background-color: oklch(0.6 0.13 195); }
+@utility stage-dot-closing { background-color: oklch(0.75 0.16 75); }
+@utility stage-dot-won { background-color: oklch(0.65 0.18 155); }
+@utility stage-dot-lost { background-color: oklch(0.62 0.22 25); }
+
+@utility stage-badge-new {
+  background-color: oklch(0.95 0.01 260);
+  color: oklch(0.35 0.02 260);
+  border-color: oklch(0.88 0.01 260);
+}
+@utility stage-badge-qualified {
+  background-color: oklch(0.94 0.04 255);
+  color: oklch(0.4 0.15 255);
+  border-color: oklch(0.85 0.08 255);
+}
+@utility stage-badge-proposal {
+  background-color: oklch(0.94 0.04 300);
+  color: oklch(0.4 0.18 300);
+  border-color: oklch(0.85 0.09 300);
+}
+@utility stage-badge-negotiation {
+  background-color: oklch(0.94 0.04 195);
+  color: oklch(0.4 0.12 195);
+  border-color: oklch(0.85 0.07 195);
+}
+@utility stage-badge-closing {
+  background-color: oklch(0.95 0.05 75);
+  color: oklch(0.45 0.15 75);
+  border-color: oklch(0.86 0.1 75);
+}
+@utility stage-badge-won {
+  background-color: oklch(0.94 0.06 155);
+  color: oklch(0.4 0.15 155);
+  border-color: oklch(0.83 0.1 155);
+}
+@utility stage-badge-lost {
+  background-color: oklch(0.94 0.05 25);
+  color: oklch(0.45 0.18 25);
+  border-color: oklch(0.86 0.1 25);
+}
+

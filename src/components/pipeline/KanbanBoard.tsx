@@ -1,0 +1,248 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { Plus, Inbox } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type Lead, type LeadStage, type Account } from "@/lib/crm";
+import { formatBaht } from "@/lib/format";
+import { KanbanCard } from "./KanbanCard";
+import { LeadDetailSheet } from "./LeadDetailSheet";
+import { NewLeadDialog } from "./NewLeadDialog";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface LeadWithRelations extends Lead {
+  account?: Account | null;
+  owner?: { id: string; full_name: string | null } | null;
+}
+
+export function KanbanBoard() {
+  const [leads, setLeads] = useState<LeadWithRelations[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [newLeadOpen, setNewLeadOpen] = useState(false);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const loadLeads = async () => {
+    const { data, error } = await crmDb()
+      .from("leads")
+      .select("*, account:accounts(id,name,industry), owner:user_profiles(id,full_name)")
+      .order("updated_at", { ascending: false });
+    if (error) {
+      toast.error("โหลดข้อมูลไม่สำเร็จ", { description: error.message });
+      setLoading(false);
+      return;
+    }
+    setLeads((data ?? []) as LeadWithRelations[]);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadLeads();
+
+    const channel = supabase
+      .channel("crm-leads-board")
+      .on("postgres_changes", { event: "*", schema: "crm", table: "leads" }, () => {
+        loadLeads();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const grouped = useMemo(() => {
+    const g: Record<LeadStage, LeadWithRelations[]> = {
+      new: [], qualified: [], proposal: [], negotiation: [], closing: [], won: [], lost: [],
+    };
+    for (const l of leads) {
+      const s = (l.stage as LeadStage) ?? "new";
+      if (g[s]) g[s].push(l);
+    }
+    return g;
+  }, [leads]);
+
+  const active = activeId ? leads.find((l) => l.id === activeId) : null;
+
+  const handleDragEnd = async (e: DragEndEvent) => {
+    setActiveId(null);
+    const { active, over } = e;
+    if (!over) return;
+    const leadId = String(active.id);
+    const newStage = String(over.id) as LeadStage;
+    const lead = leads.find((l) => l.id === leadId);
+    if (!lead || lead.stage === newStage) return;
+    if (!ACTIVE_STAGES.includes(newStage)) return;
+
+    const prevStage = lead.stage;
+    setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, stage: newStage } : l)));
+
+    const { error } = await crmDb().from("leads").update({ stage: newStage }).eq("id", leadId);
+    if (error) {
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, stage: prevStage } : l)));
+      toast.error("ย้ายดีลไม่สำเร็จ", { description: error.message });
+    } else {
+      toast.success(`ย้ายไป "${STAGE_LABEL_TH[newStage]}" แล้ว`);
+    }
+  };
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between border-b bg-background px-6 py-4">
+        <div>
+          <h1 className="text-xl font-semibold">Pipeline</h1>
+          <p className="text-xs text-muted-foreground">ลาก-วางเพื่อเปลี่ยนสถานะดีล</p>
+        </div>
+        <Button onClick={() => setNewLeadOpen(true)}>
+          <Plus className="mr-1 h-4 w-4" /> เพิ่มดีลใหม่
+        </Button>
+      </div>
+
+      <div className="flex-1 overflow-x-auto p-6">
+        <DndContext
+          sensors={sensors}
+          onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveId(null)}
+        >
+          <div className="flex min-w-max gap-4 pb-4">
+            {ACTIVE_STAGES.map((stage) => (
+              <Column
+                key={stage}
+                stage={stage}
+                leads={grouped[stage]}
+                loading={loading}
+                onCardClick={setSelectedLeadId}
+                activeId={activeId}
+              />
+            ))}
+          </div>
+
+          <DragOverlay>
+            {active ? (
+              <div className="w-72 rotate-2 opacity-90">
+                <KanbanCard lead={active} onClick={() => {}} />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {OUTCOME_STAGES.map((stage) => {
+            const list = grouped[stage];
+            const sum = list.reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
+            const isWon = stage === "won";
+            return (
+              <div
+                key={stage}
+                className={`rounded-xl border-2 p-4 ${
+                  isWon
+                    ? "border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20"
+                    : "border-red-200 bg-red-50/50 dark:bg-red-950/20"
+                }`}
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${isWon ? "bg-emerald-500" : "bg-red-500"}`}
+                    />
+                    <span className="font-semibold">{STAGE_LABEL_TH[stage]}</span>
+                    <span className="text-sm text-muted-foreground">({list.length})</span>
+                  </div>
+                  <span className="text-sm font-medium">{formatBaht(sum)}</span>
+                </div>
+                <div className="space-y-2">
+                  {list.slice(0, 3).map((l) => (
+                    <button
+                      key={l.id}
+                      onClick={() => setSelectedLeadId(l.id)}
+                      className="w-full rounded-md bg-background/70 px-3 py-2 text-left text-sm hover:bg-background"
+                    >
+                      <div className="truncate font-medium">{l.title}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {l.account?.name ?? "-"} · {formatBaht(Number(l.expected_value ?? 0))}
+                      </div>
+                    </button>
+                  ))}
+                  {list.length === 0 && (
+                    <p className="py-2 text-center text-xs text-muted-foreground">ยังไม่มีดีล</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <LeadDetailSheet leadId={selectedLeadId} onClose={() => setSelectedLeadId(null)} onChanged={loadLeads} />
+      <NewLeadDialog open={newLeadOpen} onOpenChange={setNewLeadOpen} onCreated={loadLeads} />
+    </div>
+  );
+}
+
+function Column({
+  stage,
+  leads,
+  loading,
+  onCardClick,
+  activeId,
+}: {
+  stage: LeadStage;
+  leads: LeadWithRelations[];
+  loading: boolean;
+  onCardClick: (id: string) => void;
+  activeId: string | null;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: stage });
+  const sum = leads.reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
+
+  return (
+    <div className="flex w-72 shrink-0 flex-col">
+      <div className="mb-3 flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <span className={`h-2.5 w-2.5 rounded-full stage-dot-${stage}`} />
+          <span className="text-sm font-semibold">{STAGE_LABEL_TH[stage]}</span>
+          <span className="text-xs text-muted-foreground">({leads.length})</span>
+        </div>
+        <span className="text-xs font-medium text-muted-foreground">{formatBaht(sum)}</span>
+      </div>
+      <div
+        ref={setNodeRef}
+        className={`flex min-h-[calc(100vh-16rem)] flex-col gap-2 rounded-xl border bg-muted/40 p-2 transition-colors ${
+          isOver ? "border-primary/60 bg-primary/5" : ""
+        }`}
+      >
+        {loading ? (
+          <>
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </>
+        ) : leads.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
+            <Inbox className="h-6 w-6" />
+            <span className="text-xs">ยังไม่มีดีลในขั้นนี้</span>
+          </div>
+        ) : (
+          leads.map((l) => (
+            <div key={l.id} className={activeId === l.id ? "opacity-30" : ""}>
+              <KanbanCard lead={l} onClick={() => onCardClick(l.id)} draggable />
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
