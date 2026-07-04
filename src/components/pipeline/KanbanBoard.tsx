@@ -528,7 +528,12 @@ function Column({
                   onDuplicate={() => onDuplicate(l)}
                   lineUnread={lineUnreadCounts?.[l.id] ?? 0}
                   onLineBadgeClear={() => onLineBadgeClear?.(l.id)}
+                  showClaimButton={showClaimButton}
+                  currentUserId={currentUserId}
+                  onClaim={onClaim}
+                  linePreview={linePreviews?.[l.id]}
                 />
+
               </div>
             ))}
 
