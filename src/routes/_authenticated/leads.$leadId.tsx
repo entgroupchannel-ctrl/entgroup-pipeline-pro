@@ -102,7 +102,20 @@ function LeadDetailPage() {
       owner_id: leadData.owner_id ?? "",
       stage_changed_at: leadData.updated_at ?? leadData.created_at ?? "",
     });
+    if (leadData.fa_inbound_id) {
+      fetchFADocument(leadData.fa_inbound_id).then(setFaDoc);
+    } else {
+      setFaDoc(null);
+    }
     setLoading(false);
+  };
+
+  const unlinkFA = async () => {
+    if (!lead) return;
+    const { error } = await crmDb().from("leads").update({ fa_inbound_id: null }).eq("id", lead.id);
+    if (error) return toast.error("ยกเลิก link ไม่สำเร็จ", { description: error.message });
+    toast.success("ยกเลิก link แล้ว");
+    load();
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [leadId]);
