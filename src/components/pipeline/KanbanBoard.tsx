@@ -77,6 +77,32 @@ export function KanbanBoard() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { count } = await crmDb()
+        .from("activities")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_id", user.id)
+        .eq("done", false)
+        .lt("due_at", new Date().toISOString());
+      setOverdueCount(count ?? 0);
+    })();
+  }, [user, leads.length]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable) return;
+      if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        setNewLeadOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const grouped = useMemo(() => {
     const g: Record<LeadStage, LeadWithRelations[]> = {
       new: [], qualified: [], proposal: [], negotiation: [], closing: [], won: [], lost: [],
