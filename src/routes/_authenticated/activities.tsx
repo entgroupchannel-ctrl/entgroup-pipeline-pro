@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { z } from "zod";
@@ -127,8 +127,14 @@ function ActivitiesPage() {
             const initials = (owner?.full_name ?? "?")
               .split(" ").map((s) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
             return (
-              <li key={a.id} className={`flex items-center gap-3 px-4 py-3 ${overdue ? "border-l-4 border-l-red-500" : ""} ${a.done ? "opacity-60" : ""}`}>
-                <Checkbox checked={a.done} onCheckedChange={(v) => toggleDone(a, !!v)} />
+              <li
+                key={a.id}
+                className={`flex items-center gap-3 px-4 py-3 ${overdue ? "border-l-4 border-l-red-500" : ""} ${a.done ? "opacity-60" : ""} ${a.lead_id ? "cursor-pointer hover:bg-muted/40" : ""} transition-colors`}
+                onClick={() => { if (a.lead_id) navigate({ to: "/leads/$leadId", params: { leadId: a.lead_id } }); }}
+              >
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Checkbox checked={a.done} onCheckedChange={(v) => toggleDone(a, !!v)} />
+                </div>
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                   <Icon className="h-4 w-4" />
                 </span>
@@ -137,13 +143,9 @@ function ActivitiesPage() {
                     {a.subject ?? ACTIVITY_TYPE_LABEL[a.type as ActivityType] ?? a.type}
                   </div>
                   {lead && a.lead_id && (
-                    <Link
-                      to="/leads/$leadId"
-                      params={{ leadId: a.lead_id }}
-                      className="truncate text-xs text-primary hover:underline"
-                    >
+                    <span className="truncate text-xs text-primary">
                       {lead.title}
-                    </Link>
+                    </span>
                   )}
                 </div>
                 <div className={`shrink-0 text-xs ${overdue ? "font-medium text-red-600" : "text-muted-foreground"}`}>
