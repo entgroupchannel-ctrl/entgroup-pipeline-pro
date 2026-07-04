@@ -36,9 +36,16 @@ interface LeadWithRelations extends Lead {
   nextActivity?: Activity | null;
 }
 
-export function KanbanBoard() {
+interface KanbanBoardProps {
+  sourceFilter?: "all" | "line";
+  showClaimButton?: boolean;
+}
+
+export function KanbanBoard({ sourceFilter = "all", showClaimButton = false }: KanbanBoardProps = {}) {
   const { user } = useAuth();
   const [leads, setLeads] = useState<LeadWithRelations[]>([]);
+  const [linePreviews, setLinePreviews] = useState<Record<string, string>>({});
+  const [lineSubFilter, setLineSubFilter] = useState<"all" | "unclaimed" | "mine">("all");
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -50,6 +57,7 @@ export function KanbanBoard() {
   const [lastSync, setLastSync] = useState<string | null>(null);
   const refreshSync = () => fetchFALastSync().then(setLastSync).catch(() => {});
   const { unreadCounts, latestMessage, clearBadge } = useLineRealtime();
+
 
   useEffect(() => {
     if (!latestMessage) return;
@@ -158,22 +166,63 @@ export function KanbanBoard() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const filteredLeads = useMemo(() => {
+    if (sourceFilter !== "line") return leads;
+    let list = leads.filter((l) => l.source === "line");
+    if (lineSubFilter === "unclaimed") list = list.filter((l) => !l.owner_id);
+    else if (lineSubFilter === "mine") list = list.filter((l) => l.owner_id === user?.id);
+    return list;
+  }, [leads, sourceFilter, lineSubFilter, user?.id]);
+
+  const lineCounts = useMemo(() => {
+    const src = leads.filter((l) => l.source === "line");
+    return {
+      all: src.length,
+      unclaimed: src.filter((l) => !l.owner_id).length,
+      mine: src.filter((l) => l.owner_id === user?.id).length,
+    };
+  }, [leads, user?.id]);
+
+  // Fetch latest LINE message preview per visible lead when on LINE tab
+  useEffect(() => {
+    if (sourceFilter !== "line") { setLinePreviews({}); return; }
+    const ids = leads.filter((l) => l.source === "line").map((l) => l.id);
+    if (ids.length === 0) { setLinePreviews({}); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await crmDb()
+        .from("activities")
+        .select("lead_id, body, created_at")
+        .in("lead_id", ids)
+        .eq("type", "line")
+        .order("created_at", { ascending: false });
+      if (cancelled) return;
+      const map: Record<string, string> = {};
+      for (const a of (data ?? []) as any[]) {
+        if (a.lead_id && !map[a.lead_id] && a.body) map[a.lead_id] = a.body;
+      }
+      setLinePreviews(map);
+    })();
+    return () => { cancelled = true; };
+  }, [sourceFilter, leads]);
+
   const totalPipeline = useMemo(
-    () => leads.filter((l) => ACTIVE_STAGES.includes(l.stage as LeadStage))
-               .reduce((s, l) => s + Number(l.expected_value ?? 0), 0),
-    [leads],
+    () => filteredLeads.filter((l) => ACTIVE_STAGES.includes(l.stage as LeadStage))
+                       .reduce((s, l) => s + Number(l.expected_value ?? 0), 0),
+    [filteredLeads],
   );
 
   const grouped = useMemo(() => {
     const g: Record<LeadStage, LeadWithRelations[]> = {
       new: [], qualified: [], proposal: [], negotiation: [], closing: [], won: [], lost: [],
     };
-    for (const l of leads) {
+    for (const l of filteredLeads) {
       const s = (l.stage as LeadStage) ?? "new";
       if (g[s]) g[s].push(l);
     }
     return g;
-  }, [leads]);
+  }, [filteredLeads]);
+
 
   const active = activeId ? leads.find((l) => l.id === activeId) : null;
 
@@ -250,6 +299,27 @@ export function KanbanBoard() {
       )}
 
       <div className="flex-1 overflow-x-auto p-6">
+        {sourceFilter === "line" && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            {([
+              ["all", "ทั้งหมด", lineCounts.all],
+              ["unclaimed", "รอรับงาน", lineCounts.unclaimed],
+              ["mine", "ของฉัน", lineCounts.mine],
+            ] as const).map(([key, label, count]) => (
+              <button
+                key={key}
+                onClick={() => setLineSubFilter(key)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  lineSubFilter === key
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "bg-background hover:bg-muted"
+                }`}
+              >
+                {label} <span className="ml-1 opacity-70">({count})</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         <DndContext
           sensors={sensors}
@@ -271,9 +341,14 @@ export function KanbanBoard() {
                 onDuplicate={duplicateLead}
                 lineUnreadCounts={unreadCounts}
                 onLineBadgeClear={clearBadge}
+                showClaimButton={showClaimButton}
+                currentUserId={user?.id}
+                onClaim={loadLeads}
+                linePreviews={sourceFilter === "line" ? linePreviews : undefined}
               />
             ))}
           </div>
+
 
           <DragOverlay>
             {active ? (
@@ -349,6 +424,10 @@ function Column({
   onDuplicate,
   lineUnreadCounts,
   onLineBadgeClear,
+  showClaimButton,
+  currentUserId,
+  onClaim,
+  linePreviews,
 }: {
   stage: LeadStage;
   leads: LeadWithRelations[];
@@ -360,7 +439,12 @@ function Column({
   onDuplicate: (lead: LeadWithRelations) => void;
   lineUnreadCounts?: Record<string, number>;
   onLineBadgeClear?: (leadId: string) => void;
+  showClaimButton?: boolean;
+  currentUserId?: string;
+  onClaim?: () => void;
+  linePreviews?: Record<string, string>;
 }) {
+
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 10;
@@ -444,7 +528,12 @@ function Column({
                   onDuplicate={() => onDuplicate(l)}
                   lineUnread={lineUnreadCounts?.[l.id] ?? 0}
                   onLineBadgeClear={() => onLineBadgeClear?.(l.id)}
+                  showClaimButton={showClaimButton}
+                  currentUserId={currentUserId}
+                  onClaim={onClaim}
+                  linePreview={linePreviews?.[l.id]}
                 />
+
               </div>
             ))}
 

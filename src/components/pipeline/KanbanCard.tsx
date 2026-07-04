@@ -21,7 +21,12 @@ interface Props {
   onDuplicate?: () => void;
   lineUnread?: number;
   onLineBadgeClear?: () => void;
+  showClaimButton?: boolean;
+  currentUserId?: string;
+  onClaim?: () => void;
+  linePreview?: string;
 }
+
 
 // Priority: 0 = none, 1 = low, 2 = medium, 3 = high
 function PriorityStars({ priority, leadId, onChange }: {
@@ -60,7 +65,7 @@ function PriorityStars({ priority, leadId, onChange }: {
   );
 }
 
-export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDuplicate, lineUnread = 0, onLineBadgeClear }: Props) {
+export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDuplicate, lineUnread = 0, onLineBadgeClear, showClaimButton = false, currentUserId, onClaim, linePreview }: Props) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id, disabled: !draggable });
   const downRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -136,6 +141,13 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
       {/* Account */}
       <p className="mt-0.5 truncate text-xs text-muted-foreground">{lead.account?.name ?? "ไม่ระบุบริษัท"}</p>
 
+      {/* LINE preview */}
+      {linePreview && (
+        <p className="mt-0.5 truncate text-[11px] italic text-muted-foreground/80">
+          💬 {linePreview.length > 40 ? linePreview.slice(0, 40) + "…" : linePreview}
+        </p>
+      )}
+
       {/* Value */}
       <div className="mt-2 text-sm font-bold text-foreground">
         {formatBaht(Number(lead.expected_value ?? 0))}
@@ -183,12 +195,40 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
               <Clock className="h-3.5 w-3.5 text-red-500" />
             </span>
           )}
-          {/* Owner avatar */}
-          <Avatar className="h-6 w-6">
-            <AvatarFallback className="bg-primary/10 text-[10px] text-primary">{initials || "?"}</AvatarFallback>
-          </Avatar>
+          {/* Mine badge (LINE tab) */}
+          {showClaimButton && lead.owner_id && lead.owner_id === currentUserId ? (
+            <span className="inline-flex items-center rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+              ✅ ของฉัน
+            </span>
+          ) : (
+            /* Owner avatar */
+            <Avatar className="h-6 w-6">
+              <AvatarFallback className="bg-primary/10 text-[10px] text-primary">{initials || "?"}</AvatarFallback>
+            </Avatar>
+          )}
         </div>
       </div>
+
+      {/* Claim button (LINE tab, unassigned) */}
+      {showClaimButton && !lead.owner_id && (
+        <button
+          type="button"
+          onClick={async (e) => {
+            e.stopPropagation();
+            if (!currentUserId) { toast.error("ไม่พบผู้ใช้"); return; }
+            const { error } = await crmDb().from("leads").update({ owner_id: currentUserId }).eq("id", lead.id);
+            if (error) { toast.error("รับงานไม่สำเร็จ", { description: error.message }); return; }
+            toast.success("รับงานแล้ว ✅");
+            onClaim?.();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+          className="mt-2 w-full rounded-md bg-emerald-500 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-600"
+        >
+          🙋 รับงาน
+        </button>
+      )}
     </div>
+
   );
 }
