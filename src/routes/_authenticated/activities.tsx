@@ -37,7 +37,7 @@ function ActivitiesPage() {
   const [rows, setRows] = useState<Activity[] | null>(null);
   const [leadsMap, setLeadsMap] = useState<Map<string, { title: string }>>(new Map());
   const [profilesMap, setProfilesMap] = useState<Map<string, { full_name: string | null }>>(new Map());
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  
 
   const isManager = role === "manager" || role === "admin";
 
