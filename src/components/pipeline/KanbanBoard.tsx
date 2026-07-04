@@ -139,18 +139,33 @@ export function KanbanBoard() {
   };
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b bg-background px-6 py-4">
-        <div>
+    <div className="flex h-full flex-col page-fade-in">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b bg-background px-6 py-4 sm:flex sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold">Pipeline</h1>
-          <p className="text-xs text-muted-foreground">ลาก-วางเพื่อเปลี่ยนสถานะดีล</p>
+          <p className="text-xs text-muted-foreground">ลาก-วาง หรือกด <kbd className="rounded border bg-muted px-1 text-[10px]">N</kbd> เพื่อเพิ่มดีลใหม่</p>
         </div>
-        <Button onClick={() => setNewLeadOpen(true)}>
-          <Plus className="mr-1 h-4 w-4" /> เพิ่มดีลใหม่
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <FileDown className="mr-1 h-4 w-4" /> Import จาก FlowAccount
+          </Button>
+          <Button onClick={() => setNewLeadOpen(true)}>
+            <Plus className="mr-1 h-4 w-4" /> เพิ่มดีลใหม่
+          </Button>
+        </div>
       </div>
 
+      {overdueCount > 0 && (
+        <div className="border-b bg-amber-50 px-6 py-3 dark:bg-amber-950/30">
+          <Link to="/activities" className="flex items-center gap-2 text-sm text-amber-800 hover:underline dark:text-amber-200">
+            <AlertCircle className="h-4 w-4" />
+            คุณมี <span className="font-semibold">{overdueCount}</span> รายการที่ต้องติดตาม
+          </Link>
+        </div>
+      )}
+
       <div className="flex-1 overflow-x-auto p-6">
+
         <DndContext
           sensors={sensors}
           onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))}
