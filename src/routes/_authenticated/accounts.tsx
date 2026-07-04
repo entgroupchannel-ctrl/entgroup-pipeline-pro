@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Search, Plus, Building2 } from "lucide-react";
+import { Loader2, Search, Plus, Building2, Star, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,9 @@ interface Account {
   address: string | null;
   owner_id: string | null;
   created_by: string | null;
+  is_key_account: boolean;
+  key_account_owner_id: string | null;
+  key_account_note: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -121,13 +124,20 @@ function AccountsPage() {
                 {filtered.map((a) => (
                   <tr key={a.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3">
-                      <Link
-                        to="/accounts/$accountId"
-                        params={{ accountId: a.id }}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {a.name}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to="/accounts/$accountId"
+                          params={{ accountId: a.id }}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {a.name}
+                        </Link>
+                        {a.is_key_account && (
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                            <Crown className="h-2.5 w-2.5" /> Key Account
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {a.industry ?? "—"}
