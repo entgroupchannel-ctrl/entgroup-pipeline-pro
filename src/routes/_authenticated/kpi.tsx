@@ -210,7 +210,7 @@ function KpiPage() {
             <p className="text-xs text-muted-foreground">วันนี้ / สัปดาห์นี้ / เดือนนี้</p>
           </div>
           {isManager && (
-            <Button size="sm" variant="outline" onClick={() => { setTargetUserId(user?.id ?? ""); setSetTargetOpen(true); }}>
+            <Button size="sm" variant="outline" onClick={() => { setTargetSelf(true); setSetTargetOpen(true); }}>
               ตั้งเป้าหมายตัวเอง
             </Button>
           )}
