@@ -91,7 +91,15 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      onClick={onClick}
+      onPointerDown={(e) => { downRef.current = { x: e.clientX, y: e.clientY }; }}
+      onPointerUp={(e) => {
+        const d = downRef.current;
+        downRef.current = null;
+        if (!d) return;
+        const dx = e.clientX - d.x;
+        const dy = e.clientY - d.y;
+        if (Math.hypot(dx, dy) < 6) onClick?.();
+      }}
       className="group cursor-pointer rounded-lg border bg-card p-3 shadow-sm transition-all hover:shadow-md hover:border-primary/30 select-none touch-none"
     >
       {/* Title row with drag handle + 3-dot menu */}
@@ -104,7 +112,12 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
           <GripVertical className="h-4 w-4" />
         </div>
         <h3 className="line-clamp-2 text-sm font-semibold leading-snug flex-1">{lead.title}</h3>
-        <div onClick={(e) => e.stopPropagation()} className="-mt-0.5">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+          className="-mt-0.5"
+        >
           <RowActions
             align="right"
             actions={[
