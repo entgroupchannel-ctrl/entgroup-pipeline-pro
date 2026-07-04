@@ -11,12 +11,14 @@ import {
 } from "@dnd-kit/core";
 import { Plus, Inbox, FileDown, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type Lead, type LeadStage, type Account } from "@/lib/crm";
 import { formatBaht } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { KanbanCard } from "./KanbanCard";
+import { toast } from "sonner";
 import { NewLeadDialog } from "./NewLeadDialog";
 import { FAImportModal } from "@/components/flowaccount/FAImportModal";
 import { fetchFALastSync } from "@/lib/flowaccount-client";
@@ -40,6 +42,7 @@ export function KanbanBoard() {
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const openLead = (id: string) => navigate({ to: "/leads/$leadId", params: { leadId: id } });
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -50,7 +53,8 @@ export function KanbanBoard() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const deleteLead = async (id: string) => {
-    if (!confirm("ลบดีลนี้?")) return;
+    const _ok = await confirm({ title: "ลบดีลนี้?", variant: "danger" });
+    if (!_ok) return;
     const { error } = await crmDb().from("leads").delete().eq("id", id);
     if (error) { toast.error("ลบไม่สำเร็จ"); return; }
     toast.success("ลบแล้ว"); loadLeads();
@@ -254,8 +258,6 @@ export function KanbanBoard() {
                 onCardClick={openLead}
                 activeId={activeId}
                 totalPipeline={totalPipeline}
-                onDelete={deleteLead}
-                onDuplicate={duplicateLead}
               />
             ))}
           </div>
@@ -330,8 +332,6 @@ function Column({
   onCardClick,
   activeId,
   totalPipeline,
-  onDelete,
-  onDuplicate,
 }: {
   stage: LeadStage;
   leads: LeadWithRelations[];
@@ -339,10 +339,7 @@ function Column({
   onCardClick: (id: string) => void;
   activeId: string | null;
   totalPipeline: number;
-  onDelete: (id: string) => void;
-  onDuplicate: (lead: LeadWithRelations) => void;
 }) {
-
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const sum = leads.reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
 
@@ -395,8 +392,8 @@ function Column({
                 lead={l}
                 onClick={() => onCardClick(l.id)}
                 draggable
-                onDelete={() => onDelete(l.id)}
-                onDuplicate={() => onDuplicate(l)}
+                onDelete={() => deleteLead(l.id)}
+                onDuplicate={() => duplicateLead(l)}
               />
             </div>
           ))

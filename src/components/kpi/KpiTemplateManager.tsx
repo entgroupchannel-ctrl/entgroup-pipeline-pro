@@ -17,6 +17,7 @@ import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { formatBaht } from "@/lib/format";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -110,6 +111,7 @@ function TemplateCard({ t, onEdit, onDelete, onApply }: {
 
 export function KpiTemplateManager() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [profiles,  setProfiles]  = useState<any[]>([]);
   const [loading,   setLoading]   = useState(true);
@@ -133,7 +135,8 @@ export function KpiTemplateManager() {
   useEffect(() => { load(); }, []);
 
   const deleteTemplate = async (id: string) => {
-    if (!confirm("ลบ template นี้?")) return;
+    const _ok = await confirm({ title: "ลบ template นี้?", variant: "danger" });
+    if (!_ok) return;
     const { error } = await crmDb().from("kpi_templates").delete().eq("id", id);
     if (error) { toast.error("ลบไม่สำเร็จ"); return; }
     toast.success("ลบ template แล้ว");

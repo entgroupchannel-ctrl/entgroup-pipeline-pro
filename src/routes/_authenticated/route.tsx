@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -44,6 +45,7 @@ function AuthenticatedLayout() {
   }
 
   return (
+    <ConfirmDialogProvider>
     <SidebarProvider>
       <div className="flex min-h-screen w-full min-w-0 bg-muted/20">
         <AppSidebar />
@@ -58,5 +60,6 @@ function AuthenticatedLayout() {
         </SidebarInset>
       </div>
     </SidebarProvider>
+    </ConfirmDialogProvider>
   );
 }
