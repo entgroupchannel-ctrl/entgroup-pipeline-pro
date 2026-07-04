@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   Loader2, Search, Plus, TrendingUp, Calendar, ChevronLeft, ChevronRight,
   BarChart2, Trophy, AlertTriangle, DollarSign,
-Trash2,} from "lucide-react";
+, Trash2} from "lucide-react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -415,15 +415,12 @@ function LeadsPage() {
                     new Date(l.expected_close_date).getTime() < Date.now();
 
                   return (
-                    <tr key={l.id} className={`hover:bg-muted/30 transition-colors ${selected.has(l.id) ? "bg-primary/5" : ""}`}>
-                      <td className="px-3 py-3">
+                    <tr key={l.id} className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected.has(l.id) ? "bg-primary/5" : ""}`} onClick={() => navigate({ to: "/leads/$leadId", params: { leadId: l.id } })}>
+                      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                         <Checkbox checked={selected.has(l.id)} onCheckedChange={() => toggleSelect(l.id)} />
                       </td>
                       <td className="px-4 py-3 max-w-[220px]">
-                        <Link to="/leads/$leadId" params={{ leadId: l.id }}
-                          className="truncate block font-medium text-primary hover:underline">
-                          {l.title}
-                        </Link>
+                        <span className="truncate block font-medium text-primary">{l.title}</span>
                       </td>
                       <td className="px-4 py-3 max-w-[160px]">
                         <span className="truncate block text-xs text-muted-foreground">{accountName ?? "—"}</span>
@@ -457,7 +454,7 @@ function LeadsPage() {
                         ) : <span className="text-xs text-muted-foreground">—</span>}
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{formatThaiDate(l.updated_at)}</td>
-                      <td className="px-2 py-3">
+                      <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                         <RowActions actions={[
                           stdOpen(() => navigate({ to: "/leads/$leadId", params: { leadId: l.id } })),
                           stdDupe(() => duplicateLead(l)),
