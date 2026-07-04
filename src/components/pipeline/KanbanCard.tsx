@@ -6,7 +6,7 @@ import { formatBaht, daysBetween, timeFromNow, isOverdue } from "@/lib/format";
 import { crmDb, type Lead, type LeadStage } from "@/lib/crm";
 import { activityIcon, type Activity } from "@/lib/activities";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 interface Props {
   lead: Lead & {
