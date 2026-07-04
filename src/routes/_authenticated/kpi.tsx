@@ -144,6 +144,7 @@ function KpiPage() {
   const [loading, setLoading] = useState(true);
   const [setTargetOpen, setSetTargetOpen] = useState(false);
   const [targetUserId, setTargetUserId] = useState<string>("");
+  const [targetSelf, setTargetSelf] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -209,7 +210,7 @@ function KpiPage() {
             <p className="text-xs text-muted-foreground">วันนี้ / สัปดาห์นี้ / เดือนนี้</p>
           </div>
           {isManager && (
-            <Button size="sm" variant="outline" onClick={() => { setTargetUserId(user?.id ?? ""); setSetTargetOpen(true); }}>
+            <Button size="sm" variant="outline" onClick={() => { setTargetSelf(true); setSetTargetOpen(true); }}>
               ตั้งเป้าหมายตัวเอง
             </Button>
           )}
@@ -244,7 +245,7 @@ function KpiPage() {
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Trophy className="h-5 w-5 text-amber-500" /> Leaderboard ทีม
             </h2>
-            <Button size="sm" onClick={() => { setTargetUserId(""); setSetTargetOpen(true); }}>
+            <Button size="sm" onClick={() => { setTargetSelf(false); setTargetUserId(""); setSetTargetOpen(true); }}>
               ตั้งเป้าหมายพนักงาน
             </Button>
           </div>
@@ -369,10 +370,10 @@ function KpiPage() {
       <SetTargetDialog
         open={setTargetOpen}
         onOpenChange={setSetTargetOpen}
-        userId={targetUserId}
+        userId={targetSelf ? user?.id ?? "" : targetUserId}
         profiles={profiles}
-        existing={targets.find((t) => t.user_id === targetUserId) ?? null}
-        onSaved={() => { setSetTargetOpen(false); load(); }}
+        existing={targets.find((t) => t.user_id === (targetSelf ? user?.id ?? "" : targetUserId)) ?? null}
+        onSaved={() => { setSetTargetOpen(false); setTargetSelf(false); load(); }}
       />
     </div>
   );
