@@ -312,6 +312,48 @@ function EmailsPage() {
             {/* Step preview */}
             {step === "preview" && (
               <>
+                {/* Template picker */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">Template ที่บันทึกไว้</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-7 text-xs">
+                        📋 เลือก Template
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-72">
+                      <DropdownMenuLabel className="text-xs">Templates ({templates.length})</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {templates.length === 0 ? (
+                        <div className="px-2 py-3 text-xs text-muted-foreground">ยังไม่มี template ที่บันทึก</div>
+                      ) : (
+                        templates.map((t) => (
+                          <DropdownMenuItem
+                            key={t.id}
+                            onSelect={(e) => e.preventDefault()}
+                            className="flex items-center justify-between gap-2"
+                          >
+                            <button
+                              className="flex-1 text-left min-w-0"
+                              onClick={() => applyTemplate(t)}
+                            >
+                              <div className="text-sm truncate">{t.name}</div>
+                              <div className="text-[10px] text-muted-foreground truncate">{t.subject}</div>
+                            </button>
+                            <button
+                              className="text-muted-foreground hover:text-destructive shrink-0"
+                              onClick={() => deleteTemplate(t.id)}
+                              aria-label="ลบ template"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
                 <div className="space-y-1.5">
                   <Label>หัวเรื่อง</Label>
                   <Input value={subject} onChange={(e) => setSubject(e.target.value)} className="text-sm" />
@@ -319,12 +361,21 @@ function EmailsPage() {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <Label>เนื้อหา</Label>
-                    <button
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                      onClick={() => setStep("compose")}
-                    >
-                      <RotateCcw className="h-3 w-3" /> ร่างใหม่
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setSaveOpen(true)}
+                        disabled={!subject.trim() || !body.trim()}
+                      >
+                        <Save className="h-3 w-3" /> 💾 บันทึกเป็น Template
+                      </button>
+                      <button
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setStep("compose")}
+                      >
+                        <RotateCcw className="h-3 w-3" /> ร่างใหม่
+                      </button>
+                    </div>
                   </div>
                   <Textarea
                     value={body}
