@@ -29,8 +29,13 @@ export function KanbanCard({ lead, onClick, draggable = false }: Props) {
     .toUpperCase();
 
   const next = lead.nextActivity ?? null;
-  const overdue = !!next?.due_at && new Date(next.due_at).getTime() < Date.now();
+  const overdue = !!next?.due_at && isOverdue(next.due_at);
   const NextIcon = next ? activityIcon(next.type) : null;
+  const subjectShort = next?.subject
+    ? next.subject.length > 20
+      ? next.subject.slice(0, 20) + "…"
+      : next.subject
+    : "งานติดตาม";
 
   return (
     <div
@@ -49,28 +54,6 @@ export function KanbanCard({ lead, onClick, draggable = false }: Props) {
       <p className="mt-1 truncate text-xs text-muted-foreground">{lead.account?.name ?? "ไม่ระบุบริษัท"}</p>
       <div className="mt-2 text-sm font-semibold text-foreground">{formatBaht(Number(lead.expected_value ?? 0))}</div>
 
-      {/* Next action badge */}
-      <div className="mt-2">
-        {next && NextIcon ? (
-          <div
-            className={`inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-1 text-[11px] font-medium ${
-              overdue
-                ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
-                : "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
-            }`}
-          >
-            <NextIcon className="h-3 w-3 shrink-0" />
-            <span className="truncate">
-              {overdue ? "เลยกำหนด · " : ""}
-              {next.subject ?? "งานติดตาม"}
-              {!overdue && next.due_at ? ` · ${timeFromNow(next.due_at)}` : ""}
-            </span>
-          </div>
-        ) : (
-          <div className="text-[11px] text-muted-foreground">ไม่มีงานค้าง</div>
-        )}
-      </div>
-
       <div className="mt-3 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Avatar className="h-6 w-6">
@@ -86,6 +69,27 @@ export function KanbanCard({ lead, onClick, draggable = false }: Props) {
           )}
           {days > 14 && <Clock className="h-3.5 w-3.5 text-red-500" />}
         </div>
+      </div>
+
+      {/* Next action row */}
+      <div className="mt-2">
+        {next && NextIcon && next.due_at ? (
+          <div
+            className={`flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11px] font-medium ${
+              overdue
+                ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                : "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+            }`}
+          >
+            <div className="flex min-w-0 items-center gap-1">
+              <NextIcon className="h-3 w-3 shrink-0" />
+              <span className="truncate">{subjectShort}</span>
+            </div>
+            <span className="shrink-0">{overdue ? "เลยกำหนด" : timeFromNow(next.due_at)}</span>
+          </div>
+        ) : (
+          <div className="text-[11px] text-muted-foreground">ไม่มีงานค้าง</div>
+        )}
       </div>
     </div>
   );
