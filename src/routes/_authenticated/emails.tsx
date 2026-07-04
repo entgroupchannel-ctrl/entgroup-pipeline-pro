@@ -2,15 +2,35 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Mail, Sparkles, Send, Loader2, RotateCcw, Search } from "lucide-react";
+import { Mail, Sparkles, Send, Loader2, RotateCcw, Search, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenuSeparator, DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { draftLeadEmail, sendLeadEmail } from "@/lib/lead-email.functions";
+
+const TEMPLATES_KEY = "email_templates";
+type SavedTemplate = { id: string; name: string; subject: string; body: string; created_at: string };
+
+function loadTemplates(): SavedTemplate[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(window.localStorage.getItem(TEMPLATES_KEY) || "[]"); }
+  catch { return []; }
+}
+function saveTemplates(list: SavedTemplate[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list));
+}
 
 export const Route = createFileRoute("/_authenticated/emails")({
   component: EmailsPage,
