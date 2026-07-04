@@ -54,12 +54,26 @@ export function KanbanBoard() {
       setLoading(false);
       return;
     }
+    const leadIds = (leadsRes.data ?? []).map((l: any) => l.id);
+    const actsRes = leadIds.length
+      ? await crmDb()
+          .from("activities")
+          .select("*")
+          .in("lead_id", leadIds)
+          .eq("done", false)
+          .order("due_at", { ascending: true, nullsFirst: false })
+      : { data: [] as Activity[] };
+    const nextByLead = new Map<string, Activity>();
+    for (const a of (actsRes.data ?? []) as Activity[]) {
+      if (a.lead_id && !nextByLead.has(a.lead_id)) nextByLead.set(a.lead_id, a);
+    }
     const accountsMap = new Map((accountsRes.data ?? []).map((a: any) => [a.id, a]));
     const profilesMap = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p]));
     const merged = (leadsRes.data ?? []).map((l: any) => ({
       ...l,
       account: l.account_id ? accountsMap.get(l.account_id) ?? null : null,
       owner: l.owner_id ? profilesMap.get(l.owner_id) ?? null : null,
+      nextActivity: nextByLead.get(l.id) ?? null,
     }));
     setLeads(merged as LeadWithRelations[]);
     setLoading(false);
