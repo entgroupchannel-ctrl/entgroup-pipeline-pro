@@ -144,7 +144,7 @@ export const loadLineMappings = createServerFn({ method: "GET" })
       .schema("crm").from("line_contact_mapping")
       .select(`
         line_uid, display_name, mapped_at,
-        contact:contact_id ( id, company_name, contact_name ),
+        contact:contact_id ( id, contact_name ),
         mapper:mapped_by ( id, full_name )
       `)
       .order("mapped_at", { ascending: false });
