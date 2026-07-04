@@ -13,13 +13,14 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedEmailsRouteImport } from './routes/_authenticated/emails'
 import { Route as AuthenticatedQuotationsRouteImport } from './routes/_authenticated/quotations'
 import { Route as AuthenticatedPipelineRouteImport } from './routes/_authenticated/pipeline'
+import { Route as AuthenticatedLeadsRouteImport } from './routes/_authenticated/leads'
 import { Route as AuthenticatedKpiRouteImport } from './routes/_authenticated/kpi'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedActivitiesRouteImport } from './routes/_authenticated/activities'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
-import { Route as AuthenticatedLeadsIndexRouteImport } from './routes/_authenticated/leads.index'
 import { Route as AuthenticatedLeadsLeadIdRouteImport } from './routes/_authenticated/leads.$leadId'
 import { Route as AuthenticatedAccountsAccountIdRouteImport } from './routes/_authenticated/accounts.$accountId'
 
@@ -42,6 +43,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedEmailsRoute = AuthenticatedEmailsRouteImport.update({
+  id: '/emails',
+  path: '/emails',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedQuotationsRoute = AuthenticatedQuotationsRouteImport.update({
   id: '/quotations',
   path: '/quotations',
@@ -50,6 +56,11 @@ const AuthenticatedQuotationsRoute = AuthenticatedQuotationsRouteImport.update({
 const AuthenticatedPipelineRoute = AuthenticatedPipelineRouteImport.update({
   id: '/pipeline',
   path: '/pipeline',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedLeadsRoute = AuthenticatedLeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedKpiRoute = AuthenticatedKpiRouteImport.update({
@@ -72,16 +83,11 @@ const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedLeadsIndexRoute = AuthenticatedLeadsIndexRouteImport.update({
-  id: '/leads/',
-  path: '/leads/',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedLeadsLeadIdRoute =
   AuthenticatedLeadsLeadIdRouteImport.update({
-    id: '/leads/$leadId',
-    path: '/leads/$leadId',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/$leadId',
+    path: '/$leadId',
+    getParentRoute: () => AuthenticatedLeadsRoute,
   } as any)
 const AuthenticatedAccountsAccountIdRoute =
   AuthenticatedAccountsAccountIdRouteImport.update({
@@ -97,12 +103,13 @@ export interface FileRoutesByFullPath {
   '/activities': typeof AuthenticatedActivitiesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/kpi': typeof AuthenticatedKpiRoute
+  '/leads': typeof AuthenticatedLeadsRouteWithChildren
   '/pipeline': typeof AuthenticatedPipelineRoute
+  '/emails': typeof AuthenticatedEmailsRoute
   '/quotations': typeof AuthenticatedQuotationsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/accounts/$accountId': typeof AuthenticatedAccountsAccountIdRoute
   '/leads/$leadId': typeof AuthenticatedLeadsLeadIdRoute
-  '/leads/': typeof AuthenticatedLeadsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -111,12 +118,13 @@ export interface FileRoutesByTo {
   '/activities': typeof AuthenticatedActivitiesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/kpi': typeof AuthenticatedKpiRoute
+  '/leads': typeof AuthenticatedLeadsRouteWithChildren
   '/pipeline': typeof AuthenticatedPipelineRoute
+  '/emails': typeof AuthenticatedEmailsRoute
   '/quotations': typeof AuthenticatedQuotationsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/accounts/$accountId': typeof AuthenticatedAccountsAccountIdRoute
   '/leads/$leadId': typeof AuthenticatedLeadsLeadIdRoute
-  '/leads': typeof AuthenticatedLeadsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -127,12 +135,13 @@ export interface FileRoutesById {
   '/_authenticated/activities': typeof AuthenticatedActivitiesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/kpi': typeof AuthenticatedKpiRoute
+  '/_authenticated/leads': typeof AuthenticatedLeadsRouteWithChildren
   '/_authenticated/pipeline': typeof AuthenticatedPipelineRoute
+  '/_authenticated/emails': typeof AuthenticatedEmailsRoute
   '/_authenticated/quotations': typeof AuthenticatedQuotationsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/accounts/$accountId': typeof AuthenticatedAccountsAccountIdRoute
   '/_authenticated/leads/$leadId': typeof AuthenticatedLeadsLeadIdRoute
-  '/_authenticated/leads/': typeof AuthenticatedLeadsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -143,12 +152,13 @@ export interface FileRouteTypes {
     | '/activities'
     | '/dashboard'
     | '/kpi'
+    | '/leads'
     | '/pipeline'
+    | '/emails'
     | '/quotations'
     | '/settings'
     | '/accounts/$accountId'
     | '/leads/$leadId'
-    | '/leads/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -157,12 +167,13 @@ export interface FileRouteTypes {
     | '/activities'
     | '/dashboard'
     | '/kpi'
+    | '/leads'
     | '/pipeline'
+    | '/emails'
     | '/quotations'
     | '/settings'
     | '/accounts/$accountId'
     | '/leads/$leadId'
-    | '/leads'
   id:
     | '__root__'
     | '/'
@@ -172,12 +183,13 @@ export interface FileRouteTypes {
     | '/_authenticated/activities'
     | '/_authenticated/dashboard'
     | '/_authenticated/kpi'
+    | '/_authenticated/leads'
     | '/_authenticated/pipeline'
+    | '/_authenticated/emails'
     | '/_authenticated/quotations'
     | '/_authenticated/settings'
     | '/_authenticated/accounts/$accountId'
     | '/_authenticated/leads/$leadId'
-    | '/_authenticated/leads/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -216,6 +228,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/emails': {
+      id: '/_authenticated/emails'
+      path: '/emails'
+      fullPath: '/emails'
+      preLoaderRoute: typeof AuthenticatedEmailsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/quotations': {
       id: '/_authenticated/quotations'
       path: '/quotations'
@@ -228,6 +247,13 @@ declare module '@tanstack/react-router' {
       path: '/pipeline'
       fullPath: '/pipeline'
       preLoaderRoute: typeof AuthenticatedPipelineRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/leads': {
+      id: '/_authenticated/leads'
+      path: '/leads'
+      fullPath: '/leads'
+      preLoaderRoute: typeof AuthenticatedLeadsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/kpi': {
@@ -258,19 +284,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccountsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/leads/': {
-      id: '/_authenticated/leads/'
-      path: '/leads'
-      fullPath: '/leads/'
-      preLoaderRoute: typeof AuthenticatedLeadsIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/leads/$leadId': {
       id: '/_authenticated/leads/$leadId'
-      path: '/leads/$leadId'
+      path: '/$leadId'
       fullPath: '/leads/$leadId'
       preLoaderRoute: typeof AuthenticatedLeadsLeadIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedLeadsRoute
     }
     '/_authenticated/accounts/$accountId': {
       id: '/_authenticated/accounts/$accountId'
@@ -295,28 +314,39 @@ const AuthenticatedAccountsRouteWithChildren =
     AuthenticatedAccountsRouteChildren,
   )
 
+interface AuthenticatedLeadsRouteChildren {
+  AuthenticatedLeadsLeadIdRoute: typeof AuthenticatedLeadsLeadIdRoute
+}
+
+const AuthenticatedLeadsRouteChildren: AuthenticatedLeadsRouteChildren = {
+  AuthenticatedLeadsLeadIdRoute: AuthenticatedLeadsLeadIdRoute,
+}
+
+const AuthenticatedLeadsRouteWithChildren =
+  AuthenticatedLeadsRoute._addFileChildren(AuthenticatedLeadsRouteChildren)
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRouteWithChildren
   AuthenticatedActivitiesRoute: typeof AuthenticatedActivitiesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedEmailsRoute: typeof AuthenticatedEmailsRoute
   AuthenticatedKpiRoute: typeof AuthenticatedKpiRoute
+  AuthenticatedLeadsRoute: typeof AuthenticatedLeadsRouteWithChildren
   AuthenticatedPipelineRoute: typeof AuthenticatedPipelineRoute
   AuthenticatedQuotationsRoute: typeof AuthenticatedQuotationsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
-  AuthenticatedLeadsLeadIdRoute: typeof AuthenticatedLeadsLeadIdRoute
-  AuthenticatedLeadsIndexRoute: typeof AuthenticatedLeadsIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccountsRoute: AuthenticatedAccountsRouteWithChildren,
   AuthenticatedActivitiesRoute: AuthenticatedActivitiesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedEmailsRoute: AuthenticatedEmailsRoute,
   AuthenticatedKpiRoute: AuthenticatedKpiRoute,
+  AuthenticatedLeadsRoute: AuthenticatedLeadsRouteWithChildren,
   AuthenticatedPipelineRoute: AuthenticatedPipelineRoute,
   AuthenticatedQuotationsRoute: AuthenticatedQuotationsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
-  AuthenticatedLeadsLeadIdRoute: AuthenticatedLeadsLeadIdRoute,
-  AuthenticatedLeadsIndexRoute: AuthenticatedLeadsIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
