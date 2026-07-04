@@ -48,6 +48,31 @@ function Dashboard() {
     })();
   }, []);
 
+  const now = new Date();
+  const monthStart = useMemo(() => new Date(now.getFullYear(), now.getMonth(), 1), []);
+
+  const perOwner = useMemo(() => {
+    if (!data) return [];
+    const map = new Map<string, any>();
+    for (const l of data.leads) {
+      const oid = l.owner_id ?? "unassigned";
+      if (!map.has(oid)) {
+        map.set(oid, { owner_id: oid, active: 0, active_value: 0, won_this_month: 0, won_total: 0, lost_total: 0 });
+      }
+      const rec = map.get(oid);
+      if (ACTIVE_STAGES.includes(l.stage)) {
+        rec.active += 1;
+        rec.active_value += Number(l.expected_value ?? 0);
+      }
+      if (l.stage === "won") {
+        rec.won_total += 1;
+        if (l.actual_close_date && new Date(l.actual_close_date) >= monthStart) rec.won_this_month += 1;
+      }
+      if (l.stage === "lost") rec.lost_total += 1;
+    }
+    return Array.from(map.values());
+  }, [data, monthStart]);
+
   if (!data) {
     return (
       <div className="flex h-full items-center justify-center py-24">
@@ -70,8 +95,6 @@ function Dashboard() {
     .map((l) => (new Date(l.actual_close_date).getTime() - new Date(l.created_at).getTime()) / 86400000);
   const avgCycle = cycleDays.length ? cycleDays.reduce((a, b) => a + b, 0) / cycleDays.length : 0;
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const dealsThisMonth = leads.filter((l) => new Date(l.created_at) >= monthStart).length;
 
   const stageData = [...ACTIVE_STAGES, ...OUTCOME_STAGES].map((s) => ({
@@ -80,27 +103,6 @@ function Dashboard() {
     value: leads.filter((l) => l.stage === s).reduce((sum, l) => sum + Number(l.expected_value ?? 0), 0),
   }));
 
-  const perOwner = useMemo(() => {
-    const map = new Map<string, any>();
-    for (const l of leads) {
-      const oid = l.owner_id ?? "unassigned";
-      if (!map.has(oid)) {
-        map.set(oid, { owner_id: oid, active: 0, active_value: 0, won_this_month: 0, won_total: 0, lost_total: 0 });
-      }
-      const rec = map.get(oid);
-      if (ACTIVE_STAGES.includes(l.stage)) {
-        rec.active += 1;
-        rec.active_value += Number(l.expected_value ?? 0);
-      }
-      if (l.stage === "won") {
-        rec.won_total += 1;
-        if (l.actual_close_date && new Date(l.actual_close_date) >= monthStart) rec.won_this_month += 1;
-      }
-      if (l.stage === "lost") rec.lost_total += 1;
-    }
-    return Array.from(map.values());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads]);
 
   return (
     <div className="space-y-6 p-6">
