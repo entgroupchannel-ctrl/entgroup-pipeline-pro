@@ -22,6 +22,7 @@ import {
 import { formatThaiDate as formatThaiDay } from "@/lib/format";
 import { fetchFADocument, type FADocument } from "@/lib/flowaccount-client";
 import { FAImportModal } from "@/components/flowaccount/FAImportModal";
+import { LeadQuotationsSection } from "@/components/pipeline/LeadQuotationsSection";
 import { X as XIcon, FileDown } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/leads/$leadId")({
@@ -467,6 +468,8 @@ function LeadDetailPage() {
           </div>
 
           <FAImportModal open={faImportOpen} onOpenChange={setFaImportOpen} onImported={load} />
+
+          <LeadQuotationsSection leadId={leadId} accountId={lead.account_id} />
 
           <Section title="บริษัทและผู้ติดต่อ">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
