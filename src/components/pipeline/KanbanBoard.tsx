@@ -299,6 +299,27 @@ export function KanbanBoard({ sourceFilter = "all", showClaimButton = false }: K
       )}
 
       <div className="flex-1 overflow-x-auto p-6">
+        {sourceFilter === "line" && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            {([
+              ["all", "ทั้งหมด", lineCounts.all],
+              ["unclaimed", "รอรับงาน", lineCounts.unclaimed],
+              ["mine", "ของฉัน", lineCounts.mine],
+            ] as const).map(([key, label, count]) => (
+              <button
+                key={key}
+                onClick={() => setLineSubFilter(key)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  lineSubFilter === key
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "bg-background hover:bg-muted"
+                }`}
+              >
+                {label} <span className="ml-1 opacity-70">({count})</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         <DndContext
           sensors={sensors}
@@ -320,9 +341,14 @@ export function KanbanBoard({ sourceFilter = "all", showClaimButton = false }: K
                 onDuplicate={duplicateLead}
                 lineUnreadCounts={unreadCounts}
                 onLineBadgeClear={clearBadge}
+                showClaimButton={showClaimButton}
+                currentUserId={user?.id}
+                onClaim={loadLeads}
+                linePreviews={sourceFilter === "line" ? linePreviews : undefined}
               />
             ))}
           </div>
+
 
           <DragOverlay>
             {active ? (
