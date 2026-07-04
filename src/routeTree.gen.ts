@@ -16,6 +16,7 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedQuotationsRouteImport } from './routes/_authenticated/quotations'
 import { Route as AuthenticatedPipelineRouteImport } from './routes/_authenticated/pipeline'
 import { Route as AuthenticatedLeadsRouteImport } from './routes/_authenticated/leads'
+import { Route as AuthenticatedKpiRouteImport } from './routes/_authenticated/kpi'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedActivitiesRouteImport } from './routes/_authenticated/activities'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
@@ -56,6 +57,11 @@ const AuthenticatedLeadsRoute = AuthenticatedLeadsRouteImport.update({
   path: '/leads',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedKpiRoute = AuthenticatedKpiRouteImport.update({
+  id: '/kpi',
+  path: '/kpi',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/accounts': typeof AuthenticatedAccountsRouteWithChildren
   '/activities': typeof AuthenticatedActivitiesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/kpi': typeof AuthenticatedKpiRoute
   '/leads': typeof AuthenticatedLeadsRouteWithChildren
   '/pipeline': typeof AuthenticatedPipelineRoute
   '/quotations': typeof AuthenticatedQuotationsRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/accounts': typeof AuthenticatedAccountsRouteWithChildren
   '/activities': typeof AuthenticatedActivitiesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/kpi': typeof AuthenticatedKpiRoute
   '/leads': typeof AuthenticatedLeadsRouteWithChildren
   '/pipeline': typeof AuthenticatedPipelineRoute
   '/quotations': typeof AuthenticatedQuotationsRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/_authenticated/accounts': typeof AuthenticatedAccountsRouteWithChildren
   '/_authenticated/activities': typeof AuthenticatedActivitiesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/kpi': typeof AuthenticatedKpiRoute
   '/_authenticated/leads': typeof AuthenticatedLeadsRouteWithChildren
   '/_authenticated/pipeline': typeof AuthenticatedPipelineRoute
   '/_authenticated/quotations': typeof AuthenticatedQuotationsRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/activities'
     | '/dashboard'
+    | '/kpi'
     | '/leads'
     | '/pipeline'
     | '/quotations'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/activities'
     | '/dashboard'
+    | '/kpi'
     | '/leads'
     | '/pipeline'
     | '/quotations'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/_authenticated/accounts'
     | '/_authenticated/activities'
     | '/_authenticated/dashboard'
+    | '/_authenticated/kpi'
     | '/_authenticated/leads'
     | '/_authenticated/pipeline'
     | '/_authenticated/quotations'
@@ -223,6 +235,13 @@ declare module '@tanstack/react-router' {
       path: '/leads'
       fullPath: '/leads'
       preLoaderRoute: typeof AuthenticatedLeadsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/kpi': {
+      id: '/_authenticated/kpi'
+      path: '/kpi'
+      fullPath: '/kpi'
+      preLoaderRoute: typeof AuthenticatedKpiRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
@@ -291,6 +310,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRouteWithChildren
   AuthenticatedActivitiesRoute: typeof AuthenticatedActivitiesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedKpiRoute: typeof AuthenticatedKpiRoute
   AuthenticatedLeadsRoute: typeof AuthenticatedLeadsRouteWithChildren
   AuthenticatedPipelineRoute: typeof AuthenticatedPipelineRoute
   AuthenticatedQuotationsRoute: typeof AuthenticatedQuotationsRoute
@@ -301,6 +321,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccountsRoute: AuthenticatedAccountsRouteWithChildren,
   AuthenticatedActivitiesRoute: AuthenticatedActivitiesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedKpiRoute: AuthenticatedKpiRoute,
   AuthenticatedLeadsRoute: AuthenticatedLeadsRouteWithChildren,
   AuthenticatedPipelineRoute: AuthenticatedPipelineRoute,
   AuthenticatedQuotationsRoute: AuthenticatedQuotationsRoute,
@@ -318,3 +339,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
