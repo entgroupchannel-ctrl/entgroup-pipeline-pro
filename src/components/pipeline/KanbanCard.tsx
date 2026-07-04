@@ -21,7 +21,12 @@ interface Props {
   onDuplicate?: () => void;
   lineUnread?: number;
   onLineBadgeClear?: () => void;
+  showClaimButton?: boolean;
+  currentUserId?: string;
+  onClaim?: () => void;
+  linePreview?: string;
 }
+
 
 // Priority: 0 = none, 1 = low, 2 = medium, 3 = high
 function PriorityStars({ priority, leadId, onChange }: {
