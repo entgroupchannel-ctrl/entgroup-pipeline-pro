@@ -187,22 +187,16 @@ export function FAImportModal({ open, onOpenChange, onImported }: Props) {
               ) : (
                 <ul className="divide-y">
                   {filtered.map((d) => {
-                    const used = !!d.created_rfq_id;
                     const isQT = d.document_type === "quotation";
                     const isSelected = selected?.id === d.id;
                     return (
                       <li key={d.id}>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (used) {
-                              toast.warning("เอกสารนี้ถูกใช้แล้วในระบบ", { description: "จะสร้าง Lead ใหม่ซ้ำ" });
-                            }
-                            selectDoc(d);
-                          }}
+                          onClick={() => selectDoc(d)}
                           className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-muted/50 ${
                             isSelected ? "bg-primary/5" : ""
-                          } ${used ? "opacity-60" : ""}`}
+                          }`}
                         >
                           <span
                             className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${
@@ -216,7 +210,6 @@ export function FAImportModal({ open, onOpenChange, onImported }: Props) {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="truncate font-mono text-xs font-semibold">{d.document_serial}</span>
-                              {used && <Badge variant="outline" className="h-4 text-[9px]">ใช้แล้ว</Badge>}
                             </div>
                             <div className="truncate text-xs text-muted-foreground">{d.contact_name ?? "-"}</div>
                           </div>
