@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/lib/auth-context";
 import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type LeadStage, type UserProfile } from "@/lib/crm";
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABEL, type ActivityType } from "@/lib/activities";
-import { Plus } from "lucide-react";
+import { Plus, UserPlus } from "lucide-react";
+import { InviteUserModal } from "@/components/InviteUserModal";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -101,6 +102,8 @@ function ProfileTab() {
 
 function TeamTab() {
   const [rows, setRows] = useState<UserProfile[] | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+
   const load = async () => {
     const { data } = await crmDb().from("user_profiles").select("*").order("full_name");
     setRows((data ?? []) as UserProfile[]);
@@ -119,7 +122,14 @@ function TeamTab() {
   }
 
   return (
-    <div className="rounded-xl border bg-card">
+    <>
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">{rows.length} ผู้ใช้</p>
+        <Button size="sm" onClick={() => setInviteOpen(true)}>
+          <UserPlus className="mr-1.5 h-4 w-4" /> เชิญผู้ใช้
+        </Button>
+      </div>
+      <div className="rounded-xl border bg-card">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left text-xs text-muted-foreground">
@@ -156,6 +166,8 @@ function TeamTab() {
         </tbody>
       </table>
     </div>
+      <InviteUserModal open={inviteOpen} onOpenChange={setInviteOpen} onInvited={load} />
+    </>
   );
 }
 
