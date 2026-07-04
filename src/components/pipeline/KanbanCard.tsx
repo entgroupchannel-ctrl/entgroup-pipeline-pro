@@ -7,6 +7,7 @@ import { crmDb, type Lead, type LeadStage } from "@/lib/crm";
 import { activityIcon, type Activity } from "@/lib/activities";
 import { toast } from "sonner";
 import { useRef, useState } from "react";
+import { LineBadge } from "./LineBadge";
 
 interface Props {
   lead: Lead & {
@@ -18,6 +19,8 @@ interface Props {
   draggable?: boolean;
   onDelete?: () => void;
   onDuplicate?: () => void;
+  lineUnread?: number;
+  onLineBadgeClear?: () => void;
 }
 
 // Priority: 0 = none, 1 = low, 2 = medium, 3 = high
@@ -57,7 +60,7 @@ function PriorityStars({ priority, leadId, onChange }: {
   );
 }
 
-export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDuplicate }: Props) {
+export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDuplicate, lineUnread = 0, onLineBadgeClear }: Props) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id, disabled: !draggable });
   const downRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -98,7 +101,7 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
         if (!d) return;
         const dx = e.clientX - d.x;
         const dy = e.clientY - d.y;
-        if (Math.hypot(dx, dy) < 6) onClick?.();
+        if (Math.hypot(dx, dy) < 6) { onLineBadgeClear?.(); onClick?.(); }
       }}
       className="group cursor-pointer rounded-lg border bg-card p-3 shadow-sm transition-all hover:shadow-md hover:border-primary/30 select-none touch-none"
     >
@@ -112,6 +115,7 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
           <GripVertical className="h-4 w-4" />
         </div>
         <h3 className="line-clamp-2 text-sm font-semibold leading-snug flex-1">{lead.title}</h3>
+        <LineBadge count={lineUnread} />
         <div
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
