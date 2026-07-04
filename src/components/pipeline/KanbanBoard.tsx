@@ -18,9 +18,13 @@ import { formatBaht } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { KanbanCard } from "./KanbanCard";
 import { NewLeadDialog } from "./NewLeadDialog";
-import { FlowAccountImportDialog } from "./FlowAccountImportDialog";
+import { FAImportModal } from "@/components/flowaccount/FAImportModal";
+import { fetchFALastSync } from "@/lib/flowaccount-client";
+import { formatThaiDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { RefreshCw } from "lucide-react";
 
 import type { Activity } from "@/lib/activities";
 
