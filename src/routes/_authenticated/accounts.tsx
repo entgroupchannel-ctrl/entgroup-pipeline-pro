@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Search, Plus, Building2, Star, Crown, Trash2, Download } from "lucide-react";
 import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
@@ -37,6 +37,7 @@ interface Account {
 
 function AccountsPage() {
   const { user, role } = useAuth();
+  const navigate = useNavigate();
   const confirm = useConfirm();
   const isManager = role === "manager" || role === "admin";
 
@@ -183,17 +184,11 @@ function AccountsPage() {
               </thead>
               <tbody className="divide-y">
                 {filtered.map((a) => (
-                  <tr key={a.id} className={`hover:bg-muted/30 transition-colors ${selected.has(a.id) ? "bg-primary/5" : ""}`}>
-                    <td className="px-3 py-3"><Checkbox checked={selected.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} /></td>
+                  <tr key={a.id} className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected.has(a.id) ? "bg-primary/5" : ""}`} onClick={() => navigate({ to: "/accounts/$accountId", params: { accountId: a.id } })}>
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}><Checkbox checked={selected.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Link
-                          to="/accounts/$accountId"
-                          params={{ accountId: a.id }}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {a.name}
-                        </Link>
+                        <span className="font-medium text-primary">{a.name}</span>
                         {a.is_key_account && (
                           <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
                             <Crown className="h-2.5 w-2.5" /> Key Account
@@ -204,7 +199,7 @@ function AccountsPage() {
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {a.industry ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-xs">
+                    <td className="px-4 py-3 text-xs" onClick={(e) => e.stopPropagation()}>
                       {a.website ? (
                         <a
                           href={a.website.startsWith("http") ? a.website : `https://${a.website}`}
@@ -229,7 +224,7 @@ function AccountsPage() {
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {formatThaiDate(a.created_at)}
                     </td>
-                    <td className="px-2 py-3">
+                    <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                       <RowActions actions={[
                         stdOpen(() => window.location.assign(`/accounts/${a.id}`)),
                         stdDupe(() => duplicateAccount(a)),
