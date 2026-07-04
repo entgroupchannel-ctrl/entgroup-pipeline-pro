@@ -49,6 +49,8 @@ function LeadDetailPage() {
   const [qtEditing, setQtEditing] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [chatterText, setChatterText] = useState("");
+  const [faDoc, setFaDoc] = useState<FADocument | null>(null);
+  const [faImportOpen, setFaImportOpen] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
