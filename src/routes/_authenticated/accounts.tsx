@@ -108,7 +108,7 @@ function AccountsPage() {
   const handleExport = () => {
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
     const profMap = new Map<string, { name: string }>(
-      Array.from(new Set(filtered.map(a => a.owner_id).filter(Boolean))).map(id => [id, { name: id }])
+      Array.from(new Set(filtered.map(a => a.owner_id).filter((id): id is string => id !== null))).map(id => [id, { name: id }])
     );
     const rows = accountsToRows(filtered, leadsCount, profMap);
     exportToCsv(`accounts-${new Date().toISOString().slice(0,10)}.csv`, rows);
