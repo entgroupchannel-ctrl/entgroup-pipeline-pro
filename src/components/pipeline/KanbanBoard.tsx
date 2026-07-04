@@ -23,9 +23,12 @@ import { FlowAccountImportDialog } from "./FlowAccountImportDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import type { Activity } from "@/lib/activities";
+
 interface LeadWithRelations extends Lead {
   account?: Account | null;
   owner?: { id: string; full_name: string | null } | null;
+  nextActivity?: Activity | null;
 }
 
 export function KanbanBoard() {
