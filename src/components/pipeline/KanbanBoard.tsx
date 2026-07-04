@@ -29,11 +29,14 @@ interface LeadWithRelations extends Lead {
 }
 
 export function KanbanBoard() {
+  const { user } = useAuth();
   const [leads, setLeads] = useState<LeadWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [overdueCount, setOverdueCount] = useState(0);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
