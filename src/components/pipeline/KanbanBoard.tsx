@@ -49,6 +49,24 @@ export function KanbanBoard() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
+  const deleteLead = async (id: string) => {
+    if (!confirm("ลบดีลนี้?")) return;
+    const { error } = await crmDb().from("leads").delete().eq("id", id);
+    if (error) { toast.error("ลบไม่สำเร็จ"); return; }
+    toast.success("ลบแล้ว"); loadLeads();
+  };
+
+  const duplicateLead = async (lead: LeadWithRelations) => {
+    const { error } = await crmDb().from("leads").insert({
+      title: `${lead.title} (สำเนา)`, stage: "new",
+      expected_value: lead.expected_value, account_id: lead.account_id,
+      contact_id: lead.contact_id, source: lead.source, owner_id: lead.owner_id,
+      created_by: user?.id,
+    });
+    if (error) { toast.error("สร้างซ้ำไม่สำเร็จ"); return; }
+    toast.success("สร้างซ้ำแล้ว"); loadLeads();
+  };
+
   const loadLeads = async () => {
     const [leadsRes, accountsRes, profilesRes] = await Promise.all([
       crmDb().from("leads").select("*").order("updated_at", { ascending: false }),
@@ -236,6 +254,8 @@ export function KanbanBoard() {
                 onCardClick={openLead}
                 activeId={activeId}
                 totalPipeline={totalPipeline}
+                onDelete={deleteLead}
+                onDuplicate={duplicateLead}
               />
             ))}
           </div>
@@ -310,6 +330,8 @@ function Column({
   onCardClick,
   activeId,
   totalPipeline,
+  onDelete,
+  onDuplicate,
 }: {
   stage: LeadStage;
   leads: LeadWithRelations[];
@@ -317,7 +339,10 @@ function Column({
   onCardClick: (id: string) => void;
   activeId: string | null;
   totalPipeline: number;
+  onDelete: (id: string) => void;
+  onDuplicate: (lead: LeadWithRelations) => void;
 }) {
+
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const sum = leads.reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
 
@@ -366,7 +391,13 @@ function Column({
         ) : (
           leads.map((l) => (
             <div key={l.id} className={activeId === l.id ? "opacity-30" : ""}>
-              <KanbanCard lead={l} onClick={() => onCardClick(l.id)} draggable />
+              <KanbanCard
+                lead={l}
+                onClick={() => onCardClick(l.id)}
+                draggable
+                onDelete={() => onDelete(l.id)}
+                onDuplicate={() => onDuplicate(l)}
+              />
             </div>
           ))
         )}

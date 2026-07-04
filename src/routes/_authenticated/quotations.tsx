@@ -15,6 +15,8 @@ import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { formatBaht, formatThaiDate } from "@/lib/format";
 import { fetchFADocuments, type FADocument } from "@/lib/flowaccount-client";
+import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete } from "@/components/ui/row-actions";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/_authenticated/quotations")({
   component: QuotationsPage,
@@ -80,6 +82,7 @@ function QuotationsPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [faOpen, setFaOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Quotation | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = async () => {
     let qb = crmDb().from("quotations").select("*").order("created_at", { ascending: false });
@@ -98,6 +101,45 @@ function QuotationsPage() {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [user?.id, isManager]);
+
+  const toggleSelect = (id: string) => setSelected(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const selectAll = () => setSelected(new Set((filtered ?? []).map(r => r.id)));
+  const clearAll  = () => setSelected(new Set());
+
+  const deleteQuotation = async (id: string) => {
+    if (!confirm("ลบใบเสนอราคานี้?")) return;
+    const { error } = await crmDb().from("quotations").delete().eq("id", id);
+    if (error) { toast.error("ลบไม่สำเร็จ"); return; }
+    toast.success("ลบแล้ว"); load();
+  };
+
+  const duplicateQuotation = async (r: Quotation) => {
+    const { error } = await crmDb().from("quotations").insert({
+      lead_id: r.lead_id, account_id: r.account_id,
+      title: `${r.title} (สำเนา)`, source: "crm",
+      subtotal: r.subtotal, discount: r.discount, vat_amount: r.vat_amount,
+      grand_total: r.grand_total, status: "draft",
+      issued_date: new Date().toISOString().slice(0, 10),
+      owner_id: r.owner_id, created_by: user?.id,
+    });
+    if (error) { toast.error("สร้างซ้ำไม่สำเร็จ"); return; }
+    toast.success("สร้างซ้ำแล้ว"); load();
+  };
+
+  const bulkDelete = async () => {
+    if (!confirm(`ลบ ${selected.size} รายการ?`)) return;
+    const ids = Array.from(selected);
+    const { error } = await crmDb().from("quotations").delete().in("id", ids);
+    if (error) { toast.error("ลบไม่สำเร็จ"); return; }
+    toast.success(`ลบ ${ids.length} รายการแล้ว`); clearAll(); load();
+  };
+
+  const bulkUpdateStatus = async (status: QuotationStatus) => {
+    const ids = Array.from(selected);
+    const { error } = await crmDb().from("quotations").update({ status }).in("id", ids);
+    if (error) { toast.error("อัปเดตไม่สำเร็จ"); return; }
+    toast.success(`อัปเดต ${ids.length} รายการเป็น ${STATUS_LABEL[status]} แล้ว`); clearAll(); load();
+  };
 
   const filtered = useMemo(() => {
     if (!rows) return null;
@@ -166,6 +208,18 @@ function QuotationsPage() {
         </div>
       </div>
 
+      <BulkActionBar
+        count={selected.size}
+        total={filtered?.length ?? 0}
+        onSelectAll={selectAll}
+        onClearAll={clearAll}
+        actions={[
+          { label: "ส่งแล้ว", onClick: () => bulkUpdateStatus("sent") },
+          { label: "อนุมัติ", onClick: () => bulkUpdateStatus("accepted") },
+          { label: "ลบที่เลือก", icon: <span>🗑</span>, onClick: bulkDelete, variant: "danger" },
+        ]}
+      />
+
       {filtered === null ? (
         <div className="flex justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -181,6 +235,7 @@ function QuotationsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                  <th className="px-3 py-2.5 w-8"><Checkbox checked={!!filtered?.length && selected.size === filtered.length} onCheckedChange={(v) => v ? selectAll() : clearAll()} /></th>
                   <th className="px-4 py-2.5 text-left font-medium">เลขที่</th>
                   <th className="px-4 py-2.5 text-left font-medium">ชื่อ / บริษัท</th>
                   <th className="px-4 py-2.5 text-left font-medium">ดีล</th>
@@ -190,7 +245,7 @@ function QuotationsPage() {
                   <th className="px-4 py-2.5 text-left font-medium">วันที่ออก</th>
                   <th className="px-4 py-2.5 text-left font-medium">ใช้ได้ถึง</th>
                   <th className="px-4 py-2.5 text-left font-medium">เจ้าของ</th>
-                  <th className="px-2 py-2.5" />
+                  <th className="px-2 py-2.5 w-8" />
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -198,11 +253,15 @@ function QuotationsPage() {
                   <QuotationRow
                     key={r.id}
                     row={r}
+                    selected={selected.has(r.id)}
+                    onSelect={() => toggleSelect(r.id)}
                     leadTitle={r.lead_id ? leadsMap.get(r.lead_id) : undefined}
                     accountName={r.account_id ? accountsMap.get(r.account_id) : undefined}
                     ownerName={r.owner_id ? profilesMap.get(r.owner_id) : undefined}
                     onEdit={() => { setEditTarget(r); setNewOpen(true); }}
                     onStatusChange={(s) => updateStatus(r.id, s)}
+                    onDelete={() => deleteQuotation(r.id)}
+                    onDuplicate={() => duplicateQuotation(r)}
                   />
                 ))}
               </tbody>
@@ -229,19 +288,24 @@ function QuotationsPage() {
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
 function QuotationRow({
-  row, leadTitle, accountName, ownerName, onEdit, onStatusChange,
+  row, selected, onSelect, leadTitle, accountName, ownerName, onEdit, onStatusChange, onDelete, onDuplicate,
 }: {
   row: Quotation;
+  selected?: boolean;
+  onSelect?: () => void;
   leadTitle?: string;
   accountName?: string;
   ownerName?: string;
   onEdit: () => void;
   onStatusChange: (s: QuotationStatus) => void;
+  onDelete?: () => void;
+  onDuplicate?: () => void;
 }) {
   const [statusOpen, setStatusOpen] = useState(false);
 
   return (
-    <tr className="hover:bg-muted/30 transition-colors">
+    <tr className={`hover:bg-muted/30 transition-colors ${selected ? "bg-primary/5" : ""}`}>
+      <td className="px-3 py-3"><Checkbox checked={!!selected} onCheckedChange={() => onSelect?.()} /></td>
       <td className="px-4 py-3">
         <span className="font-mono text-xs font-semibold text-muted-foreground">
           {row.quotation_no ?? "—"}
@@ -324,9 +388,11 @@ function QuotationRow({
         {ownerName ?? "—"}
       </td>
       <td className="px-2 py-3">
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onEdit}>
-          แก้ไข
-        </Button>
+        <RowActions actions={[
+          stdEdit(onEdit),
+          stdDupe(onDuplicate ?? (() => {})),
+          stdDelete(onDelete ?? (() => {})),
+        ]} />
       </td>
     </tr>
   );

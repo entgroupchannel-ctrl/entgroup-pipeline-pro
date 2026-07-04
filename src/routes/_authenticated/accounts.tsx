@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Search, Plus, Building2, Star, Crown } from "lucide-react";
+import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +41,7 @@ function AccountsPage() {
   const [leadsCount, setLeadsCount] = useState<Map<string, number>>(new Map());
   const [q, setQ] = useState("");
   const [newOpen, setNewOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = async () => {
     const [accRes, leadsRes] = await Promise.all([
@@ -57,6 +60,34 @@ function AccountsPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  const toggleSelect = (id: string) => setSelected(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const selectAll = () => setSelected(new Set((filtered ?? []).map(a => a.id)));
+  const clearAll  = () => setSelected(new Set());
+
+  const duplicateAccount = async (a: Account) => {
+    const { error } = await crmDb().from("accounts").insert({
+      name: `${a.name} (สำเนา)`, industry: a.industry, website: a.website,
+      phone: a.phone, address: a.address, owner_id: user?.id, created_by: user?.id,
+    });
+    if (error) { toast.error("สร้างซ้ำไม่สำเร็จ"); return; }
+    toast.success("สร้างซ้ำแล้ว"); load();
+  };
+
+  const deleteAccount = async (id: string) => {
+    if (!confirm("ลบบริษัทนี้? (ดีลที่เชื่อมอยู่จะไม่ถูกลบ)")) return;
+    const { error } = await crmDb().from("accounts").delete().eq("id", id);
+    if (error) { toast.error("ลบไม่สำเร็จ"); return; }
+    toast.success("ลบแล้ว"); load();
+  };
+
+  const bulkDelete = async () => {
+    if (!confirm(`ลบ ${selected.size} บริษัท?`)) return;
+    const ids = Array.from(selected);
+    const { error } = await crmDb().from("accounts").delete().in("id", ids);
+    if (error) { toast.error("ลบไม่สำเร็จ"); return; }
+    toast.success(`ลบ ${ids.length} รายการแล้ว`); clearAll(); load();
+  };
 
   const filtered = useMemo(() => {
     if (!accounts) return null;
@@ -97,6 +128,14 @@ function AccountsPage() {
       </div>
 
       {/* List */}
+      <BulkActionBar
+        count={selected.size}
+        total={filtered?.length ?? 0}
+        onSelectAll={selectAll}
+        onClearAll={clearAll}
+        actions={[{ label: "ลบที่เลือก", icon: <span>🗑</span>, onClick: bulkDelete, variant: "danger" }]}
+      />
+
       {filtered === null ? (
         <div className="flex justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -112,17 +151,20 @@ function AccountsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                  <th className="px-3 py-2.5 w-8"><Checkbox checked={!!filtered?.length && selected.size === filtered.length} onCheckedChange={(v) => v ? selectAll() : clearAll()} /></th>
                   <th className="px-4 py-2.5 text-left font-medium">ชื่อบริษัท</th>
                   <th className="px-4 py-2.5 text-left font-medium">อุตสาหกรรม</th>
                   <th className="px-4 py-2.5 text-left font-medium">เว็บไซต์</th>
                   <th className="px-4 py-2.5 text-left font-medium">โทรศัพท์</th>
                   <th className="px-4 py-2.5 text-center font-medium">ดีล</th>
                   <th className="px-4 py-2.5 text-left font-medium">สร้างเมื่อ</th>
+                  <th className="px-2 py-2.5 w-8" />
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {filtered.map((a) => (
-                  <tr key={a.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={a.id} className={`hover:bg-muted/30 transition-colors ${selected.has(a.id) ? "bg-primary/5" : ""}`}>
+                    <td className="px-3 py-3"><Checkbox checked={selected.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Link
@@ -166,6 +208,13 @@ function AccountsPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {formatThaiDate(a.created_at)}
+                    </td>
+                    <td className="px-2 py-3">
+                      <RowActions actions={[
+                        stdOpen(() => window.location.assign(`/accounts/${a.id}`)),
+                        stdDupe(() => duplicateAccount(a)),
+                        stdDelete(() => deleteAccount(a.id)),
+                      ]} />
                     </td>
                   </tr>
                 ))}

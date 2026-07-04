@@ -1,4 +1,5 @@
 import { useDraggable } from "@dnd-kit/core";
+import { RowActions, stdEdit, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
 import { Star, Clock, FileText } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatBaht, daysBetween, timeFromNow, isOverdue } from "@/lib/format";
@@ -15,6 +16,8 @@ interface Props {
   };
   onClick: () => void;
   draggable?: boolean;
+  onDelete?: () => void;
+  onDuplicate?: () => void;
 }
 
 // Priority: 0 = none, 1 = low, 2 = medium, 3 = high
@@ -54,7 +57,7 @@ function PriorityStars({ priority, leadId, onChange }: {
   );
 }
 
-export function KanbanCard({ lead, onClick, draggable = false }: Props) {
+export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDuplicate }: Props) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id, disabled: !draggable });
 
   const priority = (lead as any).priority ?? 0;
@@ -90,8 +93,20 @@ export function KanbanCard({ lead, onClick, draggable = false }: Props) {
       onClick={onClick}
       className="group cursor-pointer rounded-lg border bg-card p-3 shadow-sm transition-all hover:shadow-md hover:border-primary/30 select-none"
     >
-      {/* Title */}
-      <h3 className="line-clamp-2 text-sm font-semibold leading-snug">{lead.title}</h3>
+      {/* Title row with 3-dot menu */}
+      <div className="flex items-start justify-between gap-1 -mr-1">
+        <h3 className="line-clamp-2 text-sm font-semibold leading-snug flex-1">{lead.title}</h3>
+        <div onClick={(e) => e.stopPropagation()} className="-mt-0.5">
+          <RowActions
+            align="right"
+            actions={[
+              stdOpen(onClick),
+              stdDupe(onDuplicate ?? (() => {})),
+              stdDelete(onDelete ?? (() => {})),
+            ]}
+          />
+        </div>
+      </div>
 
       {/* Account */}
       <p className="mt-0.5 truncate text-xs text-muted-foreground">{lead.account?.name ?? "ไม่ระบุบริษัท"}</p>
