@@ -166,22 +166,63 @@ export function KanbanBoard({ sourceFilter = "all", showClaimButton = false }: K
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const filteredLeads = useMemo(() => {
+    if (sourceFilter !== "line") return leads;
+    let list = leads.filter((l) => l.source === "line");
+    if (lineSubFilter === "unclaimed") list = list.filter((l) => !l.owner_id);
+    else if (lineSubFilter === "mine") list = list.filter((l) => l.owner_id === user?.id);
+    return list;
+  }, [leads, sourceFilter, lineSubFilter, user?.id]);
+
+  const lineCounts = useMemo(() => {
+    const src = leads.filter((l) => l.source === "line");
+    return {
+      all: src.length,
+      unclaimed: src.filter((l) => !l.owner_id).length,
+      mine: src.filter((l) => l.owner_id === user?.id).length,
+    };
+  }, [leads, user?.id]);
+
+  // Fetch latest LINE message preview per visible lead when on LINE tab
+  useEffect(() => {
+    if (sourceFilter !== "line") { setLinePreviews({}); return; }
+    const ids = leads.filter((l) => l.source === "line").map((l) => l.id);
+    if (ids.length === 0) { setLinePreviews({}); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await crmDb()
+        .from("activities")
+        .select("lead_id, body, created_at")
+        .in("lead_id", ids)
+        .eq("type", "line")
+        .order("created_at", { ascending: false });
+      if (cancelled) return;
+      const map: Record<string, string> = {};
+      for (const a of (data ?? []) as any[]) {
+        if (a.lead_id && !map[a.lead_id] && a.body) map[a.lead_id] = a.body;
+      }
+      setLinePreviews(map);
+    })();
+    return () => { cancelled = true; };
+  }, [sourceFilter, leads]);
+
   const totalPipeline = useMemo(
-    () => leads.filter((l) => ACTIVE_STAGES.includes(l.stage as LeadStage))
-               .reduce((s, l) => s + Number(l.expected_value ?? 0), 0),
-    [leads],
+    () => filteredLeads.filter((l) => ACTIVE_STAGES.includes(l.stage as LeadStage))
+                       .reduce((s, l) => s + Number(l.expected_value ?? 0), 0),
+    [filteredLeads],
   );
 
   const grouped = useMemo(() => {
     const g: Record<LeadStage, LeadWithRelations[]> = {
       new: [], qualified: [], proposal: [], negotiation: [], closing: [], won: [], lost: [],
     };
-    for (const l of leads) {
+    for (const l of filteredLeads) {
       const s = (l.stage as LeadStage) ?? "new";
       if (g[s]) g[s].push(l);
     }
     return g;
-  }, [leads]);
+  }, [filteredLeads]);
+
 
   const active = activeId ? leads.find((l) => l.id === activeId) : null;
 
