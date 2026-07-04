@@ -203,7 +203,7 @@ export function KanbanBoard() {
                 stage={stage}
                 leads={grouped[stage]}
                 loading={loading}
-                onCardClick={setSelectedLeadId}
+                onCardClick={openLead}
                 activeId={activeId}
               />
             ))}
