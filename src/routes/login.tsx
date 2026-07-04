@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import fujiHero from "@/assets/fuji-hero.jpg";
+import logoEntGroup from "@/assets/LOGO_ENTGroup.png.asset.json";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -106,13 +107,11 @@ function LoginPage() {
 
           {/* Logo + title */}
           <div className="text-center space-y-3">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/30">
-              <svg viewBox="0 0 24 24" className="h-7 w-7 fill-none stroke-white stroke-2 stroke-linecap-round stroke-linejoin-round">
-                <rect x="3" y="3" width="5" height="18" rx="1" />
-                <rect x="10" y="3" width="5" height="12" rx="1" />
-                <rect x="17" y="3" width="4" height="8" rx="1" />
-              </svg>
-            </div>
+            <img
+              src={logoEntGroup.url}
+              alt="ENTGROUP logo"
+              className="mx-auto h-16 w-auto object-contain"
+            />
             <div>
               <h1 className="text-2xl font-bold tracking-tight">ENTGROUP CRM</h1>
               <p className="mt-1 text-sm text-muted-foreground">
