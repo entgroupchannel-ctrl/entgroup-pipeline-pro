@@ -4,9 +4,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { formatBaht, daysBetween } from "@/lib/format";
 import { STAGE_LABEL_TH, type Lead, type LeadStage } from "@/lib/crm";
+import { activityIcon, timeFromNow, type Activity } from "@/lib/activities";
 
 interface Props {
-  lead: Lead & { account?: { name: string } | null; owner?: { full_name: string | null } | null };
+  lead: Lead & {
+    account?: { name: string } | null;
+    owner?: { full_name: string | null } | null;
+    nextActivity?: Activity | null;
+  };
   onClick: () => void;
   draggable?: boolean;
 }
@@ -22,6 +27,10 @@ export function KanbanCard({ lead, onClick, draggable = false }: Props) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
+
+  const next = lead.nextActivity ?? null;
+  const overdue = !!next?.due_at && new Date(next.due_at).getTime() < Date.now();
+  const NextIcon = next ? activityIcon(next.type) : null;
 
   return (
     <div
@@ -40,6 +49,28 @@ export function KanbanCard({ lead, onClick, draggable = false }: Props) {
       <p className="mt-1 truncate text-xs text-muted-foreground">{lead.account?.name ?? "ไม่ระบุบริษัท"}</p>
       <div className="mt-2 text-sm font-semibold text-foreground">{formatBaht(Number(lead.expected_value ?? 0))}</div>
 
+      {/* Next action badge */}
+      <div className="mt-2">
+        {next && NextIcon ? (
+          <div
+            className={`inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-1 text-[11px] font-medium ${
+              overdue
+                ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                : "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+            }`}
+          >
+            <NextIcon className="h-3 w-3 shrink-0" />
+            <span className="truncate">
+              {overdue ? "เลยกำหนด · " : ""}
+              {next.subject ?? "งานติดตาม"}
+              {!overdue && next.due_at ? ` · ${timeFromNow(next.due_at)}` : ""}
+            </span>
+          </div>
+        ) : (
+          <div className="text-[11px] text-muted-foreground">ไม่มีงานค้าง</div>
+        )}
+      </div>
+
       <div className="mt-3 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Avatar className="h-6 w-6">
@@ -53,9 +84,7 @@ export function KanbanCard({ lead, onClick, draggable = false }: Props) {
               <FileText className="h-2.5 w-2.5" /> QT
             </span>
           )}
-          {days > 14 && (
-            <Clock className="h-3.5 w-3.5 text-red-500" />
-          )}
+          {days > 14 && <Clock className="h-3.5 w-3.5 text-red-500" />}
         </div>
       </div>
     </div>
