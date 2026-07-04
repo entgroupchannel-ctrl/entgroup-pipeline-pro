@@ -24,6 +24,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import logoAsset from "@/assets/LOGO_ENTGroup.png.asset.json";
 
 const navItems = [
   { title: "Pipeline", url: "/pipeline", icon: KanbanSquare },
@@ -55,14 +56,12 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b">
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <KanbanSquare className="h-4 w-4" />
-          </div>
-          <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
-            <span className="text-sm font-semibold leading-tight">ENTGROUP</span>
-            <span className="text-xs text-muted-foreground leading-tight">CRM</span>
-          </div>
+        <div className="flex items-center gap-2 px-2 py-2">
+          <img
+            src={logoAsset.url}
+            alt="ENTGROUP"
+            className="h-8 w-auto object-contain"
+          />
         </div>
       </SidebarHeader>
 
