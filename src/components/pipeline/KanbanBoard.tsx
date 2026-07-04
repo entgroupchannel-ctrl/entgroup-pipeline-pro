@@ -243,6 +243,7 @@ export function KanbanBoard() {
 
       <LeadDetailSheet leadId={selectedLeadId} onClose={() => setSelectedLeadId(null)} onChanged={loadLeads} />
       <NewLeadDialog open={newLeadOpen} onOpenChange={setNewLeadOpen} onCreated={loadLeads} />
+      <FlowAccountImportDialog open={importOpen} onOpenChange={setImportOpen} onCreated={loadLeads} />
     </div>
   );
 }
