@@ -27,6 +27,20 @@ async function assertAdmin(userId: string) {
   if (role !== "admin") throw new Error("Forbidden: admin only");
 }
 
+async function loadEmailConfig(supabaseAdmin: any) {
+  const { data } = await (supabaseAdmin as any)
+    .schema("crm").from("integrations")
+    .select("*").eq("id", "email").maybeSingle();
+
+  const key       = (data?.resend_api_key || "").trim().replace(/^["']|["']$/g, "");
+  const fromEmail = (data?.from_email   || "").trim();
+  const company   = (data?.company_name || "ENTGROUP").trim();
+  const replyTo   = (data?.reply_to     || "").trim();
+  const isActive  = data?.is_active ?? false;
+
+  return { key, fromEmail, company, replyTo, isActive };
+}
+
 // ─── Invite new user ──────────────────────────────────────────────────────────
 
 export const inviteCrmUser = createServerFn({ method: "POST" })
@@ -88,19 +102,18 @@ export const inviteCrmUser = createServerFn({ method: "POST" })
     if (!actionLink) throw new Error("ไม่สามารถสร้างลิงก์ได้");
 
     // send email via Resend
-    const RESEND_API_KEY = process.env.RESEND_API_KEY;
-    const FROM_EMAIL = process.env.FROM_EMAIL;
-    const COMPANY_NAME = process.env.COMPANY_NAME ?? "ENTGROUP";
-    if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY ยังไม่ได้ตั้งค่า");
-    if (!FROM_EMAIL) throw new Error("FROM_EMAIL ยังไม่ได้ตั้งค่า");
+    const cfg = await loadEmailConfig(supabaseAdmin);
+    if (!cfg.key)       throw new Error("ยังไม่ได้ตั้งค่า Resend API Key — ไปที่ Settings > อีเมล");
+    if (!cfg.fromEmail) throw new Error("ยังไม่ได้ตั้งค่า From Email");
+    if (!cfg.isActive)  throw new Error("ระบบอีเมลยังไม่ได้เปิดใช้งาน");
 
     const displayName = data.full_name ?? data.email;
     const subject = mode === "invite"
-      ? `คำเชิญเข้าใช้งาน ${COMPANY_NAME} CRM`
-      : `เข้าใช้งาน ${COMPANY_NAME} CRM`;
+      ? `คำเชิญเข้าใช้งาน ${cfg.company} CRM`
+      : `เข้าใช้งาน ${cfg.company} CRM`;
     const html = `
       <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
-        <h2 style="margin:0 0 12px">คำเชิญเข้าใช้งาน ${COMPANY_NAME} CRM</h2>
+        <h2 style="margin:0 0 12px">คำเชิญเข้าใช้งาน ${cfg.company} CRM</h2>
         <p style="margin:0 0 8px">สวัสดี ${displayName}</p>
         <p style="margin:0 0 16px">คุณได้รับสิทธิ์เข้าใช้งานระบบ CRM ในบทบาท <strong>${data.role}</strong></p>
         <p style="margin:24px 0">
@@ -116,11 +129,11 @@ export const inviteCrmUser = createServerFn({ method: "POST" })
     const resendResp = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
+        Authorization: `Bearer ${cfg.key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: `${COMPANY_NAME} CRM <${FROM_EMAIL}>`,
+        from: `${cfg.company} CRM <${cfg.fromEmail}>`,
         to: [data.email],
         subject,
         html,
