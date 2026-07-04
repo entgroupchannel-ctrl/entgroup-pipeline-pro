@@ -10,6 +10,7 @@ import { Loader2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type Lead, type LeadStage } from "@/lib/crm";
 import { formatBaht } from "@/lib/format";
+import { LeadActivities } from "./LeadActivities";
 
 interface Props {
   leadId: string | null;
