@@ -49,7 +49,7 @@ const STAGE_COLOR: Record<LeadStage, string> = {
 const MONTH_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
 const QUARTER_MONTHS: Record<number, [number, number]> = { 1:[1,3], 2:[4,6], 3:[7,9], 4:[10,12] };
 
-export const Route = createFileRoute("/_authenticated/leads")({
+export const Route = createFileRoute("/_authenticated/leads/")({
   validateSearch: searchSchema,
   component: LeadsPage,
 });
