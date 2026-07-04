@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RefreshCw } from "lucide-react";
+import { useLineRealtime } from "@/hooks/useLineRealtime";
 
 import type { Activity } from "@/lib/activities";
 
@@ -48,6 +49,15 @@ export function KanbanBoard() {
   const [overdueCount, setOverdueCount] = useState(0);
   const [lastSync, setLastSync] = useState<string | null>(null);
   const refreshSync = () => fetchFALastSync().then(setLastSync).catch(() => {});
+  const { unreadCounts, latestMessage, clearBadge } = useLineRealtime();
+
+  useEffect(() => {
+    if (!latestMessage) return;
+    toast(`💬 LINE: ${latestMessage.display_name}`, {
+      description: latestMessage.message.slice(0, 80),
+      duration: 5000,
+    });
+  }, [latestMessage]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -259,6 +269,8 @@ export function KanbanBoard() {
                 totalPipeline={totalPipeline}
                 onDelete={deleteLead}
                 onDuplicate={duplicateLead}
+                lineUnreadCounts={unreadCounts}
+                onLineBadgeClear={clearBadge}
               />
             ))}
           </div>
@@ -335,6 +347,8 @@ function Column({
   totalPipeline,
   onDelete,
   onDuplicate,
+  lineUnreadCounts,
+  onLineBadgeClear,
 }: {
   stage: LeadStage;
   leads: LeadWithRelations[];
@@ -344,6 +358,8 @@ function Column({
   totalPipeline: number;
   onDelete: (id: string) => void;
   onDuplicate: (lead: LeadWithRelations) => void;
+  lineUnreadCounts?: Record<string, number>;
+  onLineBadgeClear?: (leadId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const [page, setPage] = useState(0);
@@ -426,6 +442,8 @@ function Column({
                   draggable
                   onDelete={() => onDelete(l.id)}
                   onDuplicate={() => onDuplicate(l)}
+                  lineUnread={lineUnreadCounts?.[l.id] ?? 0}
+                  onLineBadgeClear={() => onLineBadgeClear?.(l.id)}
                 />
               </div>
             ))}
