@@ -19,7 +19,6 @@ import { formatBaht } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { KanbanCard } from "./KanbanCard";
 import { NewLeadDialog } from "./NewLeadDialog";
-import { NewLeadDialog } from "./NewLeadDialog";
 import { FAImportModal } from "@/components/flowaccount/FAImportModal";
 import { fetchFALastSync } from "@/lib/flowaccount-client";
 import { formatThaiDate } from "@/lib/format";
