@@ -438,6 +438,30 @@ function EmailsPage() {
           )}
         </div>
       </div>
+
+      {/* Save template dialog */}
+      <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>บันทึกเป็น Template</DialogTitle>
+            <DialogDescription>ตั้งชื่อ template เพื่อเรียกใช้ในภายหลัง</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label className="text-xs">ชื่อ Template</Label>
+            <Input
+              value={tplName}
+              onChange={(e) => setTplName(e.target.value)}
+              placeholder="เช่น ติดตามหลังนำเสนอ"
+              onKeyDown={(e) => { if (e.key === "Enter") confirmSaveTemplate(); }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveOpen(false)}>ยกเลิก</Button>
+            <Button onClick={confirmSaveTemplate}>บันทึก</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
