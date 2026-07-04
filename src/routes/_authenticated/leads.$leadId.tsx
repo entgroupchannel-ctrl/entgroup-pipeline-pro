@@ -469,6 +469,8 @@ function LeadDetailPage() {
 
           <FAImportModal open={faImportOpen} onOpenChange={setFaImportOpen} onImported={load} />
 
+          <LeadQuotationsSection leadId={leadId} accountId={lead.account_id} />
+
           <Section title="บริษัทและผู้ติดต่อ">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="rounded-lg border bg-muted/30 p-3">
