@@ -127,6 +127,12 @@ export function KanbanBoard() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const totalPipeline = useMemo(
+    () => leads.filter((l) => ACTIVE_STAGES.includes(l.stage as LeadStage))
+               .reduce((s, l) => s + Number(l.expected_value ?? 0), 0),
+    [leads],
+  );
+
   const grouped = useMemo(() => {
     const g: Record<LeadStage, LeadWithRelations[]> = {
       new: [], qualified: [], proposal: [], negotiation: [], closing: [], won: [], lost: [],
@@ -229,6 +235,7 @@ export function KanbanBoard() {
                 loading={loading}
                 onCardClick={openLead}
                 activeId={activeId}
+                totalPipeline={totalPipeline}
               />
             ))}
           </div>
@@ -302,25 +309,42 @@ function Column({
   loading,
   onCardClick,
   activeId,
+  totalPipeline,
 }: {
   stage: LeadStage;
   leads: LeadWithRelations[];
   loading: boolean;
   onCardClick: (id: string) => void;
   activeId: string | null;
+  totalPipeline: number;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const sum = leads.reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
 
+  // Priority breakdown for progress bar: high=green, medium=amber, low=slate, none=muted
+  const high   = leads.filter((l) => ((l as any).priority ?? 0) >= 3).reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
+  const medium = leads.filter((l) => ((l as any).priority ?? 0) === 2).reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
+  const low    = leads.filter((l) => ((l as any).priority ?? 0) === 1).reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
+  const none   = sum - high - medium - low;
+  const pct = (v: number) => totalPipeline > 0 ? Math.max(0, Math.min(100, (v / totalPipeline) * 100)) : 0;
+
   return (
     <div className="flex w-72 shrink-0 flex-col">
-      <div className="mb-3 flex items-center justify-between px-1">
+      <div className="mb-1 flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
           <span className={`h-2.5 w-2.5 rounded-full stage-dot-${stage}`} />
           <span className="text-sm font-semibold">{STAGE_LABEL_TH[stage]}</span>
           <span className="text-xs text-muted-foreground">({leads.length})</span>
         </div>
-        <span className="text-xs font-medium text-muted-foreground">{formatBaht(sum)}</span>
+        <span className="text-xs font-semibold tabular-nums">{formatBaht(sum)}</span>
+      </div>
+
+      {/* Progress bar — priority breakdown */}
+      <div className="mb-3 flex h-1.5 w-full overflow-hidden rounded-full bg-muted/50 px-1">
+        {high   > 0 && <div style={{ width: `${pct(high)}%`   }} className="bg-emerald-500 transition-all" />}
+        {medium > 0 && <div style={{ width: `${pct(medium)}%` }} className="bg-amber-400 transition-all" />}
+        {low    > 0 && <div style={{ width: `${pct(low)}%`    }} className="bg-sky-400 transition-all" />}
+        {none   > 0 && <div style={{ width: `${pct(none)}%`   }} className="bg-slate-300 dark:bg-slate-600 transition-all" />}
       </div>
       <div
         ref={setNodeRef}
