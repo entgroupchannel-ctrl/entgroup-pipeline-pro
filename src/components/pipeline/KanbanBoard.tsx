@@ -87,6 +87,7 @@ export function KanbanBoard() {
 
   useEffect(() => {
     loadLeads();
+    refreshSync();
 
     const channel = supabase
       .channel("crm-leads-board")
