@@ -65,7 +65,7 @@ function PriorityStars({ priority, leadId, onChange }: {
   );
 }
 
-export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDuplicate, lineUnread = 0, onLineBadgeClear }: Props) {
+export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDuplicate, lineUnread = 0, onLineBadgeClear, showClaimButton = false, currentUserId, onClaim, linePreview }: Props) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id, disabled: !draggable });
   const downRef = useRef<{ x: number; y: number } | null>(null);
 
