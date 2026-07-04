@@ -1,23 +1,23 @@
 ## Problem
-On the Pipeline board, cards can no longer be moved by dragging their body. In the current `src/components/pipeline/KanbanCard.tsx`, the dnd-kit `listeners`/`attributes` are attached ONLY to the tiny `GripVertical` icon (about 16px). The rest of the card triggers `onClick` → navigates to the lead detail page. Users naturally grab the card body, so it feels "broken".
-
-Root cause: drag activator area was reduced to the grip icon only.
+After making the entire card draggable (dnd-kit `listeners` on the root `<div>`), clicking a card no longer opens the lead detail page. Root cause: attaching drag `listeners` and `onClick` to the same element is unreliable — dnd-kit's `PointerSensor` activator captures pointer events on the root, and even below the 6px activation threshold the resulting click can be swallowed / not fire consistently (especially after any tiny pointer jitter). This is the classic dnd-kit "draggable + clickable on the same node" gotcha.
 
 ## Fix
-Restore whole-card dragging while keeping the row click → open behavior and preserving the 3-dot menu / grip.
+Detect a real click (pointer up without a drag having started) at the pointer layer instead of relying on the DOM `onClick` event.
 
 Edit `src/components/pipeline/KanbanCard.tsx`:
 
-1. Move `{...attributes} {...listeners}` from the `GripVertical` wrapper to the root card `<div>` (the one with `ref={setNodeRef}`).
-2. Add `touch-none` to that root div so touch drags don't scroll.
-3. Keep the small grip icon as a visual affordance (no listeners needed).
-4. Keep `onClick={(e) => e.stopPropagation()}` wrappers around the 3-dot menu and any inline controls (priority chips, etc.) so clicking them doesn't open the lead.
-5. Leave PointerSensor `activationConstraint: { distance: 6 }` as-is — that's what lets a short click still fire `onClick` instead of starting a drag.
-
-No other files change. No logic in `KanbanBoard.tsx` needs to change.
+1. Keep `{...attributes} {...listeners}` on the root card `<div>` so the whole card remains draggable.
+2. Remove `onClick={onClick}` from the root.
+3. Track pointerdown coordinates with a `useRef<{ x: number; y: number } | null>(null)`.
+4. Add `onPointerDown={(e) => { downRef.current = { x: e.clientX, y: e.clientY } }}` to the root (this fires before dnd-kit consumes it since React synthetic handlers run on bubble).
+5. Add `onPointerUp={(e) => { const d = downRef.current; downRef.current = null; if (!d) return; const dx = e.clientX - d.x, dy = e.clientY - d.y; if (Math.hypot(dx, dy) < 6) onClick?.(); }}` — fires only when the pointer barely moved, matching the sensor's 6px activation threshold, so real drags don't trigger navigation.
+6. Keep the existing `onClick={(e) => e.stopPropagation()}` guards on the 3-dot menu wrapper. Add matching `onPointerUp={(e) => e.stopPropagation()}` on that wrapper (and on the priority chip wrapper if any) so clicking those inner controls does not bubble up and trigger `onClick`.
+7. Leave PointerSensor `activationConstraint: { distance: 6 }` in `KanbanBoard.tsx` unchanged.
 
 ## Verify
-- Drag a card from its body across columns → stage updates + toast "ย้ายไป ...".
-- Click (no drag) on a card → navigates to `/leads/$leadId`.
-- Click the 3-dot menu or grip → does not navigate, does not start drag unintentionally.
-- Run `bun run build:dev`.
+- Drag a card body → moves between columns; toast confirms.
+- Click (no drag) on the card body → navigates to `/leads/$leadId`.
+- Click 3-dot menu → menu opens, no navigation.
+- Click grip icon → no navigation (it's decorative now; a small click stays under 6px so it will actually navigate — acceptable, same as clicking the card body).
+- Touch drag on mobile still works (`touch-none` already on root).
+- `bun run build:dev` passes.
