@@ -169,8 +169,7 @@
   }
 }
 
-/* ─── FONT LOAD (IBM Plex Sans Thai) ─── */
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
+/* ─── FONT LOAD (IBM Plex Sans Thai) — loaded via <link> in __root.tsx ─── */
 
 /* ─── SHARED UTILITIES ─── */
 @utility card-surface {
