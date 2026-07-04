@@ -137,12 +137,13 @@ function ActivitiesPage() {
                     {a.subject ?? ACTIVITY_TYPE_LABEL[a.type as ActivityType] ?? a.type}
                   </div>
                   {lead && a.lead_id && (
-                    <button
-                      onClick={() => setSelectedLeadId(a.lead_id)}
+                    <Link
+                      to="/leads/$leadId"
+                      params={{ leadId: a.lead_id }}
                       className="truncate text-xs text-primary hover:underline"
                     >
                       {lead.title}
-                    </button>
+                    </Link>
                   )}
                 </div>
                 <div className={`shrink-0 text-xs ${overdue ? "font-medium text-red-600" : "text-muted-foreground"}`}>
