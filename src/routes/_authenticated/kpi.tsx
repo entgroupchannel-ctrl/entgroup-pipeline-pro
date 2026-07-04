@@ -245,7 +245,7 @@ function KpiPage() {
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Trophy className="h-5 w-5 text-amber-500" /> Leaderboard ทีม
             </h2>
-            <Button size="sm" onClick={() => { setTargetUserId(""); setSetTargetOpen(true); }}>
+            <Button size="sm" onClick={() => { setTargetSelf(false); setTargetUserId(""); setSetTargetOpen(true); }}>
               ตั้งเป้าหมายพนักงาน
             </Button>
           </div>
