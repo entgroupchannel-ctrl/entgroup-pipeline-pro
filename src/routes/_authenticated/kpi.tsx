@@ -144,6 +144,7 @@ function KpiPage() {
   const [loading, setLoading] = useState(true);
   const [setTargetOpen, setSetTargetOpen] = useState(false);
   const [targetUserId, setTargetUserId] = useState<string>("");
+  const [targetSelf, setTargetSelf] = useState(false);
 
   const load = async () => {
     setLoading(true);
