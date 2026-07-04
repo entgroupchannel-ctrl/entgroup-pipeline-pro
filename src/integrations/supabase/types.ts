@@ -12029,6 +12029,7 @@ export type Database = {
       is_campaign_staff: { Args: { _user_id: string }; Returns: boolean }
       is_floworder_user: { Args: never; Returns: boolean }
       is_partner_reviewer: { Args: { _user_id: string }; Returns: boolean }
+      is_po_staff: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { p_user_id: string }; Returns: boolean }
       log_audit_event: {
         Args: {
