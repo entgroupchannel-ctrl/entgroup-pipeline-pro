@@ -15,6 +15,7 @@ import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABEL, type ActivityType } from "@/lib/ac
 import { Plus, UserPlus } from "lucide-react";
 import { InviteUserModal } from "@/components/InviteUserModal";
 import { FlowAccountTab } from "@/components/settings/FlowAccountTab";
+import { EmailConfigTab } from "@/components/settings/EmailConfigTab";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -38,6 +39,7 @@ function SettingsPage() {
           <TabsTrigger value="stages">Pipeline Stages</TabsTrigger>
           {isManager && <TabsTrigger value="script">Sales Script</TabsTrigger>}
           {isAdmin && <TabsTrigger value="flowaccount">FlowAccount</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="email">อีเมล</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="mt-6 max-w-lg">
@@ -59,6 +61,11 @@ function SettingsPage() {
         {isAdmin && (
           <TabsContent value="flowaccount" className="mt-6">
             <FlowAccountTab />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="email" className="mt-6">
+            <EmailConfigTab />
           </TabsContent>
         )}
       </Tabs>
