@@ -26,3 +26,17 @@ export function daysBetween(from: string, to: Date = new Date()): number {
   const b = to.getTime();
   return Math.max(0, Math.floor((b - a) / 86_400_000));
 }
+
+export function timeFromNow(iso: string): string {
+  const diff = new Date(iso).getTime() - Date.now();
+  if (diff < 0) return "เลยกำหนด";
+  const h = Math.floor(diff / 3600000);
+  if (h < 1) return "อีก < 1 ชม.";
+  if (h < 24) return `อีก ${h} ชม.`;
+  return `อีก ${Math.floor(h / 24)} วัน`;
+}
+
+export function isOverdue(iso: string): boolean {
+  return new Date(iso).getTime() < Date.now();
+}
+
