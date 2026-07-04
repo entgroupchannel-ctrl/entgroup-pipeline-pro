@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { z } from "zod";
@@ -8,7 +8,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { activityIcon, formatThaiDate, ACTIVITY_TYPE_LABEL, type Activity, type ActivityType } from "@/lib/activities";
-import { LeadDetailSheet } from "@/components/pipeline/LeadDetailSheet";
 
 const searchSchema = z.object({
   filter: z.enum(["all", "overdue", "today", "pending", "done"]).optional(),
@@ -38,7 +37,7 @@ function ActivitiesPage() {
   const [rows, setRows] = useState<Activity[] | null>(null);
   const [leadsMap, setLeadsMap] = useState<Map<string, { title: string }>>(new Map());
   const [profilesMap, setProfilesMap] = useState<Map<string, { full_name: string | null }>>(new Map());
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  
 
   const isManager = role === "manager" || role === "admin";
 
@@ -138,12 +137,13 @@ function ActivitiesPage() {
                     {a.subject ?? ACTIVITY_TYPE_LABEL[a.type as ActivityType] ?? a.type}
                   </div>
                   {lead && a.lead_id && (
-                    <button
-                      onClick={() => setSelectedLeadId(a.lead_id)}
+                    <Link
+                      to="/leads/$leadId"
+                      params={{ leadId: a.lead_id }}
                       className="truncate text-xs text-primary hover:underline"
                     >
                       {lead.title}
-                    </button>
+                    </Link>
                   )}
                 </div>
                 <div className={`shrink-0 text-xs ${overdue ? "font-medium text-red-600" : "text-muted-foreground"}`}>
@@ -158,7 +158,7 @@ function ActivitiesPage() {
         </ul>
       )}
 
-      <LeadDetailSheet leadId={selectedLeadId} onClose={() => setSelectedLeadId(null)} onChanged={load} />
+      
     </div>
   );
 }

@@ -11,13 +11,12 @@ import {
 } from "@dnd-kit/core";
 import { Plus, Inbox, FileDown, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type Lead, type LeadStage, type Account } from "@/lib/crm";
 import { formatBaht } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { KanbanCard } from "./KanbanCard";
-import { LeadDetailSheet } from "./LeadDetailSheet";
 import { NewLeadDialog } from "./NewLeadDialog";
 import { FlowAccountImportDialog } from "./FlowAccountImportDialog";
 import { Button } from "@/components/ui/button";
@@ -36,7 +35,8 @@ export function KanbanBoard() {
   const [leads, setLeads] = useState<LeadWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const openLead = (id: string) => navigate({ to: "/leads/$leadId", params: { leadId: id } });
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [overdueCount, setOverdueCount] = useState(0);
@@ -203,7 +203,7 @@ export function KanbanBoard() {
                 stage={stage}
                 leads={grouped[stage]}
                 loading={loading}
-                onCardClick={setSelectedLeadId}
+                onCardClick={openLead}
                 activeId={activeId}
               />
             ))}
@@ -246,7 +246,7 @@ export function KanbanBoard() {
                   {list.slice(0, 3).map((l) => (
                     <button
                       key={l.id}
-                      onClick={() => setSelectedLeadId(l.id)}
+                      onClick={() => openLead(l.id)}
                       className="w-full rounded-md bg-background/70 px-3 py-2 text-left text-sm hover:bg-background"
                     >
                       <div className="truncate font-medium">{l.title}</div>
@@ -265,7 +265,7 @@ export function KanbanBoard() {
         </div>
       </div>
 
-      <LeadDetailSheet leadId={selectedLeadId} onClose={() => setSelectedLeadId(null)} onChanged={loadLeads} />
+      
       <NewLeadDialog open={newLeadOpen} onOpenChange={setNewLeadOpen} onCreated={loadLeads} />
       <FlowAccountImportDialog open={importOpen} onOpenChange={setImportOpen} onCreated={loadLeads} />
     </div>
