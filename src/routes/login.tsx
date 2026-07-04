@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import fujiHero from "@/assets/fuji-hero.jpg";
+import logoEntGroup from "@/assets/LOGO_ENTGroup.png.asset.json";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
