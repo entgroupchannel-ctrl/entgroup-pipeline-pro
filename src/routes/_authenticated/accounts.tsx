@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Search, Plus, Building2, Star, Crown , Trash2} from "lucide-react";
 import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
+import { exportToCsv, accountsToRows } from "@/lib/export-csv";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -103,6 +104,16 @@ function AccountsPage() {
     );
   }, [accounts, q]);
 
+  const handleExport = () => {
+    if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
+    const profMap = new Map<string, { name: string }>(
+      Array.from(new Set(filtered.map(a => a.owner_id).filter(Boolean))).map(id => [id, { name: id }])
+    );
+    const rows = accountsToRows(filtered, leadsCount, profMap);
+    exportToCsv(`accounts-${new Date().toISOString().slice(0,10)}.csv`, rows);
+    toast.success(`Export ${filtered.length} รายการแล้ว`);
+  };
+
   return (
     <div className="p-6 page-fade-in">
       {/* Header */}
@@ -113,9 +124,14 @@ function AccountsPage() {
             {filtered == null ? "กำลังโหลด…" : `${filtered.length} บริษัท`}
           </p>
         </div>
-        <Button size="sm" onClick={() => setNewOpen(true)}>
-          <Plus className="mr-1.5 h-4 w-4" /> เพิ่มบริษัท
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!filtered?.length}>
+            <Download className="mr-1.5 h-4 w-4" /> Export CSV
+          </Button>
+          <Button size="sm" onClick={() => setNewOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> เพิ่มบริษัท
+          </Button>
+        </div>
       </div>
 
       {/* Search */}

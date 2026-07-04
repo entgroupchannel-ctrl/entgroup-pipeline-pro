@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   Loader2, Search, Plus, TrendingUp, Calendar, ChevronLeft, ChevronRight,
   BarChart2, Trophy, AlertTriangle, DollarSign,
-Trash2,} from "lucide-react";
+, Trash2} from "lucide-react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { formatBaht, formatThaiDate } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { NewLeadDialog } from "@/components/pipeline/NewLeadDialog";
 import { RowActions, BulkActionBar, stdOpen, stdDupe, stdDelete } from "@/components/ui/row-actions";
+import { exportToCsv, leadsToRows } from "@/lib/export-csv";
 
 // ── Types & constants ─────────────────────────────────────────────────────────
 
@@ -229,6 +230,14 @@ function LeadsPage() {
     toast.success(`ลบ ${ids.length} รายการแล้ว`); clearAll(); load();
   };
 
+  const handleExport = () => {
+    if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
+    const rows = leadsToRows(filtered, accountsMap, profilesMap, STAGE_LABEL_TH);
+    const period = mode !== "all" ? `-${periodLabel(mode, year, month, quarter)}` : "";
+    exportToCsv(`leads${period}-${new Date().toISOString().slice(0,10)}.csv`, rows);
+    toast.success(`Export ${filtered.length} รายการแล้ว`);
+  };
+
   // ── render ───────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 page-fade-in space-y-5">
@@ -242,9 +251,14 @@ function LeadsPage() {
             {mode !== "all" && ` · ${periodLabel(mode, year, month, quarter)}`}
           </p>
         </div>
-        <Button size="sm" onClick={() => setNewOpen(true)}>
-          <Plus className="mr-1.5 h-4 w-4" /> ดีลใหม่
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!filtered?.length}>
+            <Download className="mr-1.5 h-4 w-4" /> Export CSV
+          </Button>
+          <Button size="sm" onClick={() => setNewOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> ดีลใหม่
+          </Button>
+        </div>
       </div>
 
       {/* ── Period selector ── */}

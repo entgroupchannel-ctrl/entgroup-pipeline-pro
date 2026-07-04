@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Loader2, Plus, Search, FileText, FileDown, ChevronDown,
-  Trash2,} from "lucide-react";
+, Trash2} from "lucide-react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth-context";
 import { formatBaht, formatThaiDate } from "@/lib/format";
 import { fetchFADocuments, type FADocument } from "@/lib/flowaccount-client";
 import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete } from "@/components/ui/row-actions";
+import { exportToCsv, quotationsToRows } from "@/lib/export-csv";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/_authenticated/quotations")({
@@ -166,6 +167,14 @@ function QuotationsPage() {
     load();
   };
 
+  const handleExport = () => {
+    if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
+    const profMap = new Map(Array.from(profilesMap.entries()).map(([id, name]) => [id, { name: name ?? "" }]));
+    const rows = quotationsToRows(filtered, leadsMap, accountsMap, profMap, STATUS_LABEL);
+    exportToCsv(`quotations-${new Date().toISOString().slice(0,10)}.csv`, rows);
+    toast.success(`Export ${filtered.length} รายการแล้ว`);
+  };
+
   return (
     <div className="p-6 page-fade-in">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -176,6 +185,9 @@ function QuotationsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!filtered?.length}>
+            <Download className="mr-1.5 h-4 w-4" /> Export CSV
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setFaOpen(true)}>
             <FileDown className="mr-1.5 h-4 w-4" /> Import FA
           </Button>
