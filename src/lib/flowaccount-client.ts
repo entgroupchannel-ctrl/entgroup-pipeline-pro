@@ -1,3 +1,6 @@
+// Phase 2: reads from crm.fa_documents (synced from FA API directly).
+// Phase 1 read from crm.flowaccount_documents view — this file is the only thing that changed.
+
 import { crmDb } from "./crm";
 
 export interface FADocument {
@@ -12,38 +15,40 @@ export interface FADocument {
   sales_name: string | null;
   sales_email: string | null;
   raw_data: any;
-  created_rfq_id: string | null;
+  synced_at: string;
   created_at: string;
+  // Phase 1 compat field (always null in Phase 2)
+  created_rfq_id: string | null;
 }
 
-// Phase 1: read from crm.flowaccount_documents view (mirrors floworder inbound).
-// Phase 2: swap this file to call the FlowAccount API directly — no other file changes needed.
 export async function fetchFADocuments(): Promise<FADocument[]> {
   const { data, error } = await crmDb()
-    .from("flowaccount_documents")
+    .from("fa_documents")
     .select("*")
     .order("published_on", { ascending: false, nullsFirst: false })
     .limit(500);
   if (error) throw new Error(error.message);
-  return (data ?? []) as FADocument[];
+  // add compat field
+  return ((data ?? []) as any[]).map((d) => ({ ...d, created_rfq_id: null })) as FADocument[];
 }
 
 export async function fetchFADocument(id: string): Promise<FADocument | null> {
   const { data, error } = await crmDb()
-    .from("flowaccount_documents")
+    .from("fa_documents")
     .select("*")
     .eq("id", id)
     .maybeSingle();
   if (error) return null;
-  return (data as FADocument | null) ?? null;
+  if (!data) return null;
+  return { ...(data as any), created_rfq_id: null } as FADocument;
 }
 
 export async function fetchFALastSync(): Promise<string | null> {
   const { data } = await crmDb()
-    .from("flowaccount_documents")
-    .select("created_at")
-    .order("created_at", { ascending: false })
+    .from("fa_documents")
+    .select("synced_at")
+    .order("synced_at", { ascending: false })
     .limit(1);
-  const row = (data ?? [])[0] as { created_at?: string } | undefined;
-  return row?.created_at ?? null;
+  const row = (data ?? [])[0] as { synced_at?: string } | undefined;
+  return row?.synced_at ?? null;
 }
