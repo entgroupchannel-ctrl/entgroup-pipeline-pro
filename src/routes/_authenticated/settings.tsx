@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -12,11 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/lib/auth-context";
 import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type LeadStage, type UserProfile } from "@/lib/crm";
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABEL, type ActivityType } from "@/lib/activities";
-import { Plus, UserPlus } from "lucide-react";
+import { Plus, UserPlus, Trash2 } from "lucide-react";
 import { InviteUserModal } from "@/components/InviteUserModal";
 import { FlowAccountTab } from "@/components/settings/FlowAccountTab";
 import { EmailConfigTab } from "@/components/settings/EmailConfigTab";
 import { LineOATab } from "@/components/settings/LineOATab";
+import { deactivateCrmUser } from "@/lib/invite-user.functions";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
