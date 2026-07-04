@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import fujiHero from "@/assets/fuji-hero.jpg";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -61,142 +62,15 @@ function LoginPage() {
       {/* ── LEFT: Fuji Hero ── */}
       <div className="relative hidden lg:flex flex-col overflow-hidden bg-sidebar">
 
-        {/* Fuji SVG illustration */}
-        <svg
-          viewBox="0 0 800 600"
-          xmlns="http://www.w3.org/2000/svg"
-          className="absolute inset-0 w-full h-full object-cover"
-          preserveAspectRatio="xMidYMid slice"
-        >
-          {/* Sky gradient */}
-          <defs>
-            <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0a1628" />
-              <stop offset="40%" stopColor="#0d2244" />
-              <stop offset="100%" stopColor="#1a3a5c" />
-            </linearGradient>
-            <linearGradient id="fuji" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#e8eef5" />
-              <stop offset="30%" stopColor="#c8d8e8" />
-              <stop offset="100%" stopColor="#4a6fa5" />
-            </linearGradient>
-            <linearGradient id="lake" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#1a3a5c" />
-              <stop offset="100%" stopColor="#0d2244" />
-            </linearGradient>
-            <linearGradient id="snow" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ffffff" />
-              <stop offset="100%" stopColor="#e0eaf4" />
-            </linearGradient>
-            <radialGradient id="moon" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#fff8e1" />
-              <stop offset="100%" stopColor="#ffd54f" />
-            </radialGradient>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-            </filter>
-          </defs>
+        {/* Real Mt Fuji photo */}
+        <img
+          src={fujiHero}
+          alt="ภูเขาไฟฟูจิยามพลบค่ำ พร้อมดอกซากุระและทะเลสาบสะท้อนเงา"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        {/* Overlay gradient for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050d1a] via-[#050d1a]/40 to-transparent" />
 
-          {/* Sky */}
-          <rect width="800" height="600" fill="url(#sky)" />
-
-          {/* Stars */}
-          {[
-            [80,40],[150,80],[220,30],[300,60],[380,25],[450,70],[520,35],[600,55],[680,20],[720,80],
-            [100,120],[200,100],[320,90],[440,110],[560,85],[660,100],[760,40],[50,150],[170,160],
-            [340,140],[480,130],[620,145],[740,120],[90,200],[250,180],[410,195],[570,170],[730,185],
-          ].map(([x, y], i) => (
-            <circle key={i} cx={x} cy={y} r={Math.random() > 0.7 ? 1.5 : 1} fill="white" opacity={0.6 + Math.random() * 0.4} />
-          ))}
-
-          {/* Moon */}
-          <circle cx="650" cy="90" r="28" fill="url(#moon)" filter="url(#glow)" opacity="0.95" />
-          <circle cx="660" cy="85" r="24" fill="#0d2244" opacity="0.15" />
-
-          {/* Moon reflection on lake */}
-          <ellipse cx="650" cy="490" rx="18" ry="6" fill="#ffd54f" opacity="0.3" />
-
-          {/* Distant mountains (dark silhouette) */}
-          <path d="M0,380 Q100,300 200,320 Q300,290 400,340 Q500,300 600,330 Q700,290 800,320 L800,420 L0,420 Z"
-            fill="#0d1e35" opacity="0.8" />
-
-          {/* Mt Fuji — main */}
-          <path d="M400,80 L570,380 L230,380 Z" fill="url(#fuji)" />
-
-          {/* Fuji snow cap */}
-          <path d="M400,80 L445,180 Q420,200 400,195 Q380,200 355,180 Z" fill="url(#snow)" opacity="0.95" />
-          {/* Snow detail lines */}
-          <path d="M400,80 L430,160 Q415,175 400,170 Q385,175 370,160 Z" fill="white" opacity="0.6" />
-
-          {/* Fuji ridge shading */}
-          <path d="M400,80 L570,380 Q490,360 440,300 Q410,240 400,80"
-            fill="#2a4a7a" opacity="0.3" />
-
-          {/* Foreground hills */}
-          <path d="M0,360 Q80,310 160,340 Q220,320 280,350 Q340,330 400,360 L400,420 L0,420 Z"
-            fill="#0a1628" opacity="0.9" />
-          <path d="M400,360 Q460,330 520,355 Q580,335 650,360 Q720,340 800,365 L800,420 L400,420 Z"
-            fill="#0a1628" opacity="0.9" />
-
-          {/* Lake */}
-          <ellipse cx="400" cy="460" rx="320" ry="60" fill="url(#lake)" opacity="0.85" />
-
-          {/* Lake reflection of Fuji */}
-          <path d="M400,420 L340,500 L460,500 Z" fill="#1a3a5c" opacity="0.5" />
-          <ellipse cx="400" cy="500" rx="60" ry="8" fill="#4a6fa5" opacity="0.25" />
-
-          {/* Sakura trees left */}
-          <rect x="120" y="350" width="6" height="50" fill="#2d1b0e" />
-          <ellipse cx="123" cy="345" rx="22" ry="18" fill="#c2185b" opacity="0.75" />
-          <ellipse cx="110" cy="355" rx="14" ry="12" fill="#e91e63" opacity="0.6" />
-          <ellipse cx="138" cy="352" rx="14" ry="12" fill="#f06292" opacity="0.6" />
-
-          <rect x="160" y="355" width="5" height="45" fill="#2d1b0e" />
-          <ellipse cx="162" cy="350" rx="18" ry="16" fill="#e91e63" opacity="0.7" />
-
-          {/* Sakura trees right */}
-          <rect x="640" y="348" width="6" height="52" fill="#2d1b0e" />
-          <ellipse cx="643" cy="343" rx="22" ry="18" fill="#c2185b" opacity="0.75" />
-          <ellipse cx="628" cy="353" rx="14" ry="12" fill="#f06292" opacity="0.6" />
-          <ellipse cx="658" cy="350" rx="14" ry="12" fill="#e91e63" opacity="0.6" />
-
-          <rect x="680" y="352" width="5" height="48" fill="#2d1b0e" />
-          <ellipse cx="682" cy="347" rx="18" ry="16" fill="#e91e63" opacity="0.7" />
-
-          {/* Torii gate silhouette */}
-          <rect x="370" y="330" width="8" height="55" fill="#8b1a1a" />
-          <rect x="422" y="330" width="8" height="55" fill="#8b1a1a" />
-          <rect x="360" y="326" width="80" height="9" rx="2" fill="#b71c1c" />
-          <rect x="365" y="338" width="70" height="6" rx="2" fill="#c62828" />
-
-          {/* Falling petals */}
-          {[
-            [200,280,12],[250,310,8],[320,260,10],[480,275,9],[540,295,11],[610,265,8],[170,330,7],[690,310,9],
-          ].map(([x,y,s],i) => (
-            <ellipse key={i} cx={x} cy={y} rx={s/2} ry={s/3} fill="#f8bbd0" opacity={0.7} transform={`rotate(${i*25} ${x} ${y})`} />
-          ))}
-
-          {/* Foreground ground */}
-          <rect x="0" y="410" width="800" height="190" fill="#05111f" />
-
-          {/* Path to torii */}
-          <path d="M340,600 Q380,500 395,420 L405,420 Q420,500 460,600 Z" fill="#0d2244" opacity="0.6" />
-
-          {/* Lanterns */}
-          <rect x="344" y="430" width="4" height="30" fill="#1a2a3a" />
-          <rect x="341" y="425" width="10" height="14" rx="2" fill="#ffa000" opacity="0.9" />
-          <rect x="453" y="430" width="4" height="30" fill="#1a2a3a" />
-          <rect x="450" y="425" width="10" height="14" rx="2" fill="#ffa000" opacity="0.9" />
-
-          {/* Overlay gradient for text readability */}
-          <linearGradient id="overlay" x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0%" stopColor="#050d1a" stopOpacity="0.95" />
-            <stop offset="40%" stopColor="#050d1a" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#050d1a" stopOpacity="0" />
-          </linearGradient>
-          <rect width="800" height="600" fill="url(#overlay)" />
-        </svg>
 
         {/* Hero text overlay */}
         <div className="relative z-10 flex h-full flex-col justify-between p-10">
