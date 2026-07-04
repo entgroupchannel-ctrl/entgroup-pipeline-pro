@@ -168,6 +168,23 @@ export function KanbanBoard() {
         <div className="min-w-0">
           <h1 className="text-xl font-semibold">Pipeline</h1>
           <p className="text-xs text-muted-foreground">ลาก-วาง หรือกด <kbd className="rounded border bg-muted px-1 text-[10px]">N</kbd> เพื่อเพิ่มดีลใหม่</p>
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span>Last synced: {lastSync ? formatThaiDate(lastSync) : "—"}</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={refreshSync}
+                    className="inline-flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted"
+                  >
+                    <RefreshCw className="h-3 w-3" /> Refresh
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>ข้อมูลอัปเดตจาก floworder.me อัตโนมัติ</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
