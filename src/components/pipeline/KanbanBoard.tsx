@@ -257,6 +257,8 @@ export function KanbanBoard() {
                 onCardClick={openLead}
                 activeId={activeId}
                 totalPipeline={totalPipeline}
+                onDelete={deleteLead}
+                onDuplicate={duplicateLead}
               />
             ))}
           </div>
@@ -395,8 +397,8 @@ function Column({
                 lead={l}
                 onClick={() => onCardClick(l.id)}
                 draggable
-                onDelete={() => deleteLead(l.id)}
-                onDuplicate={() => duplicateLead(l)}
+                onDelete={() => onDelete(l.id)}
+                onDuplicate={() => onDuplicate(l)}
               />
             </div>
           ))
