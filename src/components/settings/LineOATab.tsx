@@ -107,8 +107,8 @@ export function LineOATab() {
     const t = setTimeout(async () => {
       const { data } = await crmDb()
         .from("contacts")
-        .select("id, company_name, contact_name")
-        .or(`company_name.ilike.%${contactSearch}%,contact_name.ilike.%${contactSearch}%`)
+        .select("id, name, email")
+        .or(`name.ilike.%${contactSearch}%,email.ilike.%${contactSearch}%`)
         .limit(6);
       setContactResults(data ?? []);
     }, 300);
@@ -409,12 +409,12 @@ export function LineOATab() {
                         className="flex w-full flex-col px-3 py-2 text-left hover:bg-muted text-sm"
                         onClick={() => {
                           setNewMap((m) => ({ ...m, contact_id: c.id }));
-                          setContactSearch(c.company_name ?? c.contact_name ?? "");
+                          setContactSearch(c.name ?? "");
                           setContactResults([]);
                         }}
                       >
-                        <span className="font-medium">{c.company_name}</span>
-                        <span className="text-xs text-muted-foreground">{c.contact_name}</span>
+                        <span className="font-medium">{c.name}</span>
+                        <span className="text-xs text-muted-foreground">{c.email}</span>
                       </button>
                     ))}
                   </div>
@@ -454,7 +454,7 @@ export function LineOATab() {
                     <p className="text-xs text-muted-foreground font-mono">{m.line_uid}</p>
                   </td>
                   <td className="px-5 py-3">
-                    <p>{m.contact?.contact_name ?? "—"}</p>
+                    <p>{m.contact?.name ?? "—"}</p>
                     <p className="text-xs text-muted-foreground font-mono text-[10px]">{m.contact?.id?.slice(0, 8)}…</p>
                   </td>
                   <td className="px-5 py-3 text-xs text-muted-foreground">
