@@ -27,6 +27,20 @@ async function assertAdmin(userId: string) {
   if (role !== "admin") throw new Error("Forbidden: admin only");
 }
 
+async function loadEmailConfig(supabaseAdmin: any) {
+  const { data } = await (supabaseAdmin as any)
+    .schema("crm").from("integrations")
+    .select("*").eq("id", "email").maybeSingle();
+
+  const key       = (data?.resend_api_key || "").trim().replace(/^["']|["']$/g, "");
+  const fromEmail = (data?.from_email   || "").trim();
+  const company   = (data?.company_name || "ENTGROUP").trim();
+  const replyTo   = (data?.reply_to     || "").trim();
+  const isActive  = data?.is_active ?? false;
+
+  return { key, fromEmail, company, replyTo, isActive };
+}
+
 // ─── Invite new user ──────────────────────────────────────────────────────────
 
 export const inviteCrmUser = createServerFn({ method: "POST" })
