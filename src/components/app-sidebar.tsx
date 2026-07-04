@@ -24,6 +24,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import logoAsset from "@/assets/LOGO_ENTGroup.png.asset.json";
 
 const navItems = [
   { title: "Pipeline", url: "/pipeline", icon: KanbanSquare },
