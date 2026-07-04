@@ -173,10 +173,17 @@ export function KanbanBoard() {
       </div>
 
       {overdueCount > 0 && (
-        <div className="border-b bg-amber-50 px-6 py-3 dark:bg-amber-950/30">
-          <Link to="/activities" className="flex items-center gap-2 text-sm text-amber-800 hover:underline dark:text-amber-200">
+        <div className="flex items-center justify-between gap-3 border-b bg-amber-50 px-6 py-3 dark:bg-amber-950/30">
+          <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
             <AlertCircle className="h-4 w-4" />
-            คุณมี <span className="font-semibold">{overdueCount}</span> รายการที่ต้องติดตาม
+            <span>⚠ คุณมี <span className="font-semibold">{overdueCount}</span> รายการที่เลยกำหนด</span>
+          </div>
+          <Link
+            to="/activities"
+            search={{ filter: "overdue" } as any}
+            className="text-sm font-medium text-amber-900 hover:underline dark:text-amber-100"
+          >
+            ดูทั้งหมด →
           </Link>
         </div>
       )}
