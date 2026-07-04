@@ -16,6 +16,7 @@ import { Plus, UserPlus } from "lucide-react";
 import { InviteUserModal } from "@/components/InviteUserModal";
 import { FlowAccountTab } from "@/components/settings/FlowAccountTab";
 import { EmailConfigTab } from "@/components/settings/EmailConfigTab";
+import { LineOATab } from "@/components/settings/LineOATab";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -40,6 +41,7 @@ function SettingsPage() {
           {isManager && <TabsTrigger value="script">Sales Script</TabsTrigger>}
           {isAdmin && <TabsTrigger value="flowaccount">FlowAccount</TabsTrigger>}
           {isAdmin && <TabsTrigger value="email">อีเมล</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="line">LINE OA</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="mt-6 max-w-lg">
@@ -66,6 +68,11 @@ function SettingsPage() {
         {isAdmin && (
           <TabsContent value="email" className="mt-6">
             <EmailConfigTab />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="line" className="mt-6">
+            <LineOATab />
           </TabsContent>
         )}
       </Tabs>
