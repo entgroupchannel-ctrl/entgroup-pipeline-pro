@@ -346,9 +346,31 @@ function Column({
   onDuplicate: (lead: LeadWithRelations) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 10;
+
   const sum = leads.reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
 
-  // Priority breakdown for progress bar: high=green, medium=amber, low=slate, none=muted
+  // Sort: priority desc → expected_close_date asc → value desc
+  const sorted = [...leads].sort((a, b) => {
+    const pa = (a as any).priority ?? 0;
+    const pb = (b as any).priority ?? 0;
+    if (pb !== pa) return pb - pa;
+    const da = a.expected_close_date ?? "9999";
+    const db = b.expected_close_date ?? "9999";
+    if (da !== db) return da < db ? -1 : 1;
+    return Number(b.expected_value ?? 0) - Number(a.expected_value ?? 0);
+  });
+
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+  const pageLeads  = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  // Reset page when leads list changes (e.g. after drag)
+  const leadsKey = leads.map(l => l.id).join(",");
+  const prevKeyRef = { current: leadsKey };
+  if (prevKeyRef.current !== leadsKey && page > 0) setPage(0);
+
+  // Priority breakdown for progress bar
   const high   = leads.filter((l) => ((l as any).priority ?? 0) >= 3).reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
   const medium = leads.filter((l) => ((l as any).priority ?? 0) === 2).reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
   const low    = leads.filter((l) => ((l as any).priority ?? 0) === 1).reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
@@ -357,6 +379,7 @@ function Column({
 
   return (
     <div className="flex w-72 shrink-0 flex-col">
+      {/* Column header */}
       <div className="mb-1 flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
           <span className={`h-2.5 w-2.5 rounded-full stage-dot-${stage}`} />
@@ -366,18 +389,21 @@ function Column({
         <span className="text-xs font-semibold tabular-nums">{formatBaht(sum)}</span>
       </div>
 
-      {/* Progress bar — priority breakdown */}
+      {/* Progress bar */}
       <div className="mb-3 flex h-1.5 w-full overflow-hidden rounded-full bg-muted/50 px-1">
         {high   > 0 && <div style={{ width: `${pct(high)}%`   }} className="bg-emerald-500 transition-all" />}
         {medium > 0 && <div style={{ width: `${pct(medium)}%` }} className="bg-amber-400 transition-all" />}
         {low    > 0 && <div style={{ width: `${pct(low)}%`    }} className="bg-sky-400 transition-all" />}
         {none   > 0 && <div style={{ width: `${pct(none)}%`   }} className="bg-slate-300 dark:bg-slate-600 transition-all" />}
       </div>
+
+      {/* Cards area */}
       <div
         ref={setNodeRef}
-        className={`flex min-h-[calc(100vh-16rem)] flex-col gap-2 rounded-xl border bg-muted/40 p-2 transition-colors ${
+        className={`flex flex-col gap-2 rounded-xl border bg-muted/40 p-2 transition-colors ${
           isOver ? "border-primary/60 bg-primary/5" : ""
         }`}
+        style={{ minHeight: "calc(100vh - 18rem)" }}
       >
         {loading ? (
           <>
@@ -391,17 +417,59 @@ function Column({
             <span className="text-xs">ยังไม่มีดีลในขั้นนี้</span>
           </div>
         ) : (
-          leads.map((l) => (
-            <div key={l.id} className={activeId === l.id ? "opacity-30" : ""}>
-              <KanbanCard
-                lead={l}
-                onClick={() => onCardClick(l.id)}
-                draggable
-                onDelete={() => onDelete(l.id)}
-                onDuplicate={() => onDuplicate(l)}
-              />
-            </div>
-          ))
+          <>
+            {pageLeads.map((l) => (
+              <div key={l.id} className={activeId === l.id ? "opacity-30" : ""}>
+                <KanbanCard
+                  lead={l}
+                  onClick={() => onCardClick(l.id)}
+                  draggable
+                  onDelete={() => onDelete(l.id)}
+                  onDuplicate={() => onDuplicate(l)}
+                />
+              </div>
+            ))}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-1 flex items-center justify-between border-t border-border/50 pt-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-xs text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  ‹
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }).map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setPage(i)}
+                      className={`h-1.5 rounded-full transition-all ${
+                        i === page
+                          ? "w-4 bg-primary"
+                          : "w-1.5 bg-muted-foreground/40 hover:bg-muted-foreground/70"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page === totalPages - 1}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-xs text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  ›
+                </button>
+              </div>
+            )}
+
+            {/* Page info */}
+            {totalPages > 1 && (
+              <div className="text-center text-[10px] text-muted-foreground">
+                {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, leads.length)} จาก {leads.length}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
