@@ -17,7 +17,9 @@ interface Props {
 
 export function RowActions({ actions, align = "right" }: Props) {
   const [open, setOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -28,11 +30,22 @@ export function RowActions({ actions, align = "right" }: Props) {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      // flip up if less than 180px below
+      setDropUp(spaceBelow < 180);
+    }
+    setOpen((v) => !v);
+  };
+
   return (
     <div ref={ref} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleOpen}
         className={`flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${open ? "bg-muted text-foreground" : ""}`}
         title="ตัวเลือก"
       >
@@ -43,7 +56,9 @@ export function RowActions({ actions, align = "right" }: Props) {
         <>
           <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
           <div
-            className={`absolute z-30 mt-1 min-w-[160px] rounded-lg border bg-popover py-1 shadow-lg ${align === "right" ? "right-0" : "left-0"}`}
+            className={`absolute z-30 min-w-[160px] rounded-lg border bg-popover py-1 shadow-lg ${
+              align === "right" ? "right-0" : "left-0"
+            } ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}
           >
             {actions.map((a, i) => (
               <div key={i}>
