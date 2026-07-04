@@ -328,6 +328,8 @@ function Column({
   onCardClick,
   activeId,
   totalPipeline,
+  onDelete,
+  onDuplicate,
 }: {
   stage: LeadStage;
   leads: LeadWithRelations[];
@@ -335,7 +337,10 @@ function Column({
   onCardClick: (id: string) => void;
   activeId: string | null;
   totalPipeline: number;
+  onDelete: (id: string) => void;
+  onDuplicate: (lead: LeadWithRelations) => void;
 }) {
+
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const sum = leads.reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
 
