@@ -4,6 +4,7 @@ import { Loader2, Search, Plus, Building2, Star, Crown } from "lucide-react";
 import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,7 @@ interface Account {
 
 function AccountsPage() {
   const { user, role } = useAuth();
+  const confirm = useConfirm();
   const isManager = role === "manager" || role === "admin";
 
   const [accounts, setAccounts] = useState<Account[] | null>(null);
@@ -75,14 +77,16 @@ function AccountsPage() {
   };
 
   const deleteAccount = async (id: string) => {
-    if (!confirm("ลบบริษัทนี้? (ดีลที่เชื่อมอยู่จะไม่ถูกลบ)")) return;
+    const _ok = await confirm({ title: "ลบบริษัทนี้? (ดีลที่เชื่อมอยู่จะไม่ถูกลบ)", variant: "danger" });
+    if (!_ok) return;
     const { error } = await crmDb().from("accounts").delete().eq("id", id);
     if (error) { toast.error("ลบไม่สำเร็จ"); return; }
     toast.success("ลบแล้ว"); load();
   };
 
   const bulkDelete = async () => {
-    if (!confirm(`ลบ ${selected.size} บริษัท?`)) return;
+    const _ok = await confirm({ title: `ลบ ${selected.size} บริษัท?`, variant: "danger" });
+    if (!_ok) return;
     const ids = Array.from(selected);
     const { error } = await crmDb().from("accounts").delete().in("id", ids);
     if (error) { toast.error("ลบไม่สำเร็จ"); return; }

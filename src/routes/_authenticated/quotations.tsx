@@ -4,6 +4,7 @@ import {
   Loader2, Plus, Search, FileText, FileDown, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +70,7 @@ export const STATUS_COLOR: Record<QuotationStatus, string> = {
 
 function QuotationsPage() {
   const { user, role } = useAuth();
+  const confirm = useConfirm();
   const isManager = role === "manager" || role === "admin";
 
   const [rows, setRows] = useState<Quotation[] | null>(null);
@@ -107,7 +109,8 @@ function QuotationsPage() {
   const clearAll  = () => setSelected(new Set());
 
   const deleteQuotation = async (id: string) => {
-    if (!confirm("ลบใบเสนอราคานี้?")) return;
+    const _ok = await confirm({ title: "ลบใบเสนอราคานี้?", variant: "danger" });
+    if (!_ok) return;
     const { error } = await crmDb().from("quotations").delete().eq("id", id);
     if (error) { toast.error("ลบไม่สำเร็จ"); return; }
     toast.success("ลบแล้ว"); load();
@@ -127,7 +130,8 @@ function QuotationsPage() {
   };
 
   const bulkDelete = async () => {
-    if (!confirm(`ลบ ${selected.size} รายการ?`)) return;
+    const _ok = await confirm({ title: `ลบ ${selected.size} รายการ?`, variant: "danger" });
+    if (!_ok) return;
     const ids = Array.from(selected);
     const { error } = await crmDb().from("quotations").delete().in("id", ids);
     if (error) { toast.error("ลบไม่สำเร็จ"); return; }

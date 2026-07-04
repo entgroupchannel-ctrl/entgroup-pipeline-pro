@@ -6,6 +6,7 @@ import {
   BarChart2, Trophy, AlertTriangle, DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +82,7 @@ function periodLabel(mode: PeriodMode, year: number, month: number, quarter: num
 
 function LeadsPage() {
   const { user, role } = useAuth();
+  const confirm = useConfirm();
   const isManager = role === "manager" || role === "admin";
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
@@ -211,14 +213,16 @@ function LeadsPage() {
   };
 
   const deleteLead = async (id: string) => {
-    if (!confirm("ลบดีลนี้?")) return;
+    const _ok = await confirm({ title: "ลบดีลนี้?", variant: "danger" });
+    if (!_ok) return;
     const { error } = await crmDb().from("leads").delete().eq("id", id);
     if (error) { toast.error("ลบไม่สำเร็จ"); return; }
     toast.success("ลบแล้ว"); load();
   };
 
   const bulkDelete = async () => {
-    if (!confirm(`ลบ ${selected.size} รายการ?`)) return;
+    const _ok = await confirm({ title: `ลบ ${selected.size} รายการ?`, variant: "danger" });
+    if (!_ok) return;
     const ids = Array.from(selected);
     const { error } = await crmDb().from("leads").delete().in("id", ids);
     if (error) { toast.error("ลบไม่สำเร็จ"); return; }
