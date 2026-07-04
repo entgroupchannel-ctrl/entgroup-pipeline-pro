@@ -4,7 +4,7 @@
 //   await confirm({ title: "ลบดีล?", description: "...", confirmLabel: "ลบ", variant: "danger" })
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
-import { AlertTriangle, Trash2, Info, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertTriangle, Trash2, Info, CheckCircle2, Loader2, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,

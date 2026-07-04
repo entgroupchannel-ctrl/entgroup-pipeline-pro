@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   Loader2, Search, Plus, TrendingUp, Calendar, ChevronLeft, ChevronRight,
   BarChart2, Trophy, AlertTriangle, DollarSign,
-} from "lucide-react";
+Trash2,} from "lucide-react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -371,7 +371,7 @@ function LeadsPage() {
         total={filtered?.length ?? 0}
         onSelectAll={selectAll}
         onClearAll={clearAll}
-        actions={[{ label: "ลบที่เลือก", icon: <span>🗑</span>, onClick: bulkDelete, variant: "danger" }]}
+        actions={[{ label: "ลบที่เลือก", icon: <Trash2 className="h-3.5 w-3.5" />, onClick: bulkDelete, variant: "danger" }]}
       />
 
       {/* ── Table ── */}

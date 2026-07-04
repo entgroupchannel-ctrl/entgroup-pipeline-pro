@@ -18,7 +18,6 @@ import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type Lead, type L
 import { formatBaht } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { KanbanCard } from "./KanbanCard";
-import { toast } from "sonner";
 import { NewLeadDialog } from "./NewLeadDialog";
 import { FAImportModal } from "@/components/flowaccount/FAImportModal";
 import { fetchFALastSync } from "@/lib/flowaccount-client";
@@ -258,6 +257,8 @@ export function KanbanBoard() {
                 onCardClick={openLead}
                 activeId={activeId}
                 totalPipeline={totalPipeline}
+                onDelete={deleteLead}
+                onDuplicate={duplicateLead}
               />
             ))}
           </div>
@@ -332,6 +333,8 @@ function Column({
   onCardClick,
   activeId,
   totalPipeline,
+  onDelete,
+  onDuplicate,
 }: {
   stage: LeadStage;
   leads: LeadWithRelations[];
@@ -339,6 +342,8 @@ function Column({
   onCardClick: (id: string) => void;
   activeId: string | null;
   totalPipeline: number;
+  onDelete: (id: string) => void;
+  onDuplicate: (lead: LeadWithRelations) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const sum = leads.reduce((s, l) => s + Number(l.expected_value ?? 0), 0);
@@ -392,8 +397,8 @@ function Column({
                 lead={l}
                 onClick={() => onCardClick(l.id)}
                 draggable
-                onDelete={() => deleteLead(l.id)}
-                onDuplicate={() => duplicateLead(l)}
+                onDelete={() => onDelete(l.id)}
+                onDuplicate={() => onDuplicate(l)}
               />
             </div>
           ))

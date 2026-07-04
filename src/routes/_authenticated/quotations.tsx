@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Loader2, Plus, Search, FileText, FileDown, ChevronDown,
-} from "lucide-react";
+  Trash2,} from "lucide-react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -220,7 +220,7 @@ function QuotationsPage() {
         actions={[
           { label: "ส่งแล้ว", onClick: () => bulkUpdateStatus("sent") },
           { label: "อนุมัติ", onClick: () => bulkUpdateStatus("accepted") },
-          { label: "ลบที่เลือก", icon: <span>🗑</span>, onClick: bulkDelete, variant: "danger" },
+          { label: "ลบที่เลือก", icon: <Trash2 className="h-3.5 w-3.5" />, onClick: bulkDelete, variant: "danger" },
         ]}
       />
 
