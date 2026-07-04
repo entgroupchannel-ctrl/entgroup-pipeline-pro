@@ -11,13 +11,12 @@ import {
 } from "@dnd-kit/core";
 import { Plus, Inbox, FileDown, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type Lead, type LeadStage, type Account } from "@/lib/crm";
 import { formatBaht } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { KanbanCard } from "./KanbanCard";
-import { LeadDetailSheet } from "./LeadDetailSheet";
 import { NewLeadDialog } from "./NewLeadDialog";
 import { FlowAccountImportDialog } from "./FlowAccountImportDialog";
 import { Button } from "@/components/ui/button";
