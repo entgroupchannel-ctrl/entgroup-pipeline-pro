@@ -22,6 +22,7 @@ import {
 import { formatThaiDate as formatThaiDay } from "@/lib/format";
 import { fetchFADocument, type FADocument } from "@/lib/flowaccount-client";
 import { FAImportModal } from "@/components/flowaccount/FAImportModal";
+import { LeadQuotationsSection } from "@/components/pipeline/LeadQuotationsSection";
 import { X as XIcon, FileDown } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/leads/$leadId")({
