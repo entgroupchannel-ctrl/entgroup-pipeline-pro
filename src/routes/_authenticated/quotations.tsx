@@ -73,6 +73,7 @@ function QuotationsPage() {
   const { user, role } = useAuth();
   const confirm = useConfirm();
   const isManager = role === "manager" || role === "admin";
+  const isAdmin = role === "admin";
 
   const [rows, setRows] = useState<Quotation[] | null>(null);
   const [leadsMap, setLeadsMap] = useState<Map<string, string>>(new Map());
@@ -168,6 +169,7 @@ function QuotationsPage() {
   };
 
   const handleExport = () => {
+    if (!isAdmin) { toast.error("ไม่มีสิทธิ์ Export — เฉพาะ Admin เท่านั้น"); return; }
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
     const profMap = new Map(Array.from(profilesMap.entries()).map(([id, name]) => [id, { name: name ?? "" }]));
     const rows = quotationsToRows(filtered, leadsMap, accountsMap, profMap, STATUS_LABEL);
@@ -185,9 +187,11 @@ function QuotationsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={!filtered?.length}>
-            <Download className="mr-1.5 h-4 w-4" /> Export CSV
-          </Button>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={!filtered?.length}>
+              <Download className="mr-1.5 h-4 w-4" /> Export CSV
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setFaOpen(true)}>
             <FileDown className="mr-1.5 h-4 w-4" /> Import FA
           </Button>

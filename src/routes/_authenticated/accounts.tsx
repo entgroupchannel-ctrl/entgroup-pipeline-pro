@@ -85,6 +85,7 @@ function AccountsPage() {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const isManager = role === "manager" || role === "admin";
+  const isAdmin = role === "admin";
 
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [leadsCount, setLeadsCount] = useState<Map<string, number>>(new Map());
@@ -166,6 +167,7 @@ function AccountsPage() {
   }, [accounts, q, industryFilter]);
 
   const handleExport = () => {
+    if (!isAdmin) { toast.error("ไม่มีสิทธิ์ Export — เฉพาะ Admin เท่านั้น"); return; }
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
     const profMap = new Map<string, { name: string }>(
       Array.from(new Set(filtered.map(a => a.owner_id).filter((id): id is string => id !== null))).map(id => [id, { name: id }])
@@ -186,9 +188,11 @@ function AccountsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={!filtered?.length}>
-            <Download className="mr-1.5 h-4 w-4" /> Export CSV
-          </Button>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={!filtered?.length}>
+              <Download className="mr-1.5 h-4 w-4" /> Export CSV
+            </Button>
+          )}
           <Button size="sm" onClick={() => setNewOpen(true)}>
             <Plus className="mr-1.5 h-4 w-4" /> เพิ่มบริษัท
           </Button>
