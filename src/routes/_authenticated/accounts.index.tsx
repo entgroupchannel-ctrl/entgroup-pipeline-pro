@@ -192,6 +192,7 @@ function AccountsPage() {
   } = usePagination(filtered ?? [], 25);
 
   const handleExport = () => {
+    if (!isAdmin) { toast.error("เฉพาะ Admin เท่านั้นที่ Export รายชื่อลูกค้าได้"); return; }
     if (!isAdmin) { toast.error("ไม่มีสิทธิ์ Export — เฉพาะ Admin เท่านั้น"); return; }
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
     const profMap = new Map<string, { name: string }>(
@@ -238,7 +239,7 @@ function AccountsPage() {
             </SelectContent>
           </Select>
           {isAdmin && (
-            <Button variant="outline" size="sm" className="h-8" onClick={handleExport} disabled={!filtered?.length} title="เฉพาะ Admin เท่านั้น">
+            <Button variant="outline" size="sm" className="h-8" onClick={handleExport} disabled={!filtered?.length || !isAdmin} title={!isAdmin ? "เฉพาะ Admin เท่านั้น" : "Export CSV"}>
               <Download className="mr-1.5 h-3.5 w-3.5" /> Export
             </Button>
           )}

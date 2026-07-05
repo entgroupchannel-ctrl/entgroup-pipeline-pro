@@ -212,6 +212,8 @@ function LeadsPage() {
   };
 
   const handleExport = () => {
+    // Sales: export only own leads (filtered already scoped by owner_id from query)
+    // Manager/Admin: export all visible
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
     const rows = leadsToRows(filtered, accountsMap, profilesMap, STAGE_LABEL_TH);
     const period = mode !== "all" ? `-${periodLabel(mode, year, month, quarter)}` : "";
@@ -348,8 +350,10 @@ function LeadsPage() {
             </Select>
           )}
 
-          <Button variant="outline" size="sm" className="h-8" onClick={handleExport} disabled={!filtered?.length}>
-            <ArrowRight className="mr-1.5 h-3.5 w-3.5 rotate-90" /> Export CSV
+          <Button variant="outline" size="sm" className="h-8" onClick={handleExport} disabled={!filtered?.length}
+            title={!isManager ? "Export เฉพาะดีลของคุณ" : "Export CSV ทั้งหมด"}>
+            <ArrowRight className="mr-1.5 h-3.5 w-3.5 rotate-90" />
+            {isManager ? "Export CSV" : "Export ดีลของฉัน"}
           </Button>
           {canCreate && (
             <Button size="sm" className="h-8" onClick={() => setNewOpen(true)}>
