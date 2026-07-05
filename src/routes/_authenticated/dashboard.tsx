@@ -1,7 +1,7 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { Loader2, TrendingUp, Trophy, Clock, CalendarPlus, Phone, Mail, MessageCircle, StickyNote, CheckCircle2 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
+import { Loader2, TrendingUp, Trophy, Clock, CalendarPlus, Phone, Mail, MessageCircle, StickyNote, CheckCircle2, BarChart3, BarChartHorizontal, PieChart as PieChartIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type LeadStage } from "@/lib/crm";
