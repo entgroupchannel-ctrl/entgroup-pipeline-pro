@@ -1,9 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Search, Plus, Building2, Star, Crown, Trash2, Download, ExternalLink, User } from "lucide-react";
-import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
+import { Loader2, Search, Plus, Building2, Crown, Trash2, Download, ExternalLink } from "lucide-react";
+import { RowActions, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
 import { exportToCsv, accountsToRows } from "@/lib/export-csv";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -64,24 +63,6 @@ const INDUSTRIES = [
   "อื่นๆ",
 ] as const;
 
-const INDUSTRY_COLOR: Record<string, string> = {
-  "เทคโนโลยี/IT": "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
-  "อุตสาหกรรม/โรงงาน": "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  "การศึกษา": "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-  "สุขภาพ/การแพทย์": "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
-  "ภาครัฐ": "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300",
-  "พลังงาน/สาธารณูปโภค": "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
-  "การค้า/นำเข้า-ส่งออก": "bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300",
-  "ขนส่ง/โลจิสติกส์": "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
-  "ก่อสร้าง/อสังหาริมทรัพย์": "bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300",
-  "อาหาร/เกษตร": "bg-lime-100 text-lime-700 dark:bg-lime-950/40 dark:text-lime-300",
-  "โรงแรม/ท่องเที่ยว": "bg-pink-100 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300",
-  "ค้าปลีก/ค้าส่ง": "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300",
-  "สื่อ/โฆษณา": "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
-  "การเงิน/ธนาคาร": "bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300",
-  "อื่นๆ": "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-};
-
 function AccountsPage() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
@@ -90,58 +71,33 @@ function AccountsPage() {
   const { can } = usePermissions();
   const canCreate = can("account.create");
   const canDelete = can("account.delete");
-  const isAdmin = role === "admin"; // admin = super admin (highest role)
+  const isAdmin = role === "admin";
 
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [leadsCount, setLeadsCount] = useState<Map<string, number>>(new Map());
-  const [contactsMap, setContactsMap] = useState<Map<string, { name: string; phone: string | null }>>(new Map());
   const [q, setQ] = useState("");
   const [industryFilter, setIndustryFilter] = useState("ทั้งหมด");
   const [newOpen, setNewOpen] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = async () => {
-    console.log("[accounts] load() started");
     const [accRes, leadsRes] = await Promise.all([
       crmDb().from("accounts").select("*").order("name"),
       crmDb().from("leads").select("id,account_id"),
     ]);
-    console.log("[accounts] accRes:", accRes.error ?? `OK — ${accRes.data?.length} rows`);
     if (accRes.error) {
       toast.error("โหลดรายชื่อลูกค้าไม่สำเร็จ", { description: accRes.error.message });
       return;
     }
     setAccounts((accRes.data ?? []) as Account[]);
-    console.log("[accounts] setAccounts done");
 
-    // count leads per account
     const counts = new Map<string, number>();
     (leadsRes.data ?? []).forEach((l: any) => {
       if (l.account_id) counts.set(l.account_id, (counts.get(l.account_id) ?? 0) + 1);
     });
     setLeadsCount(counts);
-
-    // contacts — fetch separately; ignore error (RLS / missing table won't break the list)
-    const contactsRes = await crmDb()
-      .from("contacts")
-      .select("id,account_id,name,phone")
-      .order("name");
-    if (!contactsRes.error) {
-      const cmap = new Map<string, { name: string; phone: string | null }>();
-      (contactsRes.data ?? []).forEach((c: any) => {
-        if (c.account_id && !cmap.has(c.account_id)) {
-          cmap.set(c.account_id, { name: c.name, phone: c.phone });
-        }
-      });
-      setContactsMap(cmap);
-    }
   };
 
   useEffect(() => { load(); }, []);
-
-  const toggleSelect = (id: string) => setSelected(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
-  const selectAll = () => setSelected(new Set((filtered ?? []).map(a => a.id)));
-  const clearAll  = () => setSelected(new Set());
 
   const duplicateAccount = async (a: Account) => {
     const { error } = await crmDb().from("accounts").insert({
@@ -168,15 +124,6 @@ function AccountsPage() {
     const { error } = await crmDb().from("accounts").delete().eq("id", id);
     if (error) { toast.error("ลบไม่สำเร็จ"); return; }
     toast.success("ลบแล้ว"); load();
-  };
-
-  const bulkDelete = async () => {
-    const _ok = await confirm({ title: `ลบ ${selected.size} บริษัท?`, variant: "danger" });
-    if (!_ok) return;
-    const ids = Array.from(selected);
-    const { error } = await crmDb().from("accounts").delete().in("id", ids);
-    if (error) { toast.error("ลบไม่สำเร็จ"); return; }
-    toast.success(`ลบ ${ids.length} รายการแล้ว`); clearAll(); load();
   };
 
   const filtered = useMemo(() => {
@@ -215,11 +162,11 @@ function AccountsPage() {
   };
 
   return (
-    <div className="p-6 page-fade-in">
+    <div className="p-6 page-fade-in space-y-5">
       {/* Header */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">รายชื่อลูกค้า</h1>
+          <h1 className="text-xl font-semibold text-foreground">รายชื่อลูกค้า</h1>
           <p className="text-xs text-muted-foreground">
             {filtered == null ? "กำลังโหลด…" : `${filtered.length} บริษัท`}
           </p>
@@ -238,47 +185,29 @@ function AccountsPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="mb-4">
-        <div className="relative w-72">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            className="h-9 pl-8 text-sm"
-            placeholder="ค้นหาชื่อบริษัท / อุตสาหกรรม"
+            className="h-9 w-72 pl-8 text-sm bg-background"
+            placeholder="ค้นหาชื่อบริษัท / อุตสาหกรรม / เลขประจำตัวผู้เสียภาษี"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
-      </div>
 
-      {/* Industry filter */}
-      <div className="mb-4 -mx-6 px-6">
-        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
-          {INDUSTRIES.map((ind) => (
-            <button
-              key={ind}
-              onClick={() => setIndustryFilter(ind)}
-              className={`shrink-0 rounded-full border px-3 py-1 text-xs transition-colors ${
-                industryFilter === ind
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "bg-background hover:bg-muted"
-              }`}
-            >
-              {ind}
-            </button>
-          ))}
-        </div>
+        <Select value={industryFilter} onValueChange={setIndustryFilter}>
+          <SelectTrigger className="h-9 w-44 text-xs bg-background">
+            <SelectValue placeholder="อุตสาหกรรม" />
+          </SelectTrigger>
+          <SelectContent>
+            {INDUSTRIES.map((ind) => <SelectItem key={ind} value={ind}>{ind}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* List */}
-      <BulkActionBar
-        count={selected.size}
-        total={filtered?.length ?? 0}
-        onSelectAll={selectAll}
-        onClearAll={clearAll}
-        actions={canDelete ? [{ label: "ลบที่เลือก", icon: <Trash2 className="h-3.5 w-3.5" />, onClick: bulkDelete, variant: "danger" }] : []}
-      />
-
       {filtered === null ? (
         <div className="flex justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -289,120 +218,59 @@ function AccountsPage() {
           ไม่พบบริษัท
         </div>
       ) : (
-        <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground uppercase tracking-wide">
-                  <th className="px-3 py-2.5 w-8">
-                    <Checkbox checked={!!filtered?.length && selected.size === filtered.length} onCheckedChange={(v) => v ? selectAll() : clearAll()} />
-                  </th>
-                  <th className="px-4 py-2.5 text-left font-medium">ชื่อบริษัท</th>
-                  <th className="px-4 py-2.5 text-left font-medium">อุตสาหกรรม</th>
-                  <th className="px-4 py-2.5 text-left font-medium">ดีล</th>
-                  <th className="px-4 py-2.5 text-left font-medium">ผู้ติดต่อหลัก</th>
-                  <th className="px-4 py-2.5 text-left font-medium">เว็บไซต์</th>
-                  <th className="px-4 py-2.5 text-left font-medium">โทรศัพท์</th>
-                  <th className="px-4 py-2.5 text-left font-medium">อัปเดต</th>
-                  <th className="px-2 py-2.5 w-8" />
+                <tr className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
+                  <th className="px-4 py-3 text-left font-medium">ชื่อบริษัท</th>
+                  <th className="px-4 py-3 text-left font-medium">อุตสาหกรรม</th>
+                  <th className="px-4 py-3 text-left font-medium w-24">ดีล</th>
+                  <th className="px-4 py-3 text-left font-medium">โทรศัพท์</th>
+                  <th className="px-3 py-3 text-right w-16" />
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-border">
                 {pageItems.map((a) => {
-                  const primaryContact = contactsMap.get(a.id) ?? null;
-                  const initials = primaryContact
-                    ? primaryContact.name.split(" ").map((s: string) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase()
-                    : null;
                   const dealCount = leadsCount.get(a.id) ?? 0;
 
                   return (
                     <tr
                       key={a.id}
-                      className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected.has(a.id) ? "bg-primary/5" : ""}`}
-                      onClick={() => {
-                        console.log("[accounts] row clicked — navigating to", a.id);
-                        navigate({ to: "/accounts/$accountId", params: { accountId: a.id } });
-                      }}
+                      className="group hover:bg-muted/40 transition-colors cursor-pointer"
+                      onClick={() => navigate({ to: "/accounts/$accountId", params: { accountId: a.id } })}
                     >
-                      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={selected.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} />
-                      </td>
-
-                      {/* ชื่อบริษัท */}
-                      <td className="px-4 py-3 max-w-[220px]">
+                      <td className="px-4 py-3.5">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-medium text-primary truncate">{a.name}</span>
+                          <span className="font-medium text-foreground truncate max-w-[280px]">{a.name}</span>
                           {a.is_key_account && (
-                            <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 shrink-0">
+                            <span className="inline-flex items-center gap-0.5 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground shrink-0">
                               <Crown className="h-2.5 w-2.5" /> Key
                             </span>
                           )}
                         </div>
                         {a.account_type && (
-                          <div className="text-[10px] text-muted-foreground mt-0.5 capitalize">{a.account_type}</div>
+                          <div className="text-[11px] text-muted-foreground mt-0.5 capitalize">{a.account_type}</div>
                         )}
                       </td>
 
-                      {/* อุตสาหกรรม */}
-                      <td className="px-4 py-3">
-                        {a.industry ? (
-                          <Badge className={`text-[11px] font-medium ${INDUSTRY_COLOR[a.industry] ?? "bg-muted text-muted-foreground"}`}>
-                            {a.industry}
-                          </Badge>
-                        ) : <span className="text-xs text-muted-foreground">—</span>}
+                      <td className="px-4 py-3.5 text-sm text-foreground">
+                        {a.industry ?? <span className="text-muted-foreground">—</span>}
                       </td>
 
-                      {/* ดีล */}
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3.5 text-sm text-foreground">
                         {dealCount > 0 ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
-                            <Building2 className="h-2.5 w-2.5" />
-                            {dealCount}
+                          <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            {dealCount} ดีล
                           </span>
                         ) : <span className="text-xs text-muted-foreground">—</span>}
                       </td>
 
-                      {/* ผู้ติดต่อหลัก */}
-                      <td className="px-4 py-3">
-                        {primaryContact ? (
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-semibold text-primary">
-                              {initials}
-                            </div>
-                            <span className="truncate text-xs text-muted-foreground max-w-[120px]">
-                              {primaryContact.name}
-                            </span>
-                          </div>
-                        ) : <span className="text-xs text-muted-foreground">—</span>}
-                      </td>
-
-                      {/* เว็บไซต์ */}
-                      <td className="px-4 py-3 text-xs" onClick={(e) => e.stopPropagation()}>
-                        {a.website ? (
-                          <a
-                            href={a.website.startsWith("http") ? a.website : `https://${a.website}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-primary hover:underline max-w-[140px]"
-                          >
-                            <ExternalLink className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{a.website.replace(/^https?:\/\//, "")}</span>
-                          </a>
-                        ) : <span className="text-muted-foreground">—</span>}
-                      </td>
-
-                      {/* โทรศัพท์ */}
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                      <td className="px-4 py-3.5 text-sm text-muted-foreground">
                         {a.phone ?? "—"}
                       </td>
 
-                      {/* อัปเดต */}
-                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                        {formatThaiDate(a.updated_at)}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-3 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                         <RowActions actions={[
                           stdOpen(() => navigate({ to: "/accounts/$accountId", params: { accountId: a.id } })),
                           stdDupe(() => duplicateAccount(a)),
@@ -425,6 +293,10 @@ function AccountsPage() {
           />
         </div>
       )}
+
+      <p className="text-xs text-muted-foreground text-center">
+        คลิกแถวเพื่อดูรายละเอียดบริษัท
+      </p>
 
       <NewAccountDialog open={newOpen} onOpenChange={setNewOpen} onSaved={() => { setNewOpen(false); load(); }} />
     </div>

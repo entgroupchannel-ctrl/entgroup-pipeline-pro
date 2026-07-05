@@ -16,9 +16,8 @@ import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { formatBaht, formatThaiDate } from "@/lib/format";
 import { fetchFADocuments, type FADocument } from "@/lib/flowaccount-client";
-import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete } from "@/components/ui/row-actions";
+import { RowActions, stdEdit, stdDupe, stdDelete } from "@/components/ui/row-actions";
 import { exportToCsv, quotationsToRows } from "@/lib/export-csv";
-import { Checkbox } from "@/components/ui/checkbox";
 import { ListPagination, usePagination } from "@/components/list-pagination";
 
 export const Route = createFileRoute("/_authenticated/quotations")({
@@ -68,6 +67,14 @@ export const STATUS_COLOR: Record<QuotationStatus, string> = {
   cancelled: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
 };
 
+export const STATUS_DOT: Record<QuotationStatus, string> = {
+  draft: "bg-muted-foreground",
+  sent: "bg-blue-500",
+  accepted: "bg-emerald-500",
+  rejected: "bg-red-500",
+  cancelled: "bg-muted-foreground",
+};
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function QuotationsPage() {
@@ -87,7 +94,6 @@ function QuotationsPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [faOpen, setFaOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Quotation | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = async () => {
     let qb = crmDb().from("quotations").select("*").order("created_at", { ascending: false });
@@ -106,10 +112,6 @@ function QuotationsPage() {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [user?.id, isManager]);
-
-  const toggleSelect = (id: string) => setSelected(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
-  const selectAll = () => setSelected(new Set((filtered ?? []).map(r => r.id)));
-  const clearAll  = () => setSelected(new Set());
 
   const deleteQuotation = async (id: string) => {
     const _ok = await confirm({ title: "ลบใบเสนอราคานี้?", variant: "danger" });
@@ -132,22 +134,6 @@ function QuotationsPage() {
     toast.success("สร้างซ้ำแล้ว"); load();
   };
 
-  const bulkDelete = async () => {
-    const _ok = await confirm({ title: `ลบ ${selected.size} รายการ?`, variant: "danger" });
-    if (!_ok) return;
-    const ids = Array.from(selected);
-    const { error } = await crmDb().from("quotations").delete().in("id", ids);
-    if (error) { toast.error("ลบไม่สำเร็จ"); return; }
-    toast.success(`ลบ ${ids.length} รายการแล้ว`); clearAll(); load();
-  };
-
-  const bulkUpdateStatus = async (status: QuotationStatus) => {
-    const ids = Array.from(selected);
-    const { error } = await crmDb().from("quotations").update({ status }).in("id", ids);
-    if (error) { toast.error("อัปเดตไม่สำเร็จ"); return; }
-    toast.success(`อัปเดต ${ids.length} รายการเป็น ${STATUS_LABEL[status]} แล้ว`); clearAll(); load();
-  };
-
   const filtered = useMemo(() => {
     if (!rows) return null;
     const needle = q.trim().toLowerCase();
@@ -167,13 +153,6 @@ function QuotationsPage() {
     total: pagedTotal, paged: pageItems,
   } = usePagination(filtered ?? [], 25);
 
-  const updateStatus = async (id: string, status: QuotationStatus) => {
-    const { error } = await crmDb().from("quotations").update({ status }).eq("id", id);
-    if (error) return toast.error("อัปเดตสถานะไม่สำเร็จ", { description: error.message });
-    toast.success("อัปเดตสถานะแล้ว");
-    load();
-  };
-
   const handleExport = () => {
     if (!isAdmin) { toast.error("ไม่มีสิทธิ์ Export — เฉพาะ Admin เท่านั้น"); return; }
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
@@ -183,11 +162,16 @@ function QuotationsPage() {
     toast.success(`Export ${filtered.length} รายการแล้ว`);
   };
 
+  const openEdit = (r: Quotation) => {
+    setEditTarget(r);
+    setNewOpen(true);
+  };
+
   return (
-    <div className="p-6 page-fade-in">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div className="p-6 page-fade-in space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">ใบเสนอราคา</h1>
+          <h1 className="text-xl font-semibold text-foreground">ใบเสนอราคา</h1>
           <p className="text-xs text-muted-foreground">
             {rows == null ? "กำลังโหลด…" : `${rows.length} รายการ`}
           </p>
@@ -207,44 +191,28 @@ function QuotationsPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            className="h-9 w-60 pl-8 text-sm"
+            className="h-9 w-60 pl-8 text-sm bg-background"
             placeholder="ค้นหา เลขที่ / ชื่อ / บริษัท"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
-        <div className="flex flex-wrap gap-1">
-          {(["all", "draft", "sent", "accepted", "rejected", "cancelled"] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                statusFilter === s
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "bg-background hover:bg-muted"
-              }`}
-            >
-              {s === "all" ? "ทั้งหมด" : STATUS_LABEL[s]}
-            </button>
-          ))}
-        </div>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as QuotationStatus | "all")}>
+          <SelectTrigger className="h-9 w-36 text-xs bg-background">
+            <SelectValue placeholder="สถานะ" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">ทั้งหมด</SelectItem>
+            {(Object.keys(STATUS_LABEL) as QuotationStatus[]).map((s) => (
+              <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-
-      <BulkActionBar
-        count={selected.size}
-        total={filtered?.length ?? 0}
-        onSelectAll={selectAll}
-        onClearAll={clearAll}
-        actions={[
-          { label: "ส่งแล้ว", onClick: () => bulkUpdateStatus("sent") },
-          { label: "อนุมัติ", onClick: () => bulkUpdateStatus("accepted") },
-          { label: "ลบที่เลือก", icon: <Trash2 className="h-3.5 w-3.5" />, onClick: bulkDelete, variant: "danger" },
-        ]}
-      />
 
       {filtered === null ? (
         <div className="flex justify-center py-20">
@@ -256,30 +224,26 @@ function QuotationsPage() {
           ไม่พบใบเสนอราคา
         </div>
       ) : (
-        <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                  <th className="px-3 py-2.5 w-8"><Checkbox checked={!!filtered?.length && selected.size === filtered.length} onCheckedChange={(v) => v ? selectAll() : clearAll()} /></th>
-                  <th className="px-4 py-2.5 text-left font-medium">วันที่</th>
-                  <th className="px-4 py-2.5 text-left font-medium">เลขที่เอกสาร</th>
-                  <th className="px-4 py-2.5 text-left font-medium">ชื่อลูกค้า / ชื่อโปรเจ็ค</th>
-                  <th className="px-4 py-2.5 text-right font-medium">ยอดรวมสุทธิ</th>
-                  <th className="px-4 py-2.5 text-center font-medium">สถานะ</th>
-                  <th className="px-2 py-2.5 w-8" />
+                <tr className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
+                  <th className="px-4 py-3 text-left font-medium w-28">วันที่</th>
+                  <th className="px-4 py-3 text-left font-medium">เลขที่เอกสาร</th>
+                  <th className="px-4 py-3 text-left font-medium">ชื่อลูกค้า / ชื่อโปรเจ็ค</th>
+                  <th className="px-4 py-3 text-right font-medium">ยอดรวมสุทธิ</th>
+                  <th className="px-4 py-3 text-left font-medium w-32">สถานะ</th>
+                  <th className="px-3 py-3 text-right w-16" />
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-border">
                 {pageItems.map((r) => (
                   <QuotationRow
                     key={r.id}
                     row={r}
-                    selected={selected.has(r.id)}
-                    onSelect={() => toggleSelect(r.id)}
                     accountName={r.account_id ? accountsMap.get(r.account_id) : undefined}
-                    onEdit={() => { setEditTarget(r); setNewOpen(true); }}
-                    onStatusChange={(s) => updateStatus(r.id, s)}
+                    onEdit={() => openEdit(r)}
                     onDelete={() => deleteQuotation(r.id)}
                     onDuplicate={() => duplicateQuotation(r)}
                   />
@@ -297,6 +261,10 @@ function QuotationsPage() {
           />
         </div>
       )}
+
+      <p className="text-xs text-muted-foreground text-center">
+        คลิกแถวเพื่อดูรายละเอียดใบเสนอราคา
+      </p>
 
       <QuotationFormDialog
         open={newOpen}
@@ -316,87 +284,57 @@ function QuotationsPage() {
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
 function QuotationRow({
-  row, selected, onSelect, accountName, onEdit, onStatusChange, onDelete, onDuplicate,
+  row, accountName, onEdit, onDelete, onDuplicate,
 }: {
   row: Quotation;
-  selected?: boolean;
-  onSelect?: () => void;
   accountName?: string;
   onEdit: () => void;
-  onStatusChange: (s: QuotationStatus) => void;
   onDelete?: () => void;
   onDuplicate?: () => void;
 }) {
-  const [statusOpen, setStatusOpen] = useState(false);
   const expired = row.valid_until && new Date(row.valid_until).getTime() < Date.now();
 
   return (
     <tr
-      className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected ? "bg-primary/5" : ""}`}
+      className="group hover:bg-muted/40 transition-colors cursor-pointer"
       onClick={(e) => {
         const target = e.target as HTMLElement;
-        if (target.closest('[role="checkbox"]') || target.closest('[data-radix-collection-item]') || target.closest('button') || target.closest('[role="menuitem"]')) return;
+        if (target.closest('button') || target.closest('[role="menuitem"]')) return;
         onEdit();
       }}
     >
-      <td className="px-3 py-3"><Checkbox checked={!!selected} onCheckedChange={() => onSelect?.()} /></td>
-      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+      <td className="px-4 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
         {formatThaiDate(row.issued_date)}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3.5">
         <div className="flex items-center gap-2">
-          <span
-            className={`shrink-0 h-1.5 w-1.5 rounded-full ${
-              row.source === "flowaccount" ? "bg-amber-500" : "bg-sky-500"
-            }`}
-            title={row.source === "flowaccount" ? "FlowAccount" : "CRM"}
-          />
-          <span className="font-mono text-xs font-semibold text-muted-foreground">
+          <span className="font-mono text-sm font-medium text-foreground">
             {row.quotation_no ?? "—"}
           </span>
         </div>
+        <div className="text-[11px] text-muted-foreground mt-0.5">
+          {row.source === "flowaccount" ? "FlowAccount" : "CRM"}
+        </div>
       </td>
-      <td className="px-4 py-3 max-w-[420px]">
-        <div className="truncate font-medium">{accountName ?? "—"}</div>
+      <td className="px-4 py-3.5 max-w-[420px]">
+        <div className="truncate font-medium text-foreground">{accountName ?? "—"}</div>
         {row.title && row.title !== accountName && (
           <div className="truncate text-xs text-muted-foreground">{row.title}</div>
         )}
       </td>
-      <td className="px-4 py-3 text-right font-medium whitespace-nowrap">
+      <td className="px-4 py-3.5 text-right text-sm font-medium tabular-nums whitespace-nowrap text-foreground">
         {formatBaht(row.grand_total)}
         {expired && (
           <div className="text-[10px] text-red-500 font-normal">หมดอายุ</div>
         )}
       </td>
-      <td className="px-4 py-3 text-center">
-        <div className="relative inline-block">
-          <button
-            onClick={() => setStatusOpen((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLOR[row.status]}`}
-          >
-            {STATUS_LABEL[row.status]}
-            <ChevronDown className="h-3 w-3" />
-          </button>
-          {statusOpen && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setStatusOpen(false)} />
-              <div className="absolute right-0 top-full z-20 mt-1 rounded-lg border bg-popover py-1 shadow-md min-w-[120px]">
-                {(Object.keys(STATUS_LABEL) as QuotationStatus[]).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => { setStatusOpen(false); onStatusChange(s); }}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted"
-                  >
-                    <span className={`h-2 w-2 rounded-full ${STATUS_COLOR[s].split(" ")[0]}`} />
-                    {STATUS_LABEL[s]}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+      <td className="px-4 py-3.5 w-32">
+        <span className="inline-flex items-center gap-1.5 text-xs text-foreground">
+          <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[row.status]}`} />
+          {STATUS_LABEL[row.status]}
+        </span>
       </td>
-      <td className="px-2 py-3">
+      <td className="px-3 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
         <RowActions actions={[
           stdEdit(onEdit),
           stdDupe(onDuplicate ?? (() => {})),
@@ -896,7 +834,7 @@ export function FAImportToQuotationDialog({
                           selected?.id === d.id ? "bg-primary/5" : ""
                         }`}
                       >
-                        <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                        <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold bg-muted text-muted-foreground">
                           QT
                         </span>
                         <div className="min-w-0 flex-1">
