@@ -154,12 +154,16 @@ function AccountsPage() {
   const filtered = useMemo(() => {
     if (!accounts) return null;
     const needle = q.trim().toLowerCase();
-    if (!needle) return accounts;
-    return accounts.filter((a) =>
-      a.name.toLowerCase().includes(needle) ||
-      (a.industry ?? "").toLowerCase().includes(needle)
-    );
-  }, [accounts, q]);
+    return accounts.filter((a) => {
+      if (industryFilter !== "ทั้งหมด" && a.industry !== industryFilter) return false;
+      if (!needle) return true;
+      return (
+        a.name.toLowerCase().includes(needle) ||
+        (a.industry ?? "").toLowerCase().includes(needle) ||
+        (a.tax_id ?? "").toLowerCase().includes(needle)
+      );
+    });
+  }, [accounts, q, industryFilter]);
 
   const handleExport = () => {
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
