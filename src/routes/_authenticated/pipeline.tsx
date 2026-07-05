@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { KanbanBoard } from "@/components/pipeline/KanbanBoard";
-import { MyDayPanel } from "@/components/pipeline/MyDayPanel";
 import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
 import { crmDb } from "@/lib/crm";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,11 +45,6 @@ function PipelinePage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* My Day panel — collapsible inbox at the top */}
-      <MyDayPanel
-        onRefresh={() => setRefreshKey((k) => k + 1)}
-      />
-
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b bg-background px-6 pt-3">
         <button
