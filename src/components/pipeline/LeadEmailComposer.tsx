@@ -10,11 +10,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Sparkles, Send, Loader2, Mail, RotateCcw, ChevronDown, ChevronUp,
+  CalendarClock, MessageCircleHeart, HandHeart, FileText, UserPlus, BellRing, Tag, Wand2,
 } from "lucide-react";
 import { draftLeadEmail, sendLeadEmail } from "@/lib/lead-email.functions";
 import { useAuth } from "@/lib/auth-context";
 import { STAGE_LABEL_TH, type LeadStage } from "@/lib/crm";
+
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
