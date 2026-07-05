@@ -13,7 +13,7 @@ import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { formatBaht } from "@/lib/format";
 import {
-  fetchUnmatchedQuotes, STATUS_LABEL, STATUS_COLOR,
+  fetchUnmatchedQuotes, claimQuoteRequest, STATUS_LABEL, STATUS_COLOR,
   type B2BQuoteRequest,
 } from "@/lib/b2b-client";
 
@@ -116,7 +116,21 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
         owner_id: user?.id,
       });
 
-      toast.success(`รับงานแล้ว — Lead ถูกสร้างสำหรับ ${req.customer_company}`);
+      // 4. Claim ที่ B2B (set crm_lead_id เพื่อกัน race)
+      const claim = await claimQuoteRequest(req.id, lead.id);
+      if (!claim.ok) {
+        if (claim.conflict) {
+          toast.warning("Lead ถูกสร้างแล้ว แต่ B2B ระบุว่ามี sales อื่นรับงานนี้ไปก่อน", {
+            description: "ตรวจสอบกับทีมก่อนดำเนินการต่อ",
+          });
+        } else {
+          toast.warning("Lead ถูกสร้างแล้ว แต่ sync กลับไป B2B ไม่สำเร็จ", {
+            description: claim.error,
+          });
+        }
+      } else {
+        toast.success(`รับงานแล้ว — Lead ถูกสร้างสำหรับ ${req.customer_company}`);
+      }
       setRequests((prev) => prev.filter((r) => r.id !== req.id));
       onLeadCreated?.();
     } catch (e: any) {

@@ -50,7 +50,7 @@ async function b2bFetch(params: Record<string, string>): Promise<B2BQuoteRequest
   const url = new URL(B2B_EDGE_URL);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const resp = await fetch(url.toString(), {
-    headers: { "x-secret": B2B_SECRET },
+    headers: { "x-crm-secret": B2B_SECRET },
   });
   if (!resp.ok) throw new Error(`B2B API error: ${resp.status}`);
   const { data, error } = await resp.json();
@@ -60,17 +60,48 @@ async function b2bFetch(params: Record<string, string>): Promise<B2BQuoteRequest
 
 /** ดึง quote_requests ที่ยังไม่ได้ match กับ lead ใดเลย */
 export async function fetchUnmatchedQuotes(limit = 50): Promise<B2BQuoteRequest[]> {
-  return b2bFetch({ mode: "unmatched", limit: String(limit) });
+  return b2bFetch({ limit: String(limit) });
 }
 
 /** ดึง quote_requests ตาม b2b_request_id หลายๆ id */
 export async function fetchQuotesByIds(ids: string[]): Promise<B2BQuoteRequest[]> {
   if (!ids.length) return [];
-  return b2bFetch({ mode: "by_ids", b2b_ids: ids.join(",") });
+  return b2bFetch({ b2b_ids: ids.join(",") });
 }
 
 /** ดึง quote_request เดียวตาม id */
 export async function fetchQuoteById(id: string): Promise<B2BQuoteRequest | null> {
   const results = await fetchQuotesByIds([id]);
   return results[0] ?? null;
+}
+
+/** Claim quote_request → set crm_lead_id ใน B2B (ป้องกัน race condition) */
+export interface ClaimResult {
+  ok: boolean;
+  status: number;
+  conflict?: boolean;
+  error?: string;
+}
+
+export async function claimQuoteRequest(quoteRequestId: string, crmLeadId: string): Promise<ClaimResult> {
+  try {
+    const resp = await fetch(B2B_EDGE_URL, {
+      method: "POST",
+      headers: {
+        "x-crm-secret": B2B_SECRET,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ quote_request_id: quoteRequestId, crm_lead_id: crmLeadId }),
+    });
+    if (resp.ok) return { ok: true, status: resp.status };
+    const body = await resp.json().catch(() => ({} as any));
+    return {
+      ok: false,
+      status: resp.status,
+      conflict: resp.status === 409,
+      error: body?.error ?? `HTTP ${resp.status}`,
+    };
+  } catch (e: any) {
+    return { ok: false, status: 0, error: e?.message ?? "network error" };
+  }
 }
