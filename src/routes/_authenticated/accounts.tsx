@@ -395,8 +395,34 @@ export function NewAccountDialog({
             <Input placeholder="บริษัท ABC จำกัด" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
           <div>
+            <Label className="text-xs">เลขประจำตัวผู้เสียภาษี</Label>
+            <Input placeholder="1234567890123" value={form.tax_id} onChange={(e) => setForm({ ...form, tax_id: e.target.value })} />
+          </div>
+          <div>
             <Label className="text-xs">อุตสาหกรรม</Label>
-            <Input placeholder="เช่น อาหาร, IT, ก่อสร้าง" value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
+            <Select value={form.industry} onValueChange={(v) => setForm({ ...form, industry: v })}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="เลือกอุตสาหกรรม" />
+              </SelectTrigger>
+              <SelectContent>
+                {INDUSTRIES.filter((i) => i !== "ทั้งหมด").map((ind) => (
+                  <SelectItem key={ind} value={ind}>{ind}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">ประเภทบัญชี</Label>
+            <Select value={form.account_type} onValueChange={(v) => setForm({ ...form, account_type: v })}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="เลือกประเภทบัญชี" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="customer">ลูกค้า</SelectItem>
+                <SelectItem value="vendor">ผู้จำหน่าย</SelectItem>
+                <SelectItem value="both">ลูกค้า + ผู้จำหน่าย</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -409,7 +435,21 @@ export function NewAccountDialog({
             </div>
           </div>
           <div>
-            <Label className="text-xs">ที่อยู่</Label>
+            <Label className="text-xs">ที่อยู่เต็ม</Label>
+            <Textarea placeholder="ที่อยู่บริษัท" value={form.full_address} onChange={(e) => setForm({ ...form, full_address: e.target.value })} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">รหัสไปรษณีย์</Label>
+              <Input placeholder="10110" value={form.zip_code} onChange={(e) => setForm({ ...form, zip_code: e.target.value })} />
+            </div>
+            <div>
+              <Label className="text-xs">เครดิต (วัน)</Label>
+              <Input type="number" placeholder="30" value={form.credit_days} onChange={(e) => setForm({ ...form, credit_days: e.target.value })} />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">ที่อยู่ (ย่อ)</Label>
             <Input placeholder="ที่อยู่บริษัท" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
