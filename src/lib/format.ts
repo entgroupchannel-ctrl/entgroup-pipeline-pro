@@ -40,3 +40,15 @@ export function isOverdue(iso: string): boolean {
   return new Date(iso).getTime() < Date.now();
 }
 
+
+export function formatThaiDateTime(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "-";
+  const day = d.getDate();
+  const month = thMonths[d.getMonth()];
+  const year = (d.getFullYear() + 543) % 100;
+  const hh = d.getHours().toString().padStart(2, "0");
+  const mm = d.getMinutes().toString().padStart(2, "0");
+  return `${day} ${month} ${String(year).padStart(2, "0")}, ${hh}:${mm}`;
+}

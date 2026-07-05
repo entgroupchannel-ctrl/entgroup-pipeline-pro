@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Search, Plus, Building2, Star, Crown, Trash2, Download } from "lucide-react";
+import { Loader2, Search, Plus, Building2, Star, Crown, Trash2, Download, ExternalLink, User } from "lucide-react";
 import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
 import { exportToCsv, accountsToRows } from "@/lib/export-csv";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -97,7 +97,7 @@ function AccountsPage() {
 
   const load = async () => {
     const [accRes, leadsRes] = await Promise.all([
-      crmDb().from("accounts").select("*, tax_id, industry, full_address, zip_code, credit_days, account_type").order("name"),
+      crmDb().from("accounts").select("*, tax_id, industry, full_address, zip_code, credit_days, account_type, contacts(id, name, is_primary)").order("name"),
       crmDb().from("leads").select("id,account_id"),
     ]);
     if (accRes.error) return toast.error("โหลดบริษัทไม่สำเร็จ", { description: accRes.error.message });
@@ -273,6 +273,7 @@ function AccountsPage() {
                   <th className="px-4 py-2.5 text-left font-medium">เครดิต</th>
                   <th className="px-4 py-2.5 text-left font-medium">ที่อยู่</th>
                   <th className="px-4 py-2.5 text-left font-medium">เว็บไซต์</th>
+                  <th className="px-4 py-2.5 text-left font-medium">ผู้ติดต่อ</th>
                   <th className="px-4 py-2.5 text-left font-medium">โทรศัพท์</th>
                   <th className="px-4 py-2.5 text-center font-medium">ดีล</th>
                   <th className="px-4 py-2.5 text-left font-medium">สร้างเมื่อ</th>
@@ -317,11 +318,20 @@ function AccountsPage() {
                           href={a.website.startsWith("http") ? a.website : `https://${a.website}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-primary hover:underline truncate block max-w-[160px]"
+                          className="inline-flex items-center gap-1 text-primary hover:underline max-w-[140px]"
                         >
-                          {a.website}
+                          <ExternalLink className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{a.website.replace(/^https?:\/\//, "")}</span>
                         </a>
                       ) : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      {((a as any).contacts?.find((c: any) => c.is_primary)?.name ?? (a as any).contacts?.[0]?.name ?? null) ? (
+                        <div className="flex items-center gap-1.5">
+                          <User className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+                          <span className="truncate max-w-[120px]">{((a as any).contacts?.find((c: any) => c.is_primary)?.name ?? (a as any).contacts?.[0]?.name ?? null)}</span>
+                        </div>
+                      ) : <span>—</span>}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {a.phone ?? "—"}
