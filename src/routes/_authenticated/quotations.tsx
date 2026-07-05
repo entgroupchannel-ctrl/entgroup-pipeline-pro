@@ -790,6 +790,19 @@ export function FAImportToQuotationDialog({
   // eslint-disable-next-line
   }, [open]);
 
+  // Auto-resolve prefillLeadId → account once data loads
+  useEffect(() => {
+    if (!prefillLeadId || accounts.length === 0 || leads.length === 0) return;
+    const lead = leads.find((l) => l.id === prefillLeadId);
+    if (!lead?.account_id) return;
+    const acc = accounts.find((a) => a.id === lead.account_id);
+    if (acc && !resolvedAccount) {
+      setResolvedAccount(acc);
+      setForm((f) => ({ ...f, lead_id: prefillLeadId, account_id: lead.account_id! }));
+    }
+  // eslint-disable-next-line
+  }, [accounts, leads]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return docs;
