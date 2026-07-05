@@ -28,19 +28,32 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import logoAsset from "@/assets/LOGO_ENTGroup.png.asset.json";
 
-const navItems = [
-  { title: "Pipeline", url: "/pipeline", icon: KanbanSquare },
+const salesItems = [
+  { title: "Pipeline", url: "/pipeline", icon: Kanban },
   { title: "Key Accounts", url: "/key-accounts", icon: Crown },
   { title: "รายการดีล", url: "/leads", icon: List },
   { title: "รายชื่อลูกค้า", url: "/accounts", icon: Building2 },
+] as const;
+
+const docItems = [
   { title: "ใบเสนอราคา", url: "/quotations", icon: FileText },
   { title: "ส่งอีเมล", url: "/emails", icon: Mail },
   { title: "กิจกรรม", url: "/activities", icon: CalendarCheck },
-  { title: "KPI", url: "/kpi", icon: Target },
 ] as const;
 
-const managerItems = [
-  { title: "Dashboard", url: "/dashboard", icon: BarChart2 },
+const overviewItems = [
+  { title: "KPI", url: "/kpi", icon: Target },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "ตั้งค่า", url: "/settings", icon: Settings },
+] as const;
+
+const managerExtraItems = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "ตั้งค่า", url: "/settings", icon: Settings },
+] as const;
+
+const adminFirstItems = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
 ] as const;
 
 export function AppSidebar() {
