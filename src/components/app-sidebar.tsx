@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   Kanban,
   List,
@@ -12,6 +13,7 @@ import {
   Target,
   Mail,
   Crown,
+  Bell,
 } from "lucide-react";
 import {
   Sidebar,
@@ -25,6 +27,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/lib/auth-context";
+import { crmDb } from "@/lib/crm";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import logoAsset from "@/assets/LOGO_ENTGroup.png.asset.json";
@@ -64,6 +67,21 @@ export function AppSidebar() {
   const isActive = (url: string) => pathname === url || pathname.startsWith(url + "/");
   const isAdmin = role === "admin";
   const isManager = role === "manager" || role === "admin";
+
+  const [pendingCount, setPendingCount] = useState(0);
+  useEffect(() => {
+    if (!isManager) return;
+    const load = async () => {
+      const { count } = await crmDb()
+        .from("stage_change_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      setPendingCount(count ?? 0);
+    };
+    load();
+    const interval = setInterval(load, 30000); // poll every 30s
+    return () => clearInterval(interval);
+  }, [isManager]);
 
   const group1 = [...salesItems];
   const group2 = [...docItems];
@@ -115,6 +133,25 @@ export function AppSidebar() {
                   ))}
                 </div>
               ))}
+
+              {/* Approvals — manager/admin only */}
+              {isManager && (
+                <div className="border-t pt-2 mt-2">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={isActive("/approvals")} tooltip="คำขออนุมัติ">
+                      <Link to="/approvals" className="relative">
+                        <Bell />
+                        <span>คำขออนุมัติ</span>
+                        {pendingCount > 0 && (
+                          <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:-right-1 group-data-[collapsible=icon]:-top-1 group-data-[collapsible=icon]:ml-0">
+                            {pendingCount > 99 ? "99+" : pendingCount}
+                          </span>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </div>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
