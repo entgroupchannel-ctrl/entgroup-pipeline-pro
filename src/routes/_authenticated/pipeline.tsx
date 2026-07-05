@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { KanbanBoard } from "@/components/pipeline/KanbanBoard";
 import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
 import { crmDb } from "@/lib/crm";
+import { B2BRequestsTab } from "@/components/pipeline/B2BRequestsTab";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/pipeline")({
@@ -10,7 +11,8 @@ export const Route = createFileRoute("/_authenticated/pipeline")({
 });
 
 function PipelinePage() {
-  const [tab, setTab] = useState<"all" | "line">("all");
+  const [tab, setTab] = useState<"all" | "line" | "b2b">("all");
+  const [b2bCount, setB2bCount] = useState(0);
   const [unassignedLine, setUnassignedLine] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -72,15 +74,29 @@ function PipelinePage() {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setTab("b2b")}
+          className={`relative flex items-center gap-2 rounded-t-md px-4 py-2 text-sm font-medium transition-colors ${
+            tab === "b2b"
+              ? "bg-muted text-foreground border-b-2 border-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <span>🛒 B2B</span>
+        </button>
       </div>
 
-      {/* Kanban board */}
-      <KanbanBoard
-        key={refreshKey}
-        sourceFilter={tab}
-        showClaimButton={tab === "line"}
-        onQuickLog={handleQuickLog}
-      />
+      {/* Content — Kanban or B2B tab */}
+      {tab === "b2b" ? (
+        <B2BRequestsTab onLeadCreated={() => setRefreshKey((k) => k + 1)} />
+      ) : (
+        <KanbanBoard
+          key={refreshKey}
+          sourceFilter={tab}
+          showClaimButton={tab === "line"}
+          onQuickLog={handleQuickLog}
+        />
+      )}
 
       {/* Quick-log dialog (triggered from card buttons) */}
       <ActivityLogDialog
