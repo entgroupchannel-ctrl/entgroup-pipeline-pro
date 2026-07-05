@@ -233,14 +233,20 @@ function ActivityDetailModal({ a, leadsMap, profilesMap, onClose, onToggle, onNa
 
           {/* Lead link */}
           {leadTitle && a.lead_id && (
-            <button
-              onClick={() => { onNavigate(a.lead_id!); onClose(); }}
-              className="flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm text-primary hover:bg-primary/5 transition-colors"
-            >
-              <ExternalLink className="h-4 w-4 shrink-0" />
-              <span className="truncate font-medium">{leadTitle}</span>
-              <ChevronRight className="h-4 w-4 ml-auto shrink-0" />
-            </button>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">ดีลที่เกี่ยวข้อง</p>
+              <button
+                onClick={() => { onNavigate(a.lead_id!); onClose(); }}
+                className="group flex w-full items-center gap-2.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-left transition-colors hover:bg-primary/10 hover:border-primary/40"
+              >
+                <ExternalLink className="h-4 w-4 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-primary">{leadTitle}</p>
+                  <p className="text-[10px] text-primary/60 mt-0.5 group-hover:text-primary/80">คลิกเพื่อดูรายละเอียดดีล →</p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-primary/50 group-hover:text-primary transition-transform group-hover:translate-x-0.5" />
+              </button>
+            </div>
           )}
 
           {/* Structured body fields */}
