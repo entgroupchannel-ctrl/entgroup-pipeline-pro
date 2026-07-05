@@ -281,10 +281,10 @@ function LeadDetailPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => quickLog("call")}>
+          <Button variant="outline" size="sm" onClick={() => setCallOpen(true)}>
             <Phone className="mr-1 h-4 w-4" /> โทรหา
           </Button>
-          <Button variant="outline" size="sm" onClick={() => quickLog("line")}>
+          <Button variant="outline" size="sm" onClick={() => setLineOpen(true)}>
             <MessageCircle className="mr-1 h-4 w-4" /> ส่ง Line
           </Button>
           <Button variant="outline" size="sm" onClick={() => setEmailOpen(true)}>
