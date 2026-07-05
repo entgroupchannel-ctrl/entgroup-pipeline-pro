@@ -154,8 +154,9 @@ function QuotationsPage() {
   } = usePagination(filtered ?? [], 25);
 
   const handleExport = () => {
-    if (!isManager) { toast.error("เฉพาะ Manager และ Admin เท่านั้นที่ Export ใบเสนอราคาได้"); return; }
-    if (!isAdmin) { toast.error("ไม่มีสิทธิ์ Export — เฉพาะ Admin เท่านั้น"); return; }
+    // Sales cannot export — Manager and Admin only
+    if (!isManager) { toast.error("ไม่มีสิทธิ์ Export — เฉพาะ Manager และ Admin เท่านั้น"); return; }
+    if (!filtered?.length) return;
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
     const profMap = new Map(Array.from(profilesMap.entries()).map(([id, name]) => [id, { name: name ?? "" }]));
     const rows = quotationsToRows(filtered, leadsMap, accountsMap, profMap, STATUS_LABEL);
@@ -178,10 +179,10 @@ function QuotationsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {isAdmin && (
+          {isManager && (
             <Button variant="outline" size="sm" onClick={handleExport}
-              disabled={!filtered?.length || !isManager}
-              title={!isManager ? "เฉพาะ Manager/Admin" : "Export CSV"}>
+              disabled={!filtered?.length}
+              title="Export CSV ใบเสนอราคาที่มองเห็น">
               <Download className="mr-1.5 h-4 w-4" /> Export CSV
             </Button>
           )}
