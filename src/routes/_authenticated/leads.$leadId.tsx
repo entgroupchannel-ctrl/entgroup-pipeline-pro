@@ -814,6 +814,7 @@ function LeadDetailPage() {
         open={lineOpen}
         onOpenChange={setLineOpen}
         contactLineId={contact?.line_id ?? null}
+        contactLineName={contact?.name ?? null}
         leadId={lead.id}
         ownerId={user?.id ?? null}
         onLogged={load}
@@ -969,6 +970,7 @@ function CallDialog({ open, onOpenChange, contactPhone, leadId, ownerId, onLogge
   const [body, setBody] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [saving, setSaving] = useState(false);
+  const [createFollowup, setCreateFollowup] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
@@ -982,9 +984,20 @@ function CallDialog({ open, onOpenChange, contactPhone, leadId, ownerId, onLogge
       done_at: new Date().toISOString(),
       owner_id: ownerId,
     });
+    if (createFollowup && dueAt) {
+      await crmDb().from("activities").insert({
+        lead_id: leadId,
+        type: "call",
+        subject: "Follow-up โทร",
+        done: false,
+        due_at: dueAt,
+        owner_id: ownerId,
+      });
+    }
     setSaving(false);
     setBody("");
     setDueAt("");
+    setCreateFollowup(false);
     onOpenChange(false);
     onLogged();
     toast.success("บันทึกผลการโทรแล้ว");
@@ -992,7 +1005,7 @@ function CallDialog({ open, onOpenChange, contactPhone, leadId, ownerId, onLogge
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>บันทึกการโทร</DialogTitle>
         </DialogHeader>
@@ -1007,11 +1020,22 @@ function CallDialog({ open, onOpenChange, contactPhone, leadId, ownerId, onLogge
           )}
           <div>
             <Label className="text-xs">ผลการโทร / บันทึก</Label>
-            <Textarea rows={3} placeholder="สรุปการสนทนา..." value={body} onChange={(e) => setBody(e.target.value)} />
+            <Textarea rows={5} placeholder="สรุปการสนทนา..." value={body} onChange={(e) => setBody(e.target.value)} />
           </div>
           <div>
             <Label className="text-xs">นัดหมายครั้งต่อไป</Label>
             <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="create-followup"
+              checked={createFollowup}
+              onChange={e => setCreateFollowup(e.target.checked)}
+            />
+            <label htmlFor="create-followup" className="text-xs text-muted-foreground cursor-pointer">
+              สร้างกิจกรรม follow-up อัตโนมัติ
+            </label>
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
@@ -1026,7 +1050,7 @@ function CallDialog({ open, onOpenChange, contactPhone, leadId, ownerId, onLogge
   );
 }
 
-function LineDialog({ open, onOpenChange, contactLineId, leadId, ownerId, onLogged }: { open: boolean; onOpenChange: (v: boolean) => void; contactLineId: string | null; leadId: string; ownerId: string | null; onLogged: () => void }) {
+function LineDialog({ open, onOpenChange, contactLineId, contactLineName, leadId, ownerId, onLogged }: { open: boolean; onOpenChange: (v: boolean) => void; contactLineId: string | null; contactLineName: string | null; leadId: string; ownerId: string | null; onLogged: () => void }) {
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -1050,16 +1074,16 @@ function LineDialog({ open, onOpenChange, contactLineId, leadId, ownerId, onLogg
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>ส่ง LINE</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           {contactLineId && (
             <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2">
-              <span className="text-sm font-medium text-[#06C755]">{contactLineId}</span>
+              <span className="text-sm font-medium">{contactLineName ?? contactLineId ?? "ไม่ทราบ LINE ID"}</span>
               <a
-                href={`https://line.me/ti/p/${contactLineId}`}
+                href={`https://line.me/ti/p/~${contactLineId}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-md bg-[#06C755] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#05a847]"
@@ -1068,6 +1092,7 @@ function LineDialog({ open, onOpenChange, contactLineId, leadId, ownerId, onLogg
               </a>
             </div>
           )}
+          {contactLineId && <p className="text-xs text-muted-foreground">LINE: {contactLineId}</p>}
           <div>
             <Label className="text-xs">บันทึกข้อความที่ส่ง</Label>
             <Textarea rows={3} placeholder="สรุปข้อความที่ส่งไป..." value={body} onChange={(e) => setBody(e.target.value)} />
