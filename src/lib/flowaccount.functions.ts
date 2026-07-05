@@ -32,7 +32,7 @@ async function getIntegration(supabaseAdmin: any) {
 export const testFAConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { faFetch } = await import("./flowaccount.server");
     const { status, body, text } = await faFetch("/quotations?currentPage=1&pageSize=1");
     if (status < 200 || status >= 300) {
@@ -56,7 +56,7 @@ export const saveFACredentials = createServerFn({ method: "POST" })
     }).parse(input)
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Build update payload — only overwrite secret if not sentinel
@@ -88,7 +88,7 @@ export const saveFACredentials = createServerFn({ method: "POST" })
 export const loadFASettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data, error } = await (supabaseAdmin as any)
@@ -127,7 +127,7 @@ export const loadFASettings = createServerFn({ method: "GET" })
 export const syncFADocuments = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { faFetch, pickArray, pickSerial, pickNumber, extractSalesName, extractSalesEmail } =
       await import("./flowaccount.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
