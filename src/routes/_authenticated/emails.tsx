@@ -336,6 +336,19 @@ function EmailsPage() {
   const [tplName, setTplName]             = useState("");
   const [tplSearch, setTplSearch]         = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<{id:string;filename:string;mime_type:string;public_url:string;size:number}[]>([]);
+  const [cc,  setCc]  = useState("");
+  const [bcc, setBcc] = useState("");
+  const [showCcBcc, setShowCcBcc] = useState(false);
+  const [mediaFiles, setMediaFiles] = useState<{id:string;name:string;filename:string;size:number;mime_type:string;public_url:string}[]>([]);
+  const [showAttachPicker, setShowAttachPicker] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadMediaFiles = async () => {
+    const { data } = await crmDb().from("email_attachments").select("id,name,filename,size,mime_type,public_url").order("created_at", { ascending: false });
+    setMediaFiles((data ?? []) as any[]);
+  };
+  useEffect(() => { loadMediaFiles(); }, []);
 
   const loadTemplates = async () => {
     const { data } = await crmDb().from("email_templates").select("*").eq("is_active", true).order("is_system", { ascending: false }).order("category").order("name");
@@ -358,7 +371,6 @@ function EmailsPage() {
     };
     setSubject(applyMergeTags(t.subject, vars));
     setBody(applyMergeTags(t.body, vars));
-    setStep("preview");
     const attachIds = (t as any).attachments ?? [];
     if (attachIds.length > 0) {
       const { data } = await crmDb().from("email_attachments").select("id,filename,mime_type,public_url,size").in("id", attachIds);
@@ -440,7 +452,6 @@ function EmailsPage() {
       }) as { subject: string; body: string };
       setSubject(result.subject);
       setBody(result.body);
-      setStep("preview");
     } catch (e: any) {
       toast.error("AI ร่างอีเมลไม่สำเร็จ", { description: e?.message });
     } finally {
@@ -476,13 +487,15 @@ function EmailsPage() {
           lead_id:     leadId,
           contact_id:  recipientMode === "contact" ? selected?.id : selected?.contact_id,
           attachments: attachments.length > 0 ? attachments : undefined,
+          cc:          cc.trim() || undefined,
+          bcc:         bcc.trim() || undefined,
         },
       });
       toast.success("ส่งอีเมลแล้ว ✓", {
         description: `ถึง ${toName || to}${leadId ? ` · ดีล: ${selected?.title}` : ""}${attachments.length > 0 ? ` · ไฟล์แนบ ${attachments.length} ไฟล์` : ""}`,
       });
-      setBrief(""); setSubject(""); setBody(""); setTo(""); setToName("");
-      setSelected(null); setStep("compose"); setPendingAttachments([]); setLeadId(undefined);
+      setBrief(""); setSubject(""); setBody(""); setTo(""); setToName(""); setCc(""); setBcc("");
+      setSelected(null); setStep("compose"); setPendingAttachments([]); setLeadId(undefined); setShowCcBcc(false); setShowAiPanel(false);
       loadLogs();
     } catch (e: any) {
       toast.error("ส่งอีเมลไม่สำเร็จ", { description: e?.message });
@@ -619,23 +632,73 @@ function EmailsPage() {
               </div>
             )}
 
-            {/* Step compose */}
-            {step === "compose" && (
-              <>
-                {!subject && !body && (
-                  <div className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2.5 text-xs text-muted-foreground">
-                    <Mail className="h-3.5 w-3.5 shrink-0" />
-                    คลิก template ด้านซ้ายเพื่อเริ่มต้น หรือพิมพ์ข้อความที่ต้องการสื่อด้านล่าง
-                  </div>
-                )}
+            {/* ── Unified compose area (no step switching) ── */}
 
-                <div className="space-y-1.5">
+            {/* CC / BCC toggle */}
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowCcBcc((v) => !v)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                {showCcBcc ? <ChevronDown className="h-3 w-3" /> : <ChevronDown className="h-3 w-3 -rotate-90" />}
+                CC / BCC
+              </button>
+              {(cc || bcc) && <span className="text-[10px] text-primary">• มี CC/BCC</span>}
+            </div>
+            {showCcBcc && (
+              <div className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/20 p-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">CC</Label>
+                  <Input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="email@example.com" className="h-8 text-xs" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">BCC</Label>
+                  <Input value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="email@example.com" className="h-8 text-xs" />
+                </div>
+              </div>
+            )}
+
+            {/* Subject */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">หัวเรื่อง</Label>
+              <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="หัวเรื่องอีเมล" className="text-sm" />
+            </div>
+
+            {/* Body */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">เนื้อหา</Label>
+                <div className="flex items-center gap-2">
+                  {/* AI Draft button — top right */}
+                  {aiReady && (
+                    <button
+                      onClick={() => setShowAiPanel((v) => !v)}
+                      className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium border transition-colors ${
+                        showAiPanel
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border hover:border-primary hover:text-primary"
+                      }`}
+                    >
+                      <Sparkles className="h-3 w-3" /> ร่างด้วย AI
+                    </button>
+                  )}
+                  <button
+                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                    onClick={() => setSaveOpen(true)}
+                    disabled={!subject.trim() || !body.trim()}
+                  >
+                    <Save className="h-3 w-3" /> บันทึก template
+                  </button>
+                </div>
+              </div>
+
+              {/* AI panel — collapsible */}
+              {showAiPanel && (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label>สิ่งที่ต้องการสื่อ</Label>
-                    {/* Quick brief chips */}
+                    <p className="text-xs font-medium text-primary flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5" /> บอก AI ว่าต้องการสื่ออะไร
+                    </p>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-6 text-xs gap-1 text-muted-foreground">
+                        <Button variant="ghost" size="sm" className="h-6 text-[11px] gap-1 text-muted-foreground">
                           ตัวอย่าง <ChevronDown className="h-3 w-3" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -651,136 +714,133 @@ function EmailsPage() {
                   <Textarea
                     value={brief}
                     onChange={(e) => setBrief(e.target.value)}
-                    placeholder="เช่น อยากติดตามผลหลังส่งใบเสนอราคาไปเมื่อวาน ถามว่าตัดสินใจได้ยัง และเสนอนัดประชุมเพิ่มเติม"
-                    rows={4}
-                    className="resize-none text-sm"
+                    placeholder="เช่น ติดตามผลหลังส่งใบเสนอราคา ถามว่าตัดสินใจได้ยัง"
+                    rows={3}
+                    className="resize-none text-xs bg-background"
+                    autoFocus
                   />
+                  <Button
+                    size="sm"
+                    onClick={async () => { await handleDraft(); setShowAiPanel(false); }}
+                    disabled={drafting || !brief.trim()}
+                    className="w-full"
+                  >
+                    {drafting
+                      ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />กำลังร่าง…</>
+                      : <><Sparkles className="mr-1.5 h-3.5 w-3.5" />ร่างให้เลย</>}
+                  </Button>
                 </div>
+              )}
 
-                <Button
-                  onClick={handleDraft}
-                  disabled={drafting || !brief.trim() || !aiReady}
-                  className="w-full"
-                  title={!aiReady ? "AI ยังไม่พร้อม — ตั้งค่าก่อน" : undefined}
+              <Textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={12}
+                className="resize-y text-sm"
+                placeholder={!subject && !body ? "คลิก template ด้านซ้าย หรือเขียนเนื้อหาโดยตรง" : ""}
+              />
+            </div>
+
+            {/* Attachments row */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* From Media Library */}
+                <button
+                  onClick={() => setShowAttachPicker((v) => !v)}
+                  className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
                 >
-                  {drafting
-                    ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังร่าง…</>
-                    : <><Sparkles className="mr-2 h-4 w-4" />ให้ AI ร่างให้</>}
-                </Button>
+                  <Paperclip className="h-3 w-3" /> แนบจาก Media Library
+                </button>
+                {/* Upload file directly */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                >
+                  <Plus className="h-3 w-3" /> อัปโหลดไฟล์
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 10 * 1024 * 1024) { toast.error("ไฟล์ใหญ่เกิน 10MB"); return; }
+                    const fakeAtt = {
+                      id: crypto.randomUUID(),
+                      filename: file.name,
+                      mime_type: file.type || "application/octet-stream",
+                      public_url: URL.createObjectURL(file),
+                      size: file.size,
+                      _file: file,
+                    };
+                    setPendingAttachments((p) => [...p, fakeAtt as any]);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                    toast.success(`เพิ่มไฟล์ "${file.name}" แล้ว`);
+                  }}
+                />
+              </div>
 
-                {!aiReady && aiCfg !== null && (
-                  <p className="text-center text-xs text-muted-foreground">
-                    {role === "admin"
-                      ? <>AI ยังไม่พร้อม — <Link to="/settings" className="text-primary hover:underline">ตั้งค่า AI ✦</Link></>
-                      : "AI ยังไม่พร้อม — ติดต่อ Admin"}
-                  </p>
-                )}
-              </>
-            )}
-
-            {/* Step preview */}
-            {step === "preview" && (
-              <>
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs text-muted-foreground">Template ที่บันทึกไว้</Label>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-7 text-xs">
-                        📋 เลือก Template
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-72">
-                      <DropdownMenuLabel className="text-xs">Templates ({templates.length})</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {templates.length === 0 ? (
-                        <div className="px-2 py-3 text-xs text-muted-foreground">ยังไม่มี template</div>
-                      ) : (
-                        templates.map((t) => (
-                          <DropdownMenuItem key={t.id} onSelect={(e) => e.preventDefault()} className="flex items-center justify-between gap-2">
-                            <button className="flex-1 text-left min-w-0" onClick={() => applyTemplate(t)}>
-                              <div className="text-sm truncate">{t.name}</div>
-                              <div className="text-[10px] text-muted-foreground truncate">{t.subject}</div>
-                            </button>
-                            <button className="text-muted-foreground hover:text-destructive shrink-0" onClick={() => deleteTemplate(t.id)}>
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </DropdownMenuItem>
-                        ))
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label>หัวเรื่อง</Label>
-                  <Input value={subject} onChange={(e) => setSubject(e.target.value)} className="text-sm" />
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label>เนื้อหา</Label>
-                    <div className="flex items-center gap-3">
-                      <button
-                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => setSaveOpen(true)}
-                        disabled={!subject.trim() || !body.trim()}
-                      >
-                        <Save className="h-3 w-3" /> บันทึกเป็น Template
-                      </button>
-                      <button
-                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => setStep("compose")}
-                      >
-                        <RotateCcw className="h-3 w-3" /> ร่างใหม่
-                      </button>
-                    </div>
-                  </div>
-                  <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={12} className="resize-y text-sm" />
-                </div>
-
-                {/* Send summary */}
-                <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
-                  <div className="flex gap-2 text-xs">
-                    <span className="w-10 shrink-0 text-muted-foreground">ถึง</span>
-                    <span className="font-medium">{toName ? `${toName} <${to}>` : to || "—"}</span>
-                  </div>
-                  {leadId && selected && (
-                    <div className="flex gap-2 text-xs">
-                      <span className="w-10 shrink-0 text-muted-foreground">ดีล</span>
-                      <span>{selected.title}</span>
-                    </div>
+              {/* Media Library picker */}
+              {showAttachPicker && (
+                <div className="rounded-xl border bg-card overflow-hidden max-h-44 overflow-y-auto">
+                  {mediaFiles.length === 0 ? (
+                    <p className="p-3 text-xs text-muted-foreground">ยังไม่มีไฟล์ — อัปโหลดที่ Settings &gt; Media Library</p>
+                  ) : (
+                    <ul className="divide-y">
+                      {mediaFiles.map((f) => {
+                        const checked = pendingAttachments.some((a) => a.id === f.id);
+                        return (
+                          <li
+                            key={f.id}
+                            onClick={() => {
+                              if (checked) {
+                                setPendingAttachments((p) => p.filter((a) => a.id !== f.id));
+                              } else {
+                                setPendingAttachments((p) => [...p, f]);
+                              }
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted/40 transition-colors ${checked ? "bg-primary/5" : ""}`}
+                          >
+                            <div className={`h-3.5 w-3.5 shrink-0 rounded border-2 flex items-center justify-center ${checked ? "border-primary bg-primary" : "border-muted-foreground/40"}`}>
+                              {checked && <span className="text-[8px] text-white font-bold">✓</span>}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium truncate">{f.name}</p>
+                              <p className="text-[10px] text-muted-foreground">{f.filename} · {(f.size/1024/1024).toFixed(1)}MB</p>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
                   )}
-                  <div className="flex gap-2 text-xs">
-                    <span className="w-10 shrink-0 text-muted-foreground">เรื่อง</span>
-                    <span>{subject || "—"}</span>
-                  </div>
                 </div>
+              )}
 
-                {/* Attachment preview */}
-                {pendingAttachments.length > 0 && (
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
-                      <Paperclip className="h-3.5 w-3.5" /> ไฟล์แนบ ({pendingAttachments.length})
-                    </p>
-                    {pendingAttachments.map((att) => (
-                      <div key={att.id} className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
-                        <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        <span className="flex-1 truncate text-xs">{att.filename}</span>
-                        <span className="text-[10px] text-muted-foreground">{(att.size/1024/1024).toFixed(1)}MB</span>
-                        <button onClick={() => setPendingAttachments((p) => p.filter((x) => x.id !== att.id))}>
-                          <XIcon className="h-3.5 w-3.5 text-muted-foreground hover:text-red-500" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              {/* Pending attachments list */}
+              {pendingAttachments.length > 0 && (
+                <div className="space-y-1">
+                  {pendingAttachments.map((att) => (
+                    <div key={att.id} className="flex items-center gap-2 rounded-lg border bg-muted/20 px-3 py-1.5">
+                      <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      <span className="flex-1 truncate text-xs">{att.filename}</span>
+                      <span className="text-[10px] text-muted-foreground">{(att.size/1024/1024).toFixed(1)}MB</span>
+                      <button onClick={() => setPendingAttachments((p) => p.filter((x) => x.id !== att.id))}>
+                        <XIcon className="h-3.5 w-3.5 text-muted-foreground hover:text-red-500" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-                <Button onClick={handleSend} disabled={sending || !to || !subject || !body} className="w-full">
-                  {sending
-                    ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังส่ง…</>
-                    : <><Send className="mr-2 h-4 w-4" />ส่งอีเมล</>}
-                </Button>
-              </>
-            )}
+            {/* Send button */}
+            <Button onClick={handleSend} disabled={sending || !to || !subject || !body} className="w-full">
+              {sending
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังส่ง…</>
+                : <><Send className="mr-2 h-4 w-4" />ส่งอีเมล{pendingAttachments.length > 0 ? ` (${pendingAttachments.length} ไฟล์แนบ)` : ""}</>}
+            </Button>
           </div>
         </div>
 
