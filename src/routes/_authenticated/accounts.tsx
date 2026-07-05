@@ -353,11 +353,11 @@ export function NewAccountDialog({
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    name: "", industry: "", website: "", phone: "", address: "",
+    name: "", industry: "", account_type: "", tax_id: "", website: "", phone: "", full_address: "", zip_code: "", credit_days: "", address: "",
   });
 
   useEffect(() => {
-    if (open) setForm({ name: "", industry: "", website: "", phone: "", address: "" });
+    if (open) setForm({ name: "", industry: "", account_type: "", tax_id: "", website: "", phone: "", full_address: "", zip_code: "", credit_days: "", address: "" });
   }, [open]);
 
   const submit = async () => {
