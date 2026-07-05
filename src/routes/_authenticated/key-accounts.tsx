@@ -106,6 +106,7 @@ function KeyAccountsPage() {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<KeyAccount[]>([]);
   const [activities, setActivities] = useState<ActivityRow[]>([]);
+  const [profileMap, setProfileMap] = useState<Map<string, string | null>>(new Map());
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("ทั้งหมด");
   const [selected, setSelected] = useState<KeyAccount | null>(null);
@@ -113,6 +114,7 @@ function KeyAccountsPage() {
   const [logOpen, setLogOpen] = useState(false);
   const [logType, setLogType] = useState("meeting");
   const [logNote, setLogNote] = useState("");
+
 
   const load = async () => {
     const now = new Date();
