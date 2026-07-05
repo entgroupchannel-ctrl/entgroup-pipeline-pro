@@ -447,7 +447,10 @@ function LeadsPage() {
                         <Checkbox checked={selected.has(l.id)} onCheckedChange={() => toggleSelect(l.id)} />
                       </td>
                       <td className="px-4 py-3 max-w-[220px]">
-                        <span className="truncate block font-medium text-primary">{l.title}</span>
+                        <span className="font-mono text-xs font-semibold text-primary">{(l as any).deal_number ?? l.title}</span>
+                        {(l as any).deal_number && l.title && l.title !== (l as any).deal_number && (
+                          <span className="truncate block text-xs text-muted-foreground mt-0.5">{l.title}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 max-w-[160px]">
                         <span className="truncate block text-xs text-muted-foreground">{accountName ?? "—"}</span>
