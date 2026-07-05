@@ -97,16 +97,18 @@ function AccountsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = async () => {
-    // Fetch accounts + leads in parallel; contacts fetched separately so an error won't block the main list
+    console.log("[accounts] load() started");
     const [accRes, leadsRes] = await Promise.all([
       crmDb().from("accounts").select("*").order("name"),
       crmDb().from("leads").select("id,account_id"),
     ]);
+    console.log("[accounts] accRes:", accRes.error ?? `OK — ${accRes.data?.length} rows`);
     if (accRes.error) {
       toast.error("โหลดรายชื่อลูกค้าไม่สำเร็จ", { description: accRes.error.message });
       return;
     }
     setAccounts((accRes.data ?? []) as Account[]);
+    console.log("[accounts] setAccounts done");
 
     // count leads per account
     const counts = new Map<string, number>();
@@ -311,7 +313,10 @@ function AccountsPage() {
                     <tr
                       key={a.id}
                       className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected.has(a.id) ? "bg-primary/5" : ""}`}
-                      onClick={() => navigate({ to: "/accounts/$accountId", params: { accountId: a.id } })}
+                      onClick={() => {
+                        console.log("[accounts] row clicked — navigating to", a.id);
+                        navigate({ to: "/accounts/$accountId", params: { accountId: a.id } });
+                      }}
                     >
                       <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                         <Checkbox checked={selected.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} />
