@@ -1,6 +1,6 @@
 import { useDraggable } from "@dnd-kit/core";
 import { RowActions, stdEdit, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
-import { Star, Clock, FileText, GripVertical } from "lucide-react";
+import { Star, Clock, FileText, GripVertical, Phone, MessageCircle, Users, Mail } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatBaht, daysBetween, timeFromNow, isOverdue } from "@/lib/format";
 import { crmDb, type Lead, type LeadStage } from "@/lib/crm";
@@ -191,19 +191,22 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
         onPointerDown={(e) => e.stopPropagation()}
         onPointerUp={(e) => e.stopPropagation()}
       >
-        {(["call","line","meeting","email"] as const).map((type) => {
-          const ICON: Record<string, string> = { call:"📞", line:"💬", meeting:"👥", email:"✉️" };
-          return (
-            <button
-              key={type}
-              title={`บันทึก ${type}`}
-              onClick={() => onQuickLog?.(lead.id, type)}
-              className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              {ICON[type]}
-            </button>
-          );
-        })}
+        {([
+          { type: "call",    Icon: Phone,         label: "โทรศัพท์",  color: "text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400" },
+          { type: "line",    Icon: MessageCircle, label: "LINE",       color: "text-green-600 bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-950/30 dark:border-green-800 dark:text-green-400" },
+          { type: "meeting", Icon: Users,         label: "ประชุม",     color: "text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-400" },
+          { type: "email",   Icon: Mail,          label: "อีเมล",      color: "text-violet-600 bg-violet-50 border-violet-200 hover:bg-violet-100 dark:bg-violet-950/30 dark:border-violet-800 dark:text-violet-400" },
+        ] as const).map(({ type, Icon, label, color }) => (
+          <button
+            key={type}
+            title={`บันทึก${label}`}
+            onClick={() => onQuickLog?.(lead.id, type)}
+            className={`flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${color}`}
+          >
+            <Icon className="h-3 w-3" />
+            <span className="hidden sm:inline">{label}</span>
+          </button>
+        ))}
       </div>
 
       {/* Bottom row: stars + indicators + avatar */}
