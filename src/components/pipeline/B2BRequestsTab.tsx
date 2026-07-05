@@ -34,7 +34,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
   const load = async () => {
     setLoading(true); setError(null);
     try {
-      const data = await fetchUnmatchedQuotes({ limit: 50 });
+      const data = await fetchUnmatchedQuotes(50);
       setRequests(data);
     } catch (e: any) {
       setError(e.message ?? "เชื่อมต่อ B2B ไม่สำเร็จ");
