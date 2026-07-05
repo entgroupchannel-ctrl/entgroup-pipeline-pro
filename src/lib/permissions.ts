@@ -42,7 +42,7 @@ export function usePermissions() {
       .from("role_permissions")
       .select("action,role,allowed,require_approval,require_reason")
       .eq("role", role)
-      .then(({ data }) => {
+      .then(({ data }: { data: PermRow[] | null }) => {
         const r = (data ?? []) as PermRow[];
         cache[role] = { rows: r, ts: Date.now() };
         setRows(r);
