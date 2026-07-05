@@ -391,7 +391,7 @@ function LeadsPage() {
         total={filtered?.length ?? 0}
         onSelectAll={selectAll}
         onClearAll={clearAll}
-        actions={[{ label: "ลบที่เลือก", icon: <Trash2 className="h-3.5 w-3.5" />, onClick: bulkDelete, variant: "danger" }]}
+        actions={isManager ? [{ label: "ลบที่เลือก", icon: <Trash2 className="h-3.5 w-3.5" />, onClick: bulkDelete, variant: "danger" }] : []}
       />
 
       {/* ── Table ── */}
@@ -478,7 +478,7 @@ function LeadsPage() {
                         <RowActions actions={[
                           stdOpen(() => navigate({ to: "/leads/$leadId", params: { leadId: l.id } })),
                           stdDupe(() => duplicateLead(l)),
-                          stdDelete(() => deleteLead(l.id)),
+                          ...(isManager ? [stdDelete(() => deleteLead(l.id))] : []),
                         ]} />
                       </td>
                     </tr>
