@@ -19,6 +19,7 @@ import { FlowAccountTab } from "@/components/settings/FlowAccountTab";
 import { EmailConfigTab } from "@/components/settings/EmailConfigTab";
 import { LineOATab } from "@/components/settings/LineOATab";
 import { AISettingsTab } from "@/components/settings/AISettingsTab";
+import { PermissionsTab } from "@/components/settings/PermissionsTab";
 import { deactivateCrmUser } from "@/lib/invite-user.functions";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
@@ -47,6 +48,7 @@ function SettingsPage() {
           {isAdmin && <TabsTrigger value="email">อีเมล</TabsTrigger>}
           {isAdmin && <TabsTrigger value="line">LINE OA</TabsTrigger>}
           {isAdmin && <TabsTrigger value="ai">AI ✦</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="permissions">สิทธิ์การใช้งาน</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="mt-6 max-w-lg">
@@ -83,6 +85,11 @@ function SettingsPage() {
         {isAdmin && (
           <TabsContent value="ai" className="mt-6">
             <AISettingsTab />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="permissions" className="mt-6">
+            <PermissionsTab />
           </TabsContent>
         )}
       </Tabs>
