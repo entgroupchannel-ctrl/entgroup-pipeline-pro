@@ -90,17 +90,19 @@ function AccountsPage() {
 
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [leadsCount, setLeadsCount] = useState<Map<string, number>>(new Map());
+  const [contactsMap, setContactsMap] = useState<Map<string, { name: string; phone: string | null }>>(new Map());
   const [q, setQ] = useState("");
   const [industryFilter, setIndustryFilter] = useState("ทั้งหมด");
   const [newOpen, setNewOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = async () => {
-    const [accRes, leadsRes] = await Promise.all([
-      crmDb().from("accounts").select("*, tax_id, industry, full_address, zip_code, credit_days, account_type, contacts(id, name, phone, is_primary)").order("name"),
+    const [accRes, leadsRes, contactsRes] = await Promise.all([
+      crmDb().from("accounts").select("*").order("name"),
       crmDb().from("leads").select("id,account_id"),
+      crmDb().from("contacts").select("id,account_id,name,phone").order("name"),
     ]);
-    if (accRes.error) return toast.error("โหลดบริษัทไม่สำเร็จ", { description: accRes.error.message });
+    if (accRes.error) return toast.error("โหลดรายชื่อลูกค้าไม่สำเร็จ", { description: accRes.error.message });
     setAccounts((accRes.data ?? []) as Account[]);
 
     // count leads per account
@@ -109,6 +111,15 @@ function AccountsPage() {
       if (l.account_id) counts.set(l.account_id, (counts.get(l.account_id) ?? 0) + 1);
     });
     setLeadsCount(counts);
+
+    // map first contact per account
+    const cmap = new Map<string, { name: string; phone: string | null }>();
+    (contactsRes.data ?? []).forEach((c: any) => {
+      if (c.account_id && !cmap.has(c.account_id)) {
+        cmap.set(c.account_id, { name: c.name, phone: c.phone });
+      }
+    });
+    setContactsMap(cmap);
   };
 
   useEffect(() => { load(); }, []);
@@ -193,7 +204,7 @@ function AccountsPage() {
       {/* Header */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">บริษัท</h1>
+          <h1 className="text-xl font-semibold">รายชื่อลูกค้า</h1>
           <p className="text-xs text-muted-foreground">
             {filtered == null ? "กำลังโหลด…" : `${filtered.length} บริษัท`}
           </p>
@@ -281,8 +292,7 @@ function AccountsPage() {
               </thead>
               <tbody className="divide-y">
                 {pageItems.map((a) => {
-                  const contacts = (a as any).contacts as { id: string; name: string; phone: string | null; is_primary: boolean | null }[] | undefined;
-                  const primaryContact = contacts?.find((c) => c.is_primary) ?? contacts?.[0] ?? null;
+                  const primaryContact = contactsMap.get(a.id) ?? null;
                   const initials = primaryContact
                     ? primaryContact.name.split(" ").map((s: string) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase()
                     : null;
