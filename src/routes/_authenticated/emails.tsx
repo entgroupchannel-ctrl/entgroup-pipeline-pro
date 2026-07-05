@@ -124,19 +124,37 @@ function RecipientSelector({
       }
       setResults((data ?? []).map((c: any) => ({ ...c, company_name: accountMap[c.account_id] ?? "" })));
     } else {
-      // Lead mode: search leads by title or account name
-      const { data: leadsData } = await crmDb()
+      // Lead mode: search by deal_number, title, OR account name
+      // Step 1: search by account name to get account_ids
+      const { data: matchedAccs } = await crmDb()
+        .from("accounts").select("id,name")
+        .ilike("name", `%${q}%`).limit(20);
+      const matchedAccIds = (matchedAccs ?? []).map((a: any) => a.id);
+
+      // Step 2: query leads — match deal_number, title, OR account_id in matched accounts
+      let leadsQuery = crmDb()
         .from("leads")
-        .select("id, title, stage, expected_value, contact_id, account_id")
-        .ilike("title", `%${q}%`)
+        .select("id, title, deal_number, stage, expected_value, contact_id, account_id")
         .not("stage", "in", "(won,lost)")
         .order("updated_at", { ascending: false })
-        .limit(8);
-      // Enrich with account + contact
+        .limit(10);
+
+      if (matchedAccIds.length > 0) {
+        leadsQuery = leadsQuery.or(
+          `title.ilike.%${q}%,deal_number.ilike.%${q}%,account_id.in.(${matchedAccIds.join(",")})`
+        );
+      } else {
+        leadsQuery = leadsQuery.or(`title.ilike.%${q}%,deal_number.ilike.%${q}%`);
+      }
+
+      const { data: leadsData } = await leadsQuery;
+
+      // Step 3: enrich with accounts + contacts
       const accountIds = [...new Set((leadsData ?? []).map((l: any) => l.account_id).filter(Boolean))];
       const contactIds = [...new Set((leadsData ?? []).map((l: any) => l.contact_id).filter(Boolean))];
       let accountMap: Record<string, any> = {};
       let contactMap: Record<string, any> = {};
+
       if (accountIds.length) {
         const { data: accs } = await crmDb().from("accounts").select("id,name").in("id", accountIds);
         accountMap = Object.fromEntries((accs ?? []).map((a: any) => [a.id, a]));
@@ -145,11 +163,33 @@ function RecipientSelector({
         const { data: cts } = await crmDb().from("contacts").select("id,name,email").in("id", contactIds);
         contactMap = Object.fromEntries((cts ?? []).map((c: any) => [c.id, c]));
       }
-      setResults((leadsData ?? []).map((l: any) => ({
-        ...l,
-        account: l.account_id ? accountMap[l.account_id] : null,
-        contact: l.contact_id ? contactMap[l.contact_id] : null,
-      })));
+
+      // Step 4: for accounts without direct contact, fetch first contact of that account
+      const accsWithNoContact = accountIds.filter((aid) => {
+        const lead = (leadsData ?? []).find((l: any) => l.account_id === aid);
+        return lead && !lead.contact_id;
+      });
+      const accContactMap: Record<string, any> = {};
+      if (accsWithNoContact.length) {
+        const { data: accCts } = await crmDb()
+          .from("contacts").select("id,name,email,account_id")
+          .in("account_id", accsWithNoContact).limit(50);
+        for (const c of (accCts ?? [])) {
+          if (c.email && !accContactMap[c.account_id]) {
+            accContactMap[c.account_id] = c;
+          }
+        }
+      }
+
+      setResults((leadsData ?? []).map((l: any) => {
+        const directContact = l.contact_id ? contactMap[l.contact_id] : null;
+        const accContact = l.account_id ? accContactMap[l.account_id] : null;
+        return {
+          ...l,
+          account: l.account_id ? accountMap[l.account_id] : null,
+          contact: directContact ?? accContact ?? null,
+        };
+      }));
     }
     setSearching(false);
   };
@@ -201,11 +241,12 @@ function RecipientSelector({
             {mode === "lead" ? (
               <>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium truncate">{selected.title}</span>
+                  <span className="font-mono text-xs font-semibold text-primary">{selected.deal_number ?? selected.title}</span>
                   <Badge variant="outline" className="text-[10px] shrink-0">{STAGE_LABEL[selected.stage] ?? selected.stage}</Badge>
                 </div>
+                <div className="text-sm font-medium truncate">{selected.account?.name ?? "—"}</div>
                 <div className="text-xs text-muted-foreground truncate">
-                  {selected.account?.name ?? "—"} · {selected.contact?.name ?? "—"} · {to || "ไม่มีอีเมล"}
+                  {selected.contact?.name ?? "—"} · {to || <span className="text-amber-600">ไม่มีอีเมล</span>}
                 </div>
               </>
             ) : (
@@ -247,11 +288,12 @@ function RecipientSelector({
                       <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium truncate">{item.title}</span>
+                          <span className="font-mono text-xs font-semibold text-primary">{item.deal_number ?? item.title}</span>
                           <Badge variant="outline" className="text-[10px] shrink-0">{STAGE_LABEL[item.stage] ?? item.stage}</Badge>
                         </div>
+                        <div className="font-medium text-sm truncate">{item.account?.name ?? "—"}</div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {item.account?.name ?? "ไม่มีบริษัท"} · {item.contact?.name ?? "ไม่มีผู้ติดต่อ"}
+                          {item.contact?.name ?? "ไม่มีผู้ติดต่อ"}
                           {item.contact?.email ? ` · ${item.contact.email}` : " · ไม่มีอีเมล"}
                         </div>
                       </div>
