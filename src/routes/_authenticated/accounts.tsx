@@ -97,12 +97,15 @@ function AccountsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = async () => {
-    const [accRes, leadsRes, contactsRes] = await Promise.all([
+    // Fetch accounts + leads in parallel; contacts fetched separately so an error won't block the main list
+    const [accRes, leadsRes] = await Promise.all([
       crmDb().from("accounts").select("*").order("name"),
       crmDb().from("leads").select("id,account_id"),
-      crmDb().from("contacts").select("id,account_id,name,phone").order("name"),
     ]);
-    if (accRes.error) return toast.error("โหลดรายชื่อลูกค้าไม่สำเร็จ", { description: accRes.error.message });
+    if (accRes.error) {
+      toast.error("โหลดรายชื่อลูกค้าไม่สำเร็จ", { description: accRes.error.message });
+      return;
+    }
     setAccounts((accRes.data ?? []) as Account[]);
 
     // count leads per account
@@ -112,14 +115,20 @@ function AccountsPage() {
     });
     setLeadsCount(counts);
 
-    // map first contact per account
-    const cmap = new Map<string, { name: string; phone: string | null }>();
-    (contactsRes.data ?? []).forEach((c: any) => {
-      if (c.account_id && !cmap.has(c.account_id)) {
-        cmap.set(c.account_id, { name: c.name, phone: c.phone });
-      }
-    });
-    setContactsMap(cmap);
+    // contacts — fetch separately; ignore error (RLS / missing table won't break the list)
+    const contactsRes = await crmDb()
+      .from("contacts")
+      .select("id,account_id,name,phone")
+      .order("name");
+    if (!contactsRes.error) {
+      const cmap = new Map<string, { name: string; phone: string | null }>();
+      (contactsRes.data ?? []).forEach((c: any) => {
+        if (c.account_id && !cmap.has(c.account_id)) {
+          cmap.set(c.account_id, { name: c.name, phone: c.phone });
+        }
+      });
+      setContactsMap(cmap);
+    }
   };
 
   useEffect(() => { load(); }, []);
