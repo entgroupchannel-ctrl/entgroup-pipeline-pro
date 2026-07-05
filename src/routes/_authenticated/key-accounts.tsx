@@ -454,9 +454,8 @@ function KeyAccountsPage() {
             )}
             {tab === "ดีลที่เกี่ยวข้อง" && (
               <DealsTab
-                account={selected}
                 leads={getAccLeads(selected)}
-                onAddDeal={() => {/* navigate to pipeline */}}
+                onAddDeal={() => setTab("บันทึกกิจกรรม")}
               />
             )}
 
