@@ -110,11 +110,13 @@ function RecipientSelector({
     if (!q.trim()) { setResults([]); return; }
     setSearching(true);
     if (mode === "contact") {
-      const { data } = await crmDb()
+      const { data, error: contactErr } = await crmDb()
         .from("contacts")
         .select("id, name, email, position, account_id")
         .or(`name.ilike.%${q}%,email.ilike.%${q}%`)
         .limit(8);
+      if (contactErr) { console.error("[email search] contacts error:", contactErr); setSearching(false); return; }
+      console.log("[email search] contacts found:", data?.length, "for query:", q);
       // Fetch account names for matched contacts
       const accountIds = [...new Set((data ?? []).map((c: any) => c.account_id).filter(Boolean))];
       let accountMap: Record<string, string> = {};
