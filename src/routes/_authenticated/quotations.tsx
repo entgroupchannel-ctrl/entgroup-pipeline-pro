@@ -262,15 +262,11 @@ function QuotationsPage() {
               <thead>
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
                   <th className="px-3 py-2.5 w-8"><Checkbox checked={!!filtered?.length && selected.size === filtered.length} onCheckedChange={(v) => v ? selectAll() : clearAll()} /></th>
-                  <th className="px-4 py-2.5 text-left font-medium">เลขที่</th>
-                  <th className="px-4 py-2.5 text-left font-medium">ชื่อ / บริษัท</th>
-                  <th className="px-4 py-2.5 text-left font-medium">ดีล</th>
-                  <th className="px-4 py-2.5 text-right font-medium">มูลค่า</th>
-                  <th className="px-4 py-2.5 text-center font-medium">แหล่ง</th>
+                  <th className="px-4 py-2.5 text-left font-medium">วันที่</th>
+                  <th className="px-4 py-2.5 text-left font-medium">เลขที่เอกสาร</th>
+                  <th className="px-4 py-2.5 text-left font-medium">ชื่อลูกค้า / ชื่อโปรเจ็ค</th>
+                  <th className="px-4 py-2.5 text-right font-medium">ยอดรวมสุทธิ</th>
                   <th className="px-4 py-2.5 text-center font-medium">สถานะ</th>
-                  <th className="px-4 py-2.5 text-left font-medium">วันที่ออก</th>
-                  <th className="px-4 py-2.5 text-left font-medium">ใช้ได้ถึง</th>
-                  <th className="px-4 py-2.5 text-left font-medium">เจ้าของ</th>
                   <th className="px-2 py-2.5 w-8" />
                 </tr>
               </thead>
@@ -281,9 +277,7 @@ function QuotationsPage() {
                     row={r}
                     selected={selected.has(r.id)}
                     onSelect={() => toggleSelect(r.id)}
-                    leadTitle={r.lead_id ? leadsMap.get(r.lead_id) : undefined}
                     accountName={r.account_id ? accountsMap.get(r.account_id) : undefined}
-                    ownerName={r.owner_id ? profilesMap.get(r.owner_id) : undefined}
                     onEdit={() => { setEditTarget(r); setNewOpen(true); }}
                     onStatusChange={(s) => updateStatus(r.id, s)}
                     onDelete={() => deleteQuotation(r.id)}
