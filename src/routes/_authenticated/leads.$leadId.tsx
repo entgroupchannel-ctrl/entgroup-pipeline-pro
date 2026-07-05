@@ -57,6 +57,9 @@ function LeadDetailPage() {
   const [emailOpen, setEmailOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
   const [lineOpen, setLineOpen] = useState(false);
+  const [wonConfirmOpen, setWonConfirmOpen] = useState(false);
+  const [lostConfirmOpen, setLostConfirmOpen] = useState(false);
+  const [lostReason, setLostReason] = useState("");
 
   const [form, setForm] = useState({
     title: "",
