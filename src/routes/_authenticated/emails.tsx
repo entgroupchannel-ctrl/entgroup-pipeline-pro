@@ -365,7 +365,7 @@ function EmailsPage() {
       "ชื่อผู้รับ":  toName || "คุณลูกค้า",
       "ชื่อบริษัท": selected?.company_name || selected?.account?.name || "",
       "ชื่อผู้ส่ง":  profile?.full_name || user?.email || "",
-      "ชื่อดีล":    selected?.deal_number ?? selected?.title || "",
+      "ชื่อดีล":    (selected?.deal_number ?? selected?.title) || "",
       "มูลค่าดีล":  selected?.expected_value ? `฿${Number(selected.expected_value).toLocaleString()}` : "",
       "วันที่วันนี้": new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" }),
     };
