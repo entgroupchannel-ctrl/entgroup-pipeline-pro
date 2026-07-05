@@ -25,6 +25,12 @@ interface Account {
   id: string;
   name: string;
   industry: string | null;
+  industry_group: string | null;
+  full_address: string | null;
+  zip_code: string | null;
+  credit_days: number | null;
+  account_type: string | null;
+  tax_id: string | null;
   website: string | null;
   phone: string | null;
   address: string | null;
@@ -36,6 +42,43 @@ interface Account {
   created_at: string;
   updated_at: string;
 }
+
+const INDUSTRIES = [
+  "ทั้งหมด",
+  "เทคโนโลยี/IT",
+  "อุตสาหกรรม/โรงงาน",
+  "การศึกษา",
+  "สุขภาพ/การแพทย์",
+  "ภาครัฐ",
+  "พลังงาน/สาธารณูปโภค",
+  "การค้า/นำเข้า-ส่งออก",
+  "ขนส่ง/โลจิสติกส์",
+  "ก่อสร้าง/อสังหาริมทรัพย์",
+  "อาหาร/เกษตร",
+  "โรงแรม/ท่องเที่ยว",
+  "ค้าปลีก/ค้าส่ง",
+  "สื่อ/โฆษณา",
+  "การเงิน/ธนาคาร",
+  "อื่นๆ",
+] as const;
+
+const INDUSTRY_COLOR: Record<string, string> = {
+  "เทคโนโลยี/IT": "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+  "อุตสาหกรรม/โรงงาน": "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  "การศึกษา": "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+  "สุขภาพ/การแพทย์": "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+  "ภาครัฐ": "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300",
+  "พลังงาน/สาธารณูปโภค": "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+  "การค้า/นำเข้า-ส่งออก": "bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300",
+  "ขนส่ง/โลจิสติกส์": "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
+  "ก่อสร้าง/อสังหาริมทรัพย์": "bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300",
+  "อาหาร/เกษตร": "bg-lime-100 text-lime-700 dark:bg-lime-950/40 dark:text-lime-300",
+  "โรงแรม/ท่องเที่ยว": "bg-pink-100 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300",
+  "ค้าปลีก/ค้าส่ง": "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300",
+  "สื่อ/โฆษณา": "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
+  "การเงิน/ธนาคาร": "bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300",
+  "อื่นๆ": "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+};
 
 function AccountsPage() {
   const { user, role } = useAuth();
