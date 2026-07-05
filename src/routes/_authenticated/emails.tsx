@@ -23,17 +23,11 @@ import { useAuth } from "@/lib/auth-context";
 import { draftLeadEmail, sendLeadEmail } from "@/lib/lead-email.functions";
 import { loadAISettings, type AISettings } from "@/lib/ai-settings.functions";
 
-const TEMPLATES_KEY = "email_templates";
-type SavedTemplate = { id: string; name: string; subject: string; body: string; created_at: string };
+type SavedTemplate = { id: string; name: string; category: string; subject: string; body: string; is_system: boolean; created_at: string };
 
-function loadTemplates(): SavedTemplate[] {
-  if (typeof window === "undefined") return [];
-  try { return JSON.parse(window.localStorage.getItem(TEMPLATES_KEY) || "[]"); }
-  catch { return []; }
-}
-function saveTemplates(list: SavedTemplate[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list));
+// Merge tags substitution
+function applyMergeTags(text: string, vars: Record<string, string>): string {
+  return text.replace(/\{\{([^}]+)\}\}/g, (_, key) => vars[key.trim()] ?? `{{${key.trim()}}}`);
 }
 
 export const Route = createFileRoute("/_authenticated/emails")({
@@ -122,11 +116,17 @@ function EmailsPage() {
   // history
   const [logs, setLogs] = useState<any[]>([]);
 
-  // templates
+  // templates (from DB)
   const [templates, setTemplates] = useState<SavedTemplate[]>([]);
   const [saveOpen, setSaveOpen] = useState(false);
   const [tplName, setTplName] = useState("");
-  useEffect(() => { setTemplates(loadTemplates()); }, []);
+  const [tplPickerOpen, setTplPickerOpen] = useState(false);
+
+  const loadTemplates = async () => {
+    const { data } = await crmDb().from("email_templates").select("*").eq("is_active", true).order("is_system", { ascending: false }).order("category").order("name");
+    setTemplates((data ?? []) as SavedTemplate[]);
+  };
+  useEffect(() => { loadTemplates(); }, []);
 
   // Load AI config once on mount
   useEffect(() => {
@@ -134,9 +134,18 @@ function EmailsPage() {
   }, []);
 
   const applyTemplate = (t: SavedTemplate) => {
-    setSubject(t.subject);
-    setBody(t.body);
+    const vars: Record<string, string> = {
+      "ชื่อผู้รับ":  toName || "คุณลูกค้า",
+      "ชื่อบริษัท": selected?.company_name || "",
+      "ชื่อผู้ส่ง":  profile?.full_name || user?.email || "",
+      "เลขดีล":     "",
+      "มูลค่าดีล":  "",
+      "วันที่วันนี้": new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" }),
+    };
+    setSubject(applyMergeTags(t.subject, vars));
+    setBody(applyMergeTags(t.body, vars));
     setStep("preview");
+    setTplPickerOpen(false);
     toast.success(`โหลด template: ${t.name}`);
   };
   const deleteTemplate = (id: string) => {
@@ -144,15 +153,17 @@ function EmailsPage() {
     setTemplates(next); saveTemplates(next);
     toast.success("ลบ template แล้ว");
   };
-  const confirmSaveTemplate = () => {
+  const confirmSaveTemplate = async () => {
     const name = tplName.trim();
     if (!name) { toast.error("กรุณาระบุชื่อ template"); return; }
     if (!subject.trim() || !body.trim()) { toast.error("ยังไม่มีเนื้อหาให้บันทึก"); return; }
-    const next: SavedTemplate[] = [
-      ...templates,
-      { id: crypto.randomUUID(), name, subject: subject.trim(), body: body.trim(), created_at: new Date().toISOString() },
-    ];
-    setTemplates(next); saveTemplates(next);
+    const { error } = await crmDb().from("email_templates").insert({
+      name, category: "ทั่วไป",
+      subject: subject.trim(), body: body.trim(),
+      is_system: false, created_by: user?.id,
+    });
+    if (error) { toast.error("บันทึกไม่สำเร็จ"); return; }
+    await loadTemplates();
     setSaveOpen(false); setTplName("");
     toast.success("บันทึก template แล้ว ✓");
   };
@@ -348,24 +359,51 @@ function EmailsPage() {
             {/* Step compose */}
             {step === "compose" && (
               <>
-                {/* Quick briefs */}
+                {/* Template picker from DB */}
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">เริ่มด้วย template</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-muted-foreground">เริ่มด้วย template</Label>
+                    <button onClick={() => setTplPickerOpen((v) => !v)} className="text-xs text-primary hover:underline">
+                      {tplPickerOpen ? "ซ่อน" : `ดู template ทั้งหมด (${templates.length})`}
+                    </button>
+                  </div>
+                  {/* Quick pills — system templates only */}
                   <div className="flex flex-wrap gap-1.5">
-                    {QUICK_BRIEFS.map((q) => (
-                      <button
-                        key={q.label}
-                        onClick={() => setBrief(q.text)}
-                        className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                          brief === q.text
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "bg-background hover:bg-muted"
-                        }`}
-                      >
-                        {q.label}
+                    {templates.filter((t) => t.is_system).slice(0, 5).map((t) => (
+                      <button key={t.id} onClick={() => applyTemplate(t)}
+                        className="rounded-full border px-2.5 py-1 text-xs hover:bg-muted hover:border-primary transition-colors">
+                        {t.name}
                       </button>
                     ))}
                   </div>
+                  {/* Expanded template picker */}
+                  {tplPickerOpen && (
+                    <div className="rounded-xl border bg-card p-3 space-y-3 max-h-64 overflow-y-auto">
+                      {["แนะนำองค์กร","ใบเสนอราคา","Follow Up","สินค้าและบริการ","โปรโมชัน","ทั่วไป"].map((cat) => {
+                        const catTpls = templates.filter((t) => t.category === cat);
+                        if (!catTpls.length) return null;
+                        return (
+                          <div key={cat}>
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">{cat}</p>
+                            <div className="space-y-1">
+                              {catTpls.map((t) => (
+                                <button key={t.id} onClick={() => applyTemplate(t)}
+                                  className="flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left hover:bg-muted transition-colors group">
+                                  <span className={`mt-0.5 text-[10px] font-medium shrink-0 rounded px-1.5 py-0.5 ${t.is_system ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"}`}>
+                                    {t.is_system ? "กลาง" : "ส่วนตัว"}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-medium">{t.name}</p>
+                                    <p className="text-[10px] text-muted-foreground truncate">{t.subject}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
