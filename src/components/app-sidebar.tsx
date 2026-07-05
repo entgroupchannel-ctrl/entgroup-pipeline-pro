@@ -32,7 +32,7 @@ const navItems = [
   { title: "Pipeline", url: "/pipeline", icon: KanbanSquare },
   { title: "Key Accounts", url: "/key-accounts", icon: Crown },
   { title: "รายการดีล", url: "/leads", icon: List },
-  { title: "บริษัท", url: "/accounts", icon: Building2 },
+  { title: "รายชื่อลูกค้า", url: "/accounts", icon: Building2 },
   { title: "ใบเสนอราคา", url: "/quotations", icon: FileText },
   { title: "ส่งอีเมล", url: "/emails", icon: Mail },
   { title: "กิจกรรม", url: "/activities", icon: CalendarCheck },
