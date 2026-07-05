@@ -80,18 +80,41 @@ function AccountsPage() {
   const [newOpen, setNewOpen] = useState(false);
 
   const load = async () => {
-    const [accRes, leadsRes] = await Promise.all([
-      crmDb().from("accounts").select("*").order("name"),
-      crmDb().from("leads").select("id,account_id"),
-    ]);
-    if (accRes.error) {
-      toast.error("โหลดรายชื่อลูกค้าไม่สำเร็จ", { description: accRes.error.message });
-      return;
+    // Supabase default limit = 1,000 — must fetch all pages manually
+    const PAGE = 1000;
+    let allAccounts: Account[] = [];
+    let page = 0;
+    while (true) {
+      const { data, error } = await crmDb()
+        .from("accounts")
+        .select("*")
+        .order("name")
+        .range(page * PAGE, (page + 1) * PAGE - 1);
+      if (error) {
+        toast.error("โหลดรายชื่อลูกค้าไม่สำเร็จ", { description: error.message });
+        return;
+      }
+      allAccounts = [...allAccounts, ...(data ?? []) as Account[]];
+      if ((data ?? []).length < PAGE) break; // last page
+      page++;
     }
-    setAccounts((accRes.data ?? []) as Account[]);
+    setAccounts(allAccounts);
+
+    // Also fetch all leads (paginated)
+    let allLeads: any[] = [];
+    let lp = 0;
+    while (true) {
+      const { data } = await crmDb()
+        .from("leads")
+        .select("id,account_id")
+        .range(lp * PAGE, (lp + 1) * PAGE - 1);
+      allLeads = [...allLeads, ...(data ?? [])];
+      if ((data ?? []).length < PAGE) break;
+      lp++;
+    }
 
     const counts = new Map<string, number>();
-    (leadsRes.data ?? []).forEach((l: any) => {
+    allLeads.forEach((l: any) => {
       if (l.account_id) counts.set(l.account_id, (counts.get(l.account_id) ?? 0) + 1);
     });
     setLeadsCount(counts);
