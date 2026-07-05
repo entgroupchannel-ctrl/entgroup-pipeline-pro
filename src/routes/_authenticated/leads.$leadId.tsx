@@ -886,6 +886,63 @@ function LeadDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={keyOwnerOpen} onOpenChange={setKeyOwnerOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Crown className="h-4 w-4 text-amber-600" /> เพิ่ม Sales ดูแล Key Account
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Sales ที่รับผิดชอบ <span className="text-red-500">*</span></Label>
+              <Select value={keyOwnerUser || "none"} onValueChange={(v) => setKeyOwnerUser(v === "none" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="เลือก Sales..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— เลือก Sales —</SelectItem>
+                  {profiles.filter(p => p.is_active).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.id.slice(0, 8)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Contact ที่ดูแล (optional)</Label>
+              <Select value={keyOwnerContact || "none"} onValueChange={(v) => setKeyOwnerContact(v === "none" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="เลือก Contact..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— ไม่ระบุ —</SelectItem>
+                  {contacts.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}{c.position ? ` (${c.position})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Contact คนละคนสำหรับ Sales แต่ละคนในองค์กรใหญ่
+              </p>
+            </div>
+            <div>
+              <Label className="text-xs">หมายเหตุ</Label>
+              <Textarea
+                rows={2}
+                placeholder="เช่น ดูแลฝ่าย IT, ติดต่อด้านจัดซื้อ..."
+                value={keyOwnerNote}
+                onChange={(e) => setKeyOwnerNote(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" onClick={() => setKeyOwnerOpen(false)}>ยกเลิก</Button>
+              <Button onClick={addKeyOwner} disabled={!keyOwnerUser}
+                className="bg-amber-600 hover:bg-amber-700 text-white">
+                เพิ่ม Sales
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
