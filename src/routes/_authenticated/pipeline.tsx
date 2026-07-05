@@ -4,7 +4,9 @@ import { KanbanBoard } from "@/components/pipeline/KanbanBoard";
 import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
 import { crmDb } from "@/lib/crm";
 import { B2BRequestsTab } from "@/components/pipeline/B2BRequestsTab";
+import { LineRequestsTab } from "@/components/pipeline/LineRequestsTab";
 import { supabase } from "@/integrations/supabase/client";
+
 
 export const Route = createFileRoute("/_authenticated/pipeline")({
   component: PipelinePage,
