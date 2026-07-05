@@ -123,6 +123,19 @@ function LeadDetailPage() {
     } else {
       setFaDoc(null);
     }
+
+    // โหลด key account owners (ถ้า account เป็น key account)
+    if (leadData.account_id) {
+      const [ownersRes, contactsRes] = await Promise.all([
+        crmDb().from("key_account_owners")
+          .select("id, user_id, contact_id, note, created_at, user:user_id(full_name), contact:contact_id(name, phone, line_id)")
+          .eq("account_id", leadData.account_id),
+        crmDb().from("contacts").select("id, name, phone, line_id, position").eq("account_id", leadData.account_id),
+      ]);
+      setKeyOwners(ownersRes.data ?? []);
+      setContacts(contactsRes.data ?? []);
+    }
+
     setLoading(false);
   };
 
