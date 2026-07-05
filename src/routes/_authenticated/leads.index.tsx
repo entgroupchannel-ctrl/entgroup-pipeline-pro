@@ -239,48 +239,8 @@ function LeadsPage() {
             {mode !== "all" && ` · ${periodLabel(mode, year, month, quarter)}`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="h-8 w-64 pl-8 text-xs"
-              placeholder="ค้นหาดีล / บริษัท"
-              value={qFilter}
-              onChange={(e) => setSearch({ q: e.target.value || undefined })}
-            />
-          </div>
-
-          <Select value={stageFilter} onValueChange={(v) => setSearch({ stage: v === "active" ? undefined : v })}>
-            <SelectTrigger className="h-8 w-36 text-xs">
-              <SelectValue placeholder="Stage" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="all">ทั้งหมด</SelectItem>
-              {ALL_STAGES.map(s => <SelectItem key={s} value={s}>{STAGE_LABEL_TH[s]}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          {isManager && (
-            <Select value={ownerFilter} onValueChange={(v) => setSearch({ owner: v === "all" ? undefined : v })}>
-              <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Sales ทั้งหมด" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Sales ทั้งหมด</SelectItem>
-                {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-
-          <Button variant="outline" size="sm" className="h-8" onClick={handleExport} disabled={!filtered?.length}>
-            <ArrowRight className="mr-1.5 h-3.5 w-3.5 rotate-90" /> Export CSV
-          </Button>
-          {canCreate && (
-            <Button size="sm" className="h-8" onClick={() => setNewOpen(true)}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" /> ดีลใหม่
-            </Button>
-          )}
-        </div>
       </div>
+
 
       {/* ── Content ── */}
       <div className="flex-1 overflow-auto p-6 space-y-5">
@@ -355,8 +315,51 @@ function LeadsPage() {
             value={kpi.winRate != null ? `${kpi.winRate}%` : "—"} />
         </div>
 
+        {/* ── Filters ── */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="h-8 w-64 pl-8 text-xs"
+              placeholder="ค้นหาดีล / บริษัท"
+              value={qFilter}
+              onChange={(e) => setSearch({ q: e.target.value || undefined })}
+            />
+          </div>
+
+          <Select value={stageFilter} onValueChange={(v) => setSearch({ stage: v === "active" ? undefined : v })}>
+            <SelectTrigger className="h-8 w-36 text-xs">
+              <SelectValue placeholder="Stage" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="all">ทั้งหมด</SelectItem>
+              {ALL_STAGES.map(s => <SelectItem key={s} value={s}>{STAGE_LABEL_TH[s]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          {isManager && (
+            <Select value={ownerFilter} onValueChange={(v) => setSearch({ owner: v === "all" ? undefined : v })}>
+              <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Sales ทั้งหมด" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Sales ทั้งหมด</SelectItem>
+                {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+
+          <Button variant="outline" size="sm" className="h-8" onClick={handleExport} disabled={!filtered?.length}>
+            <ArrowRight className="mr-1.5 h-3.5 w-3.5 rotate-90" /> Export CSV
+          </Button>
+          {canCreate && (
+            <Button size="sm" className="h-8" onClick={() => setNewOpen(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> ดีลใหม่
+            </Button>
+          )}
+        </div>
 
       {/* ── Table ── */}
+
       {filtered === null ? (
         <div className="flex justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
