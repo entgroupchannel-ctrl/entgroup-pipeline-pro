@@ -41,6 +41,7 @@ interface Account {
   customer_since: string | null;
   employee_count: string | null;
   annual_revenue_range: string | null;
+  registered_capital: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -127,16 +128,19 @@ function AccountDetailPage() {
   const [leads, setLeads] = useState<any[]>([]);
   const [contactOpen, setContactOpen] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
+  const [expandedContactId, setExpandedContactId] = useState<string | "new" | null>(null);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [quotations, setQuotations] = useState<any[]>([]);
 
   const [form, setForm] = useState({
     name: "", industry: "", website: "", phone: "", address: "",
     is_key_account: false, key_account_note: "",
-    // date intelligence
     founded_date: "",
     fiscal_year_end_month: "",
     customer_since: "",
     employee_count: "",
     annual_revenue_range: "",
+    registered_capital: "",
   });
 
   const load = async () => {
@@ -168,7 +172,15 @@ function AccountDetailPage() {
         customer_since: acc.customer_since ?? "",
         employee_count: acc.employee_count ?? "",
         annual_revenue_range: acc.annual_revenue_range ?? "",
+        registered_capital: acc.registered_capital != null ? String(acc.registered_capital) : "",
       });
+      // Load activity history + quotations for timeline
+      const [actsRes, qtsRes] = await Promise.all([
+        crmDb().from("activities").select("id,type,subject,done_at,created_at,lead_id").in("lead_id", (leadsRes.data ?? []).map((l: any) => l.id)).order("created_at", { ascending: false }).limit(20),
+        crmDb().from("quotations").select("id,quotation_no,title,grand_total,status,issued_date,lead_id").in("lead_id", (leadsRes.data ?? []).map((l: any) => l.id)).order("issued_date", { ascending: false }).limit(10),
+      ]);
+      setActivities((actsRes.data ?? []) as any[]);
+      setQuotations((qtsRes.data ?? []) as any[]);
     } catch (err) {
       console.error("[account-detail] load crashed:", err);
       toast.error("โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่");
@@ -195,6 +207,7 @@ function AccountDetailPage() {
       customer_since: form.customer_since || null,
       employee_count: form.employee_count || null,
       annual_revenue_range: form.annual_revenue_range || null,
+      registered_capital: form.registered_capital ? Number(form.registered_capital.replace(/,/g, "")) : null,
     }).eq("id", accountId);
     setSaving(false);
     if (error) return toast.error("บันทึกไม่สำเร็จ", { description: error.message });
@@ -385,6 +398,24 @@ function AccountDetailPage() {
                   </div>
                 </div>
 
+                <div>
+                  <Label className="text-xs">ทุนจดทะเบียน (บาท)</Label>
+                  <Input
+                    type="number"
+                    placeholder="เช่น 1000000"
+                    value={form.registered_capital}
+                    onChange={(e) => setForm({ ...form, registered_capital: e.target.value })}
+                  />
+                  {form.registered_capital && (
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {Number(form.registered_capital).toLocaleString("th-TH")} บาท
+                      {Number(form.registered_capital) >= 5000000 ? " · ขนาดกลาง-ใหญ่" :
+                       Number(form.registered_capital) >= 1000000 ? " · ขนาดกลาง" :
+                       " · ขนาดเล็ก (SME)"}
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
                   <span className="flex items-center gap-1.5 text-xs font-medium">
                     <Crown className="h-3.5 w-3.5 text-amber-500" /> Key Account (VIP)
@@ -521,55 +552,154 @@ function AccountDetailPage() {
 
         {/* ════ TAB: ผู้ติดต่อ ════ */}
         {tab === "contacts" && (
-          <div className="mx-auto max-w-2xl p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">ผู้ติดต่อ ({contacts.length})</h2>
-              <Button size="sm" onClick={() => { setEditContact(null); setContactOpen(true); }}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" /> เพิ่มผู้ติดต่อ
-              </Button>
-            </div>
-            {contacts.length === 0 ? (
-              <div className="rounded-xl border border-dashed py-16 text-center text-sm text-muted-foreground">
-                <Users className="mx-auto mb-2 h-8 w-8 opacity-30" />
-                ยังไม่มีผู้ติดต่อ
-              </div>
-            ) : (
-              <ul className="divide-y rounded-xl border bg-card overflow-hidden">
-                {contacts.map((c) => {
-                  const bDays = daysUntilNextOccurrence(c.birth_date);
-                  return (
-                    <li key={c.id} className="flex items-start gap-3 px-4 py-4 hover:bg-muted/30 transition-colors">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                        {c.name.slice(0, 1).toUpperCase()}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-sm">{c.name}</span>
-                          {c.nickname && <span className="text-xs text-muted-foreground">({c.nickname})</span>}
-                          {bDays !== null && bDays <= 30 && <DaysUntilBadge days={bDays} />}
+          <div className="mx-auto max-w-3xl p-6 space-y-4">
+
+            {/* ── Contact list with inline expand ── */}
+            <div className="rounded-xl border bg-card overflow-hidden">
+              {contacts.length === 0 && expandedContactId !== "new" ? (
+                <div className="py-12 text-center text-sm text-muted-foreground">
+                  <Users className="mx-auto mb-2 h-7 w-7 opacity-30" />
+                  ยังไม่มีผู้ติดต่อ
+                </div>
+              ) : (
+                <ul className="divide-y">
+                  {contacts.map((c) => {
+                    const bDays = daysUntilNextOccurrence(c.birth_date);
+                    const isExpanded = expandedContactId === c.id;
+                    return (
+                      <li key={c.id}>
+                        {/* ── Summary row (always visible) ── */}
+                        <div
+                          className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isExpanded ? "bg-primary/5 border-l-2 border-primary" : "hover:bg-muted/30"}`}
+                          onClick={() => setExpandedContactId(isExpanded ? null : c.id)}
+                        >
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                            {c.name.slice(0, 1).toUpperCase()}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-medium text-sm">{c.name}</span>
+                              {c.nickname && <span className="text-xs text-muted-foreground">({c.nickname})</span>}
+                              {c.position && <span className="text-xs text-muted-foreground">· {c.position}</span>}
+                              {bDays !== null && bDays <= 30 && <DaysUntilBadge days={bDays} />}
+                            </div>
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5 text-xs text-muted-foreground">
+                              {c.phone && <span>{c.phone}</span>}
+                              {c.email && <span>{c.email}</span>}
+                              {c.line_id && <span>LINE: {c.line_id}</span>}
+                            </div>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{isExpanded ? "▲" : "▼"}</span>
                         </div>
-                        {c.position && <div className="text-xs text-muted-foreground mt-0.5">{c.position}</div>}
-                        <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          {c.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{c.phone}</span>}
-                          {c.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{c.email}</span>}
-                          {c.line_id && <span className="flex items-center gap-1"><MessageCircle className="h-3 w-3" />{c.line_id}</span>}
-                          {c.birth_date && <span className="flex items-center gap-1"><Cake className="h-3 w-3" />{formatDateTH(c.birth_date)}</span>}
-                        </div>
-                        {c.personal_notes && (
-                          <div className="mt-1.5 text-xs text-muted-foreground italic border-l-2 border-muted pl-2">{c.personal_notes}</div>
+
+                        {/* ── Inline expand: full edit form ── */}
+                        {isExpanded && (
+                          <div className="border-t bg-muted/20 px-4 py-4">
+                            <InlineContactForm
+                              initial={c}
+                              accountId={accountId}
+                              onSaved={() => { setExpandedContactId(null); load(); }}
+                              onDelete={() => { deleteContact(c.id); setExpandedContactId(null); }}
+                            />
+                          </div>
                         )}
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { setEditContact(c); setContactOpen(true); }}>แก้ไข</Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600" onClick={() => deleteContact(c.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {/* ── Add new inline ── */}
+              {expandedContactId === "new" ? (
+                <div className="border-t bg-muted/20 px-4 py-4">
+                  <p className="text-xs font-semibold text-muted-foreground mb-3">เพิ่มผู้ติดต่อใหม่</p>
+                  <InlineContactForm
+                    initial={null}
+                    accountId={accountId}
+                    onSaved={() => { setExpandedContactId(null); load(); }}
+                    onDelete={() => setExpandedContactId(null)}
+                  />
+                </div>
+              ) : (
+                <div className="border-t p-3">
+                  <button
+                    onClick={() => setExpandedContactId("new")}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-primary hover:bg-primary/5 transition-colors"
+                  >
+                    <Plus className="h-4 w-4" /> เพิ่มผู้ติดต่อ
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── ประวัติการติดต่อ ── */}
+            <div className="rounded-xl border bg-card overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b">
+                <h2 className="text-sm font-semibold flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" /> ประวัติการติดต่อ
+                </h2>
+                <span className="text-xs text-muted-foreground">{activities.length + quotations.length} รายการ</span>
+              </div>
+
+              {activities.length === 0 && quotations.length === 0 ? (
+                <div className="py-10 text-center text-xs text-muted-foreground">ยังไม่มีประวัติ</div>
+              ) : (
+                <ul className="divide-y">
+                  {/* merge and sort by date */}
+                  {[
+                    ...activities.map((a) => ({ ...a, _type: "activity", _date: a.done_at ?? a.created_at })),
+                    ...quotations.map((q) => ({ ...q, _type: "quotation", _date: q.issued_date ?? q.created_at })),
+                    ...leads.map((l) => ({ ...l, _type: "deal", _date: l.created_at })),
+                  ]
+                    .sort((a, b) => new Date(b._date).getTime() - new Date(a._date).getTime())
+                    .slice(0, 20)
+                    .map((item, i) => {
+                      if (item._type === "activity") {
+                        const iconMap: Record<string, string> = { call: "📞", email: "✉️", meeting: "👥", line: "💬", note: "📝" };
+                        return (
+                          <li key={`a-${item.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30">
+                            <span className="mt-0.5 text-base">{iconMap[item.type] ?? "📝"}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-medium text-foreground">{item.subject ?? item.type}</div>
+                              <div className="text-[11px] text-muted-foreground">{formatThaiDate(item._date)}</div>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">กิจกรรม</span>
+                          </li>
+                        );
+                      }
+                      if (item._type === "quotation") {
+                        return (
+                          <li key={`q-${item.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30">
+                            <span className="mt-0.5 text-base">📄</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-medium text-foreground">{item.quotation_no} — {item.title}</div>
+                              <div className="text-[11px] text-muted-foreground">{formatBaht(item.grand_total)} · {formatThaiDate(item._date)}</div>
+                            </div>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                              item.status === "accepted" ? "bg-emerald-100 text-emerald-700" :
+                              item.status === "rejected" ? "bg-red-100 text-red-700" :
+                              "bg-muted text-muted-foreground"
+                            }`}>{item.status === "accepted" ? "อนุมัติ" : item.status === "rejected" ? "ปฏิเสธ" : item.status ?? "ใบเสนอราคา"}</span>
+                          </li>
+                        );
+                      }
+                      // deal
+                      return (
+                        <li key={`d-${item.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30">
+                          <span className="mt-0.5 text-base">💼</span>
+                          <div className="min-w-0 flex-1">
+                            <Link to="/leads/$leadId" params={{ leadId: item.id }} className="text-xs font-medium text-primary hover:underline">{item.title}</Link>
+                            <div className="text-[11px] text-muted-foreground">{item.expected_value != null ? formatBaht(item.expected_value) : ""} · {formatThaiDate(item._date)}</div>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${STAGE_COLOR[item.stage as LeadStage]}`}>
+                            {STAGE_LABEL_TH[item.stage as LeadStage]}
+                          </span>
+                        </li>
+                      );
+                    })}
+                </ul>
+              )}
+            </div>
           </div>
         )}
 
@@ -608,67 +738,53 @@ function AccountDetailPage() {
           </div>
         )}
       </div>
-      <ContactFormDialog
-        open={contactOpen}
-        onOpenChange={setContactOpen}
-        accountId={accountId}
-        initial={editContact}
-        onSaved={() => { setContactOpen(false); load(); }}
-      />
+
     </div>
   );
 }
 
 // ── Contact Form Dialog ────────────────────────────────────────────────────────
 
-function ContactFormDialog({
-  open, onOpenChange, accountId, initial, onSaved,
+function InlineContactForm({
+  initial, accountId, onSaved, onDelete,
 }: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  accountId: string;
   initial: Contact | null;
+  accountId: string;
   onSaved: () => void;
+  onDelete: () => void;
 }) {
   const { user } = useAuth();
   const isEdit = !!initial;
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    name: "", nickname: "", position: "", email: "", phone: "", line_id: "",
-    birth_date: "", birth_year: "", gender: "", personal_notes: "",
-  });
+  const currentYear = new Date().getFullYear();
 
-  useEffect(() => {
-    if (open) {
-      setForm({
-        name:          initial?.name          ?? "",
-        nickname:      initial?.nickname       ?? "",
-        position:      initial?.position       ?? "",
-        email:         initial?.email          ?? "",
-        phone:         initial?.phone          ?? "",
-        line_id:       initial?.line_id        ?? "",
-        birth_date:    initial?.birth_date     ?? "",
-        birth_year:    initial?.birth_year != null ? String(initial.birth_year) : "",
-        gender:        initial?.gender         ?? "",
-        personal_notes: initial?.personal_notes ?? "",
-      });
-    }
-  }, [open, initial]);
+  const [form, setForm] = useState({
+    name:          initial?.name          ?? "",
+    nickname:      initial?.nickname       ?? "",
+    position:      initial?.position       ?? "",
+    email:         initial?.email          ?? "",
+    phone:         initial?.phone          ?? "",
+    line_id:       initial?.line_id        ?? "",
+    birth_date:    initial?.birth_date     ?? "",
+    birth_year:    initial?.birth_year != null ? String(initial.birth_year) : "",
+    gender:        initial?.gender         ?? "",
+    personal_notes: initial?.personal_notes ?? "",
+  });
 
   const submit = async () => {
     if (!form.name.trim()) return toast.error("กรุณาระบุชื่อผู้ติดต่อ");
     setSaving(true);
     const payload = {
-      account_id:    accountId,
-      name:          form.name.trim(),
-      nickname:      form.nickname.trim() || null,
-      position:      form.position.trim() || null,
-      email:         form.email.trim() || null,
-      phone:         form.phone.trim() || null,
-      line_id:       form.line_id.trim() || null,
-      birth_date:    form.birth_date || null,
-      birth_year:    form.birth_year ? Number(form.birth_year) : null,
-      gender:        form.gender || null,
+      account_id:     accountId,
+      name:           form.name.trim(),
+      nickname:       form.nickname.trim() || null,
+      position:       form.position.trim() || null,
+      email:          form.email.trim() || null,
+      phone:          form.phone.trim() || null,
+      line_id:        form.line_id.trim() || null,
+      birth_date:     form.birth_date || null,
+      birth_year:     form.birth_year ? Number(form.birth_year) : null,
+      gender:         form.gender || null,
       personal_notes: form.personal_notes.trim() || null,
     };
     let error;
@@ -679,135 +795,87 @@ function ContactFormDialog({
     }
     setSaving(false);
     if (error) return toast.error("บันทึกไม่สำเร็จ", { description: error.message });
-    toast.success(isEdit ? "แก้ไขผู้ติดต่อแล้ว" : "เพิ่มผู้ติดต่อแล้ว");
+    toast.success(isEdit ? "แก้ไขแล้ว" : "เพิ่มผู้ติดต่อแล้ว");
     onSaved();
   };
 
-  const currentYear = new Date().getFullYear();
-  const buddhistYear = currentYear + 543;
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "แก้ไขผู้ติดต่อ" : "เพิ่มผู้ติดต่อ"}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-1 max-h-[70vh] overflow-y-auto pr-1">
-
-          {/* ── ข้อมูลพื้นฐาน ── */}
-          <div className="space-y-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">ข้อมูลพื้นฐาน</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">ชื่อ-นามสกุล <span className="text-red-500">*</span></Label>
-                <Input placeholder="ชื่อเต็ม" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              </div>
-              <div>
-                <Label className="text-xs">ชื่อเล่น / Nickname</Label>
-                <Input placeholder="เช่น ต้น, แนน, Bob" value={form.nickname} onChange={(e) => setForm({ ...form, nickname: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">ตำแหน่ง</Label>
-                <Input placeholder="เช่น CEO, ผจก.จัดซื้อ" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} />
-              </div>
-              <div>
-                <Label className="text-xs">เพศ</Label>
-                <Select value={form.gender || "none"} onValueChange={(v) => setForm({ ...form, gender: v === "none" ? "" : v })}>
-                  <SelectTrigger><SelectValue placeholder="เลือก" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— ไม่ระบุ —</SelectItem>
-                    <SelectItem value="male">ชาย</SelectItem>
-                    <SelectItem value="female">หญิง</SelectItem>
-                    <SelectItem value="other">อื่นๆ</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* ── ช่องทางติดต่อ ── */}
-          <div className="space-y-3 border-t pt-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">ช่องทางติดต่อ</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">โทรศัพท์</Label>
-                <Input placeholder="08x-xxx-xxxx" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-              </div>
-              <div>
-                <Label className="text-xs">Line ID</Label>
-                <Input placeholder="@line_id" value={form.line_id} onChange={(e) => setForm({ ...form, line_id: e.target.value })} />
-              </div>
-            </div>
-            <div>
-              <Label className="text-xs">อีเมล</Label>
-              <Input type="email" placeholder="email@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            </div>
-          </div>
-
-          {/* ── วันเกิด ── */}
-          <div className="space-y-3 border-t pt-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-              <Cake className="h-3.5 w-3.5" /> วันเกิด
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">วันเกิด (ถ้าทราบ)</Label>
-                <Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
-                {form.birth_date && (
-                  <p className="mt-1 text-[11px] text-muted-foreground flex items-center gap-1">
-                    <Cake className="h-3 w-3" />
-                    <DaysUntilBadge days={daysUntilNextOccurrence(form.birth_date)} />
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label className="text-xs">ปีเกิด ค.ศ. (ถ้าไม่รู้วัน)</Label>
-                <Input
-                  type="number"
-                  placeholder={String(currentYear - 40)}
-                  min={1920}
-                  max={currentYear}
-                  value={form.birth_year}
-                  onChange={(e) => setForm({ ...form, birth_year: e.target.value })}
-                />
-                {form.birth_year && (
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    พ.ศ. {Number(form.birth_year) + 543} · อายุประมาณ {currentYear - Number(form.birth_year)} ปี
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ── บันทึกส่วนตัว ── */}
-          <div className="space-y-3 border-t pt-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5" /> บันทึกส่วนตัว / ความสนใจ
-            </p>
-            <div>
-              <Label className="text-xs">
-                บันทึก (ครอบครัว, งานอดิเรก, ความสนใจ, สิ่งที่ไม่ชอบ)
-              </Label>
-              <Textarea
-                rows={3}
-                placeholder="เช่น ชอบกอล์ฟ, มีลูก 2 คน, ไม่ชอบถูกโทรในช่วงบ่าย, ดื่มกาแฟ Americano"
-                value={form.personal_notes}
-                onChange={(e) => setForm({ ...form, personal_notes: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 border-t pt-3">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
-            <Button onClick={submit} disabled={saving}>
-              {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-              {isEdit ? "บันทึก" : "เพิ่ม"}
-            </Button>
-          </div>
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="sm:col-span-2">
+          <Label className="text-xs">ชื่อ-นามสกุล <span className="text-red-500">*</span></Label>
+          <Input autoFocus placeholder="ชื่อเต็ม" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </div>
-      </DialogContent>
-    </Dialog>
+        <div>
+          <Label className="text-xs">ชื่อเล่น</Label>
+          <Input placeholder="ต้น, JOY" value={form.nickname} onChange={(e) => setForm({ ...form, nickname: e.target.value })} />
+        </div>
+        <div>
+          <Label className="text-xs">ตำแหน่ง</Label>
+          <Input placeholder="CEO, ผจก." value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div>
+          <Label className="text-xs">โทรศัพท์</Label>
+          <Input placeholder="08x-xxx-xxxx" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        </div>
+        <div>
+          <Label className="text-xs">Line ID</Label>
+          <Input placeholder="@line_id" value={form.line_id} onChange={(e) => setForm({ ...form, line_id: e.target.value })} />
+        </div>
+        <div>
+          <Label className="text-xs">อีเมล</Label>
+          <Input type="email" placeholder="email@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="sm:col-span-2">
+          <Label className="text-xs flex items-center gap-1"><Cake className="h-3 w-3" /> วันเกิด</Label>
+          <Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
+          {form.birth_date && <p className="mt-0.5 text-[11px] text-muted-foreground"><DaysUntilBadge days={daysUntilNextOccurrence(form.birth_date)} /></p>}
+        </div>
+        <div>
+          <Label className="text-xs">ปีเกิด ค.ศ.</Label>
+          <Input type="number" placeholder={String(currentYear - 40)} min={1920} max={currentYear}
+            value={form.birth_year} onChange={(e) => setForm({ ...form, birth_year: e.target.value })} />
+          {form.birth_year && <p className="mt-0.5 text-[11px] text-muted-foreground">อายุ ~{currentYear - Number(form.birth_year)} ปี</p>}
+        </div>
+        <div>
+          <Label className="text-xs">เพศ</Label>
+          <Select value={form.gender || "none"} onValueChange={(v) => setForm({ ...form, gender: v === "none" ? "" : v })}>
+            <SelectTrigger><SelectValue placeholder="เลือก" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">— ไม่ระบุ —</SelectItem>
+              <SelectItem value="male">ชาย</SelectItem>
+              <SelectItem value="female">หญิง</SelectItem>
+              <SelectItem value="other">อื่นๆ</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div>
+        <Label className="text-xs">บันทึกส่วนตัว (ครอบครัว, งานอดิเรก, ความสนใจ)</Label>
+        <Textarea rows={2} placeholder="เช่น ชอบกอล์ฟ, ดื่มกาแฟ Americano, ไม่รับสายช่วงบ่าย"
+          value={form.personal_notes} onChange={(e) => setForm({ ...form, personal_notes: e.target.value })} />
+      </div>
+
+      <div className="flex items-center justify-between pt-1">
+        {isEdit ? (
+          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={onDelete}>
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" /> ลบผู้ติดต่อ
+          </Button>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={onDelete}>ยกเลิก</Button>
+        )}
+        <Button size="sm" onClick={submit} disabled={saving}>
+          {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+          {isEdit ? "บันทึก" : "เพิ่มผู้ติดต่อ"}
+        </Button>
+      </div>
+    </div>
   );
 }
