@@ -25,11 +25,11 @@ function apiMsg(body: any, fallback: string) {
   return body?.message || body?.error || body?.name || fallback;
 }
 
-async function assertAdmin(userId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await (supabaseAdmin as any)
+async function assertAdmin(supabase: any, userId: string) {
+  const { data, error } = await (supabase as any)
     .schema("crm").from("user_profiles")
     .select("role").eq("id", userId).maybeSingle();
+  if (error) throw new Error(`ตรวจสอบสิทธิ์ไม่สำเร็จ: ${error.message}`);
   if ((data as any)?.role !== "admin") throw new Error("Forbidden: admin only");
 }
 
@@ -45,7 +45,7 @@ async function loadEmailRow(supabaseAdmin: any) {
 export const getEmailConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const row = await loadEmailRow(supabaseAdmin);
 
@@ -126,7 +126,7 @@ export const saveEmailConfig = createServerFn({ method: "POST" })
     }).parse(input)
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const payload: Record<string, any> = {
@@ -159,7 +159,7 @@ export const sendDiagnosticEmail = createServerFn({ method: "POST" })
     z.object({ to: z.string().trim().email("กรุณากรอก email ที่ถูกต้อง") }).parse(input)
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const row = await loadEmailRow(supabaseAdmin);
 
