@@ -264,6 +264,40 @@ function LeadDetailPage() {
     load();
   };
 
+  const toggleKeyAccount = async () => {
+    if (!account) return;
+    const newVal = !account.is_key_account;
+    const { error } = await crmDb().from("accounts").update({ is_key_account: newVal }).eq("id", account.id);
+    if (error) { toast.error("อัปเดตไม่สำเร็จ"); return; }
+    setAccount({ ...account, is_key_account: newVal });
+    toast.success(newVal ? "เพิ่มเป็น Key Account แล้ว" : "ยกเลิก Key Account แล้ว");
+  };
+
+  const addKeyOwner = async () => {
+    if (!keyOwnerUser || !account) return;
+    const { error } = await crmDb().from("key_account_owners").insert({
+      account_id: account.id,
+      user_id: keyOwnerUser,
+      contact_id: keyOwnerContact || null,
+      note: keyOwnerNote || null,
+    });
+    if (error) {
+      if (error.code === "23505") { toast.error("Sales คนนี้ดูแล Account นี้อยู่แล้ว"); }
+      else { toast.error("เพิ่มไม่สำเร็จ"); }
+      return;
+    }
+    toast.success("เพิ่ม Sales ดูแล Key Account แล้ว");
+    setKeyOwnerOpen(false);
+    setKeyOwnerUser(""); setKeyOwnerContact(""); setKeyOwnerNote("");
+    load();
+  };
+
+  const removeKeyOwner = async (id: string) => {
+    await crmDb().from("key_account_owners").delete().eq("id", id);
+    toast.success("ลบออกแล้ว");
+    load();
+  };
+
   if (loading || !lead) {
     return (
       <div className="flex h-full items-center justify-center">
