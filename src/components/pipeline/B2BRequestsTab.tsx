@@ -29,6 +29,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
   const [search, setSearch]     = useState("");
   const [claiming, setClaiming] = useState<string | null>(null);
   const [confirmReq, setConfirmReq] = useState<B2BQuoteRequest | null>(null);
+  const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   const load = async () => {
@@ -94,7 +95,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
         done: true, done_at: new Date().toISOString(), owner_id: user?.id,
       });
       toast.success(`รับงานแล้ว — สร้าง Lead สำหรับ ${req.customer_company}`);
-      setRequests((prev) => prev.filter((r) => r.id !== req.id));
+      setClaimedIds((prev) => new Set([...prev, req.id]));
       onLeadCreated?.();
     } catch (e: any) {
       toast.error("รับงานไม่สำเร็จ", { description: e.message });
@@ -221,16 +222,22 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                                 {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                               </button>
                             )}
-                            <Button
-                              size="sm"
-                              className="h-7 px-3 text-xs"
-                              onClick={() => setConfirmReq(req)}
-                              disabled={claiming === req.id}
-                            >
-                              {claiming === req.id
-                                ? <Loader2 className="h-3 w-3 animate-spin" />
-                                : <><Plus className="mr-1 h-3 w-3" />รับงาน</>}
-                            </Button>
+                            {claimedIds.has(req.id) ? (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-muted bg-muted/50 px-3 py-1 text-xs text-muted-foreground cursor-not-allowed select-none">
+                                <CheckCircle2 className="h-3 w-3 text-emerald-500" /> รับงานแล้ว
+                              </span>
+                            ) : (
+                              <Button
+                                size="sm"
+                                className="h-7 px-3 text-xs"
+                                onClick={() => setConfirmReq(req)}
+                                disabled={claiming === req.id}
+                              >
+                                {claiming === req.id
+                                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                                  : <><Plus className="mr-1 h-3 w-3" />รับงาน</>}
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

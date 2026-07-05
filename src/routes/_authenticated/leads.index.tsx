@@ -390,7 +390,26 @@ function LeadsPage() {
                         {formatThaiDate(l.created_at)}
                       </td>
                       <td className="px-4 py-3.5">
-                        <span className="font-mono text-sm font-medium text-foreground">{dealNumber ?? l.title}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm font-medium text-foreground">{dealNumber ?? l.title}</span>
+                          {l.source && l.source !== "" && (
+                            <span className={`inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                              l.source === "b2b"        ? "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300" :
+                              l.source === "line_oa"    ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300" :
+                              l.source === "flowaccount" ? "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300" :
+                              l.source === "referral"   ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" :
+                              l.source === "website"    ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300" :
+                              "bg-muted text-muted-foreground"
+                            }`}>
+                              {l.source === "b2b" ? "🛒 B2B" :
+                               l.source === "line_oa" ? "💬 LINE" :
+                               l.source === "flowaccount" ? "FA" :
+                               l.source === "referral" ? "แนะนำ" :
+                               l.source === "website" ? "Web" :
+                               l.source}
+                            </span>
+                          )}
+                        </div>
                         {note && (
                           <span className="block text-xs text-muted-foreground truncate max-w-[260px] mt-0.5">{note}</span>
                         )}
