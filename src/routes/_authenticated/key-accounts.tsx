@@ -9,6 +9,7 @@ import {
   Mail,
   FileText,
   Users,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { crmDb } from "@/lib/crm";
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+
 
 export const Route = createFileRoute("/_authenticated/key-accounts")({
   component: KeyAccountsPage,
