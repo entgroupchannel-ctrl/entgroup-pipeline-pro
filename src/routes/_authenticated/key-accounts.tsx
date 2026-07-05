@@ -137,7 +137,7 @@ function KeyAccountsPage() {
     ]);
 
     if (accRes.error) {
-      toast.error("โหลด Key Accounts ไม่สำเร็จ");
+      toast.error("โหลด Key Accounts ไม่สำเร็จ: " + accRes.error?.message + " | " + accRes.error?.hint);
       return;
     }
 
