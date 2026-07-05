@@ -111,7 +111,7 @@ export function LeadQuotationsSection({ leadId, accountId }: Props) {
               onEdit={() => { setEditTarget(r); setNewOpen(true); }}
               onStatusChange={(s) => updateStatus(r.id, s)}
               onDelete={() => deleteQuotation(r.id)}
-              canEdit={isManager || true}
+              canEdit={isManager}
             />
           ))}
         </ul>
@@ -222,15 +222,17 @@ function QuotationMiniRow({
       <Button variant="ghost" size="sm" className="h-6 shrink-0 px-2 text-[11px]" onClick={onEdit}>
         แก้ไข
       </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-6 w-6 shrink-0 p-0 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-        onClick={onDelete}
-        title="ลบใบเสนอราคา"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </Button>
+      {canEdit && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 shrink-0 p-0 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+          onClick={onDelete}
+          title="ลบใบเสนอราคา"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      )}
     </li>
   );
 }

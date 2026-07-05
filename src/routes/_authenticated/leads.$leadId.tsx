@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, Phone, MessageCircle, Save, ExternalLink, Loader2, Check, Plus, Send, Mail, Trophy, XCircle, Crown, X,
+  ArrowLeft, Phone, MessageCircle, Save, ExternalLink, Loader2, Check, Plus, Send, Mail, Trophy, XCircle, Crown, X, Lock, AlertTriangle, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,13 @@ function LeadDetailPage() {
   const [wonConfirmOpen, setWonConfirmOpen] = useState(false);
   const [lostConfirmOpen, setLostConfirmOpen] = useState(false);
   const [lostReason, setLostReason] = useState("");
+  // Stage permission system
+  const [stageConfirmOpen, setStageConfirmOpen] = useState(false);
+  const [stageConfirmTarget, setStageConfirmTarget] = useState<LeadStage | null>(null);
+  const [stageRequestOpen, setStageRequestOpen] = useState(false);
+  const [stageRequestTarget, setStageRequestTarget] = useState<LeadStage | null>(null);
+  const [stageRequestReason, setStageRequestReason] = useState("");
+  const [stageSubmitting, setStageSubmitting] = useState(false);
 
   const [keyOwners, setKeyOwners] = useState<any[]>([]);
   const [keyOwnerOpen, setKeyOwnerOpen] = useState(false);
@@ -190,6 +197,17 @@ function LeadDetailPage() {
     return true;
   };
 
+  // Stage descriptions (hardcoded per spec)
+  const STAGE_DESC: Record<LeadStage, string> = {
+    new:         "Lead ใหม่ที่ยังไม่ผ่านการคัดกรอง — ยืนยันว่าติดต่อได้และมีความต้องการ",
+    qualified:   "ลูกค้ามีความต้องการชัดเจน มีงบประมาณ และผู้ตัดสินใจพร้อมคุย",
+    proposal:    "ส่งใบเสนอราคาหรือ proposal แล้ว กำลังรอลูกค้าพิจารณา",
+    negotiation: "ลูกค้าสนใจและกำลังต่อรองราคา/เงื่อนไข ควรมี meeting ร่วมแล้ว",
+    closing:     "ตกลงราคาแล้ว รอเอกสาร สัญญา หรือการชำระเงิน",
+    won:         "ปิดดีลสำเร็จ — นับเป็นยอดขาย",
+    lost:        "ดีลไม่สำเร็จ — บันทึกเพื่อวิเคราะห์และปรับกลยุทธ์",
+  };
+
   const changeStage = async (next: LeadStage) => {
     if (next === form.stage) return;
     const prev = form.stage;
@@ -201,6 +219,51 @@ function LeadDetailPage() {
     } else {
       setForm((f) => ({ ...f, stage: prev }));
     }
+  };
+
+  // Handle stage click with permission check
+  const handleStageClick = (next: LeadStage) => {
+    if (next === form.stage) return;
+    const currentIdx = PIPELINE_STAGES.indexOf(form.stage);
+    const nextIdx = PIPELINE_STAGES.indexOf(next);
+    const isForward = nextIdx > currentIdx;
+
+    if (isForward) {
+      // Anyone can advance — show confirm dialog
+      setStageConfirmTarget(next);
+      setStageConfirmOpen(true);
+    } else {
+      // Backward: sales must request, manager/admin can do directly
+      if (isManager) {
+        setStageConfirmTarget(next);
+        setStageConfirmOpen(true);
+      } else {
+        setStageRequestTarget(next);
+        setStageRequestReason("");
+        setStageRequestOpen(true);
+      }
+    }
+  };
+
+  const submitStageRequest = async () => {
+    if (!stageRequestTarget || !stageRequestReason.trim()) {
+      toast.error("กรุณาระบุเหตุผล");
+      return;
+    }
+    setStageSubmitting(true);
+    const { error } = await crmDb().from("stage_change_requests").insert({
+      lead_id: leadId,
+      requested_by: user?.id,
+      from_stage: form.stage,
+      to_stage: stageRequestTarget,
+      reason: stageRequestReason.trim(),
+      status: "pending",
+    });
+    setStageSubmitting(false);
+    if (error) return toast.error("ส่งคำขอไม่สำเร็จ", { description: error.message });
+    toast.success("ส่งคำขอแล้ว — รอ Manager อนุมัติ");
+    setStageRequestOpen(false);
+    setStageRequestReason("");
   };
 
   const saveQt = async () => {
@@ -354,28 +417,38 @@ function LeadDetailPage() {
         </div>
       </div>
 
-      {/* Stage bar */}
+      {/* Stage bar — permission-aware */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-6 py-3">
         <div className="flex flex-wrap items-center gap-1">
           {PIPELINE_STAGES.map((s, i) => {
             const done = i < currentStageIdx;
             const active = i === currentStageIdx;
+            const isBackward = i < currentStageIdx;
+            const isForward = i > currentStageIdx;
+            // Sales cannot click backward stages (shows lock)
+            const locked = isBackward && !isManager;
             return (
               <div key={s} className="flex items-center">
                 <button
-                  onClick={() => changeStage(s)}
+                  onClick={() => !locked && handleStageClick(s)}
+                  disabled={active}
+                  title={locked ? "ต้องขออนุมัติ Manager เพื่อถอย stage" : isBackward && isManager ? "คลิกเพื่อถอย stage (ต้องระบุเหตุผล)" : ""}
                   className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                     active
-                      ? "border-b-2 border-primary bg-primary/10 text-primary"
+                      ? "bg-primary text-primary-foreground cursor-default"
                       : done
-                      ? "text-muted-foreground hover:bg-muted"
-                      : "text-muted-foreground/70 hover:bg-muted"
+                      ? locked
+                        ? "text-muted-foreground/40 cursor-not-allowed"
+                        : "text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300"
+                      : "text-muted-foreground/70 hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  {done && <Check className="h-3 w-3" />}
+                  {done && !locked && <Check className="h-3 w-3" />}
+                  {done && locked && <Lock className="h-3 w-3" />}
                   {STAGE_LABEL_TH[s]}
+                  {isForward && !active && <ChevronRight className="h-3 w-3 opacity-50" />}
                 </button>
-                {i < PIPELINE_STAGES.length - 1 && <span className="mx-1 text-muted-foreground/50">›</span>}
+                {i < PIPELINE_STAGES.length - 1 && <span className="mx-1 text-muted-foreground/30">›</span>}
               </div>
             );
           })}
@@ -820,6 +893,80 @@ function LeadDetailPage() {
         ownerId={user?.id ?? null}
         onLogged={load}
       />
+
+      {/* ── Stage Advance Confirm Dialog ── */}
+      <Dialog open={stageConfirmOpen} onOpenChange={setStageConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ChevronRight className="h-5 w-5 text-primary" />
+              {stageConfirmTarget && PIPELINE_STAGES.indexOf(stageConfirmTarget) < currentStageIdx
+                ? `ถอยกลับไป "${stageConfirmTarget ? STAGE_LABEL_TH[stageConfirmTarget] : ""}"`
+                : `ย้ายไป "${stageConfirmTarget ? STAGE_LABEL_TH[stageConfirmTarget] : ""}"`
+              }
+            </DialogTitle>
+          </DialogHeader>
+          {stageConfirmTarget && (
+            <div className="rounded-lg border bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
+              {STAGE_DESC[stageConfirmTarget]}
+            </div>
+          )}
+          {stageConfirmTarget && PIPELINE_STAGES.indexOf(stageConfirmTarget) < currentStageIdx && isManager && (
+            <p className="text-xs text-amber-600 flex items-center gap-1">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              การถอย stage จะถูกบันทึกใน activity log
+            </p>
+          )}
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => setStageConfirmOpen(false)}>ยกเลิก</Button>
+            <Button
+              onClick={() => {
+                if (stageConfirmTarget) changeStage(stageConfirmTarget);
+                setStageConfirmOpen(false);
+              }}
+            >
+              ยืนยัน
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Stage Backward Request Dialog (Sales only) ── */}
+      <Dialog open={stageRequestOpen} onOpenChange={setStageRequestOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+              <Lock className="h-4 w-4" /> ขออนุมัติถอย stage
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+              ต้องการถอยจาก <strong>{STAGE_LABEL_TH[form.stage as LeadStage]}</strong> → <strong>{stageRequestTarget ? STAGE_LABEL_TH[stageRequestTarget] : ""}</strong>
+              <br />คำขอนี้จะส่งให้ Manager อนุมัติก่อนเปลี่ยน
+            </div>
+            <div>
+              <Label className="text-xs">เหตุผล <span className="text-red-500">*</span></Label>
+              <Textarea
+                rows={3}
+                placeholder="เช่น ลูกค้าขอข้อมูลเพิ่มก่อนตัดสินใจ, ต้องแก้ข้อมูลในใบเสนอราคา..."
+                value={stageRequestReason}
+                onChange={(e) => setStageRequestReason(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => setStageRequestOpen(false)}>ยกเลิก</Button>
+            <Button
+              className="bg-amber-600 text-white hover:bg-amber-700"
+              onClick={submitStageRequest}
+              disabled={stageSubmitting || !stageRequestReason.trim()}
+            >
+              {stageSubmitting && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              ส่งคำขออนุมัติ
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={wonConfirmOpen} onOpenChange={setWonConfirmOpen}>
         <DialogContent className="max-w-sm">
