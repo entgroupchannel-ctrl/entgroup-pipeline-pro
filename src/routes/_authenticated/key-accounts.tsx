@@ -1,17 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Crown,
-  Search,
-  Plus,
-  Phone,
-  MessageCircle,
-  Mail,
-  FileText,
-  Users,
-  ChevronDown,
-  FileDown,
-  X,
+  Crown, Search, Plus, Phone, MessageCircle, Mail, FileText, Users,
+  ChevronDown, FileDown, X, ExternalLink, StickyNote, Send,
+  CheckCircle2, Clock, AlertTriangle, UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { crmDb } from "@/lib/crm";
@@ -490,40 +482,22 @@ function KeyAccountsPage() {
           </div>
 
           {/* ── Quick Action Bar ── */}
-          <div className="flex items-center gap-2 border-b bg-muted/10 px-5 py-2 shrink-0 overflow-x-auto">
-            <button
-              onClick={() => openLog("call")}
-              className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors shrink-0"
-            >
-              <Phone className="h-3.5 w-3.5 text-emerald-600" /> โทร
-            </button>
-            <button
-              onClick={() => openLog("line")}
-              className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors shrink-0"
-            >
-              <MessageCircle className="h-3.5 w-3.5 text-green-600" /> Line
-            </button>
-            <button
-              onClick={() => setEmailOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors shrink-0"
-            >
-              <Mail className="h-3.5 w-3.5 text-blue-600" /> ส่งอีเมล
-            </button>
-            <button
-              onClick={() => openLog("meeting")}
-              className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors shrink-0"
-            >
-              <Users className="h-3.5 w-3.5 text-violet-600" /> นัดประชุม
-            </button>
-            <button
-              onClick={() => setAddDealOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors shrink-0"
-            >
-              <FileText className="h-3.5 w-3.5 text-amber-600" /> สร้างดีล
-            </button>
+          <div className="flex items-center gap-2 border-b bg-muted/5 px-5 py-2.5 shrink-0 overflow-x-auto">
+            {([
+              { label: "โทร",       icon: Phone,          color: "text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 hover:border-emerald-300", fn: () => openLog("call") },
+              { label: "Line",      icon: MessageCircle,  color: "text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20 hover:border-green-300",   fn: () => openLog("line") },
+              { label: "ส่งอีเมล", icon: Send,            color: "text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 hover:border-blue-300",     fn: () => setEmailOpen(true) },
+              { label: "นัดประชุม",icon: Users,           color: "text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/20 hover:border-violet-300", fn: () => openLog("meeting") },
+              { label: "สร้างดีล", icon: FileText,        color: "text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20 hover:border-amber-300",   fn: () => setAddDealOpen(true) },
+            ] as const).map(({ label, icon: Icon, color, fn }) => (
+              <button key={label} onClick={fn}
+                className={`flex items-center gap-2 rounded-lg border bg-card px-3.5 py-2 text-sm font-medium transition-all shrink-0 ${color}`}>
+                <Icon className="h-4 w-4" /> {label}
+              </button>
+            ))}
             <div className="ml-auto shrink-0">
               <Button size="sm" onClick={() => openLog("call")}>
-                <Plus className="mr-1 h-3.5 w-3.5" /> บันทึกกิจกรรม
+                <Plus className="mr-1.5 h-4 w-4" /> บันทึกกิจกรรม
               </Button>
             </div>
           </div>
@@ -571,7 +545,13 @@ function KeyAccountsPage() {
               <EmailLogTab accountId={selected.id} />
             )}
             {tab === "บันทึก" && (
-              <div className="text-sm text-muted-foreground">ยังไม่มีบันทึก</div>
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+                <StickyNote className="h-10 w-10 opacity-20" />
+                <p className="text-sm font-medium">ยังไม่มีบันทึก</p>
+                <p className="text-xs text-center max-w-[220px]">
+                  บันทึกเพิ่มเติมเกี่ยวกับบริษัทนี้ เช่น ข้อตกลงพิเศษ เงื่อนไขการชำระ
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -1416,6 +1396,21 @@ function SummaryCard({
 }
 
 // ── ActivityHistoryTab ────────────────────────────────────────────────────────
+const ACT_ICON: Record<string, React.ElementType> = {
+  call: Phone, meeting: Users, line: MessageCircle, email: Mail, note: StickyNote,
+};
+const ACT_COLOR: Record<string, string> = {
+  call: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+  meeting: "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
+  line: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300",
+  email: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+  note: "bg-muted text-muted-foreground",
+};
+const ACT_LABEL: Record<string, string> = {
+  call:"โทรศัพท์", meeting:"ประชุม", line:"Line", email:"อีเมล", note:"บันทึก",
+};
+const MONTHS_TH2 = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+
 function ActivityHistoryTab({ accountId }: { accountId: string }) {
   const [acts, setActs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1423,7 +1418,6 @@ function ActivityHistoryTab({ accountId }: { accountId: string }) {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      // Get all lead ids for this account
       const { data: leads } = await crmDb().from("leads").select("id").eq("account_id", accountId);
       const ids = (leads ?? []).map((l: any) => l.id);
       if (!ids.length) { setActs([]); setLoading(false); return; }
@@ -1438,33 +1432,45 @@ function ActivityHistoryTab({ accountId }: { accountId: string }) {
     })();
   }, [accountId]);
 
-  const TYPE_ICON: Record<string, string> = { call:"📞", meeting:"👥", line:"💬", email:"✉️", note:"📝" };
-  const MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
   const fmtDate = (iso: string) => {
     const d = new Date(iso);
-    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${String(d.getFullYear()+543).slice(-2)}`;
+    return `${d.getDate()} ${MONTHS_TH2[d.getMonth()]} ${String(d.getFullYear()+543).slice(-2)}`;
   };
 
-  if (loading) return <div className="flex justify-center py-10"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
-  if (!acts.length) return <p className="text-sm text-muted-foreground text-center py-10">ยังไม่มีประวัติกิจกรรม</p>;
+  if (loading) return <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
+  if (!acts.length) return (
+    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+      <Clock className="h-10 w-10 opacity-20" />
+      <p className="text-sm">ยังไม่มีประวัติกิจกรรม</p>
+    </div>
+  );
 
   return (
-    <div className="space-y-1">
-      {acts.map((a) => (
-        <div key={a.id} className="flex items-start gap-3 rounded-xl border bg-card px-4 py-3 hover:bg-muted/20 transition-colors">
-          <span className="text-base shrink-0 mt-0.5">{TYPE_ICON[a.type] ?? "📋"}</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{a.subject || "—"}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{fmtDate(a.created_at)}</p>
+    <div className="space-y-2">
+      {acts.map((a) => {
+        const Icon = ACT_ICON[a.type] ?? StickyNote;
+        const iconCls = ACT_COLOR[a.type] ?? "bg-muted text-muted-foreground";
+        return (
+          <div key={a.id} className="flex items-start gap-3 rounded-xl border bg-card px-4 py-3.5 hover:bg-muted/20 transition-colors">
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconCls}`}>
+              <Icon className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate leading-snug">{a.subject || "—"}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {ACT_LABEL[a.type] ?? a.type} · {fmtDate(a.created_at)}
+              </p>
+            </div>
+            <span className={`shrink-0 self-center text-xs font-medium px-2.5 py-1 rounded-full ${
+              a.done ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                     : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+            }`}>
+              {a.done ? <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />เสร็จ</span>
+                      : <span className="flex items-center gap-1"><Clock className="h-3 w-3" />รอ</span>}
+            </span>
           </div>
-          <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-            a.done ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                   : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-          }`}>
-            {a.done ? "✓ เสร็จ" : "รอ"}
-          </span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -1487,42 +1493,82 @@ function ContactsTab({ accountId, accountName, onEmail }: { accountId: string; a
     })();
   }, [accountId]);
 
-  if (loading) return <div className="flex justify-center py-10"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
-  if (!contacts.length) return <p className="text-sm text-muted-foreground text-center py-10">ยังไม่มีผู้ติดต่อ</p>;
+  if (loading) return <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
 
   return (
-    <div className="space-y-2">
-      {contacts.map((c) => (
-        <div key={c.id} className="rounded-xl border bg-card px-4 py-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold truncate">{c.name}</p>
-              {c.position && <p className="text-xs text-muted-foreground">{c.position}</p>}
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              {c.phone && (
-                <a href={`tel:${c.phone}`} className="rounded-lg border p-1.5 text-muted-foreground hover:text-primary hover:border-primary transition-colors" title={c.phone}>
-                  <Phone className="h-3.5 w-3.5" />
-                </a>
-              )}
-              {c.line_id && (
-                <a href={`https://line.me/ti/p/~${c.line_id}`} target="_blank" rel="noreferrer" className="rounded-lg border p-1.5 text-muted-foreground hover:text-green-600 hover:border-green-400 transition-colors" title={`Line: ${c.line_id}`}>
-                  <MessageCircle className="h-3.5 w-3.5" />
-                </a>
-              )}
-              {c.email && (
-                <button onClick={onEmail} className="rounded-lg border p-1.5 text-muted-foreground hover:text-blue-600 hover:border-blue-400 transition-colors" title={c.email}>
-                  <Mail className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-            {c.email && <span className="truncate max-w-[200px]">{c.email}</span>}
-            {c.phone && <span>{c.phone}</span>}
-          </div>
+    <div className="space-y-3">
+      {/* Header: count + link to account detail */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-muted-foreground">{contacts.length} ผู้ติดต่อ</p>
+        <Link
+          to="/accounts/$accountId"
+          params={{ accountId }}
+          className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+        >
+          <ExternalLink className="h-3.5 w-3.5" /> จัดการผู้ติดต่อ
+        </Link>
+      </div>
+
+      {contacts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-12 text-muted-foreground gap-3">
+          <UserPlus className="h-10 w-10 opacity-20" />
+          <p className="text-sm">ยังไม่มีผู้ติดต่อ</p>
+          <Link
+            to="/accounts/$accountId"
+            params={{ accountId }}
+            className="flex items-center gap-1.5 rounded-lg border bg-card px-4 py-2 text-sm font-medium text-primary hover:bg-muted transition-colors"
+          >
+            <UserPlus className="h-4 w-4" /> เพิ่มผู้ติดต่อ
+          </Link>
         </div>
-      ))}
+      ) : (
+        contacts.map((c) => (
+          <div key={c.id} className="rounded-xl border bg-card px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold truncate">{c.name}</p>
+                {c.position && <p className="text-sm text-muted-foreground mt-0.5">{c.position}</p>}
+                <div className="mt-2 space-y-1">
+                  {c.email && (
+                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Mail className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{c.email}</span>
+                    </p>
+                  )}
+                  {c.phone && (
+                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Phone className="h-3.5 w-3.5 shrink-0" />{c.phone}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                {c.phone && (
+                  <a href={`tel:${c.phone}`}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground hover:text-emerald-600 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors"
+                    title={c.phone}>
+                    <Phone className="h-4 w-4" />
+                  </a>
+                )}
+                {c.line_id && (
+                  <a href={`https://line.me/ti/p/~${c.line_id}`} target="_blank" rel="noreferrer"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground hover:text-green-600 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors"
+                    title={`Line: ${c.line_id}`}>
+                    <MessageCircle className="h-4 w-4" />
+                  </a>
+                )}
+                {c.email && (
+                  <button onClick={onEmail}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors"
+                    title={c.email}>
+                    <Send className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
@@ -1535,10 +1581,11 @@ function EmailLogTab({ accountId }: { accountId: string }) {
   useEffect(() => {
     (async () => {
       setLoading(true);
+      // Try related_id match OR metadata jsonb match
       const { data } = await crmDb()
         .from("email_send_log")
         .select("*")
-        .or(`related_id.eq.${accountId},metadata->>account_id.eq.${accountId}`)
+        .eq("related_id", accountId)
         .order("created_at", { ascending: false })
         .limit(30);
       setLogs(data ?? []);
@@ -1546,38 +1593,82 @@ function EmailLogTab({ accountId }: { accountId: string }) {
     })();
   }, [accountId]);
 
-  const MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  const MONTHS_E = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
   const fmtDate = (iso: string) => {
     const d = new Date(iso);
-    return `${d.getDate()} ${MONTHS[d.getMonth()]} · ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    return `${d.getDate()} ${MONTHS_E[d.getMonth()]} · ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
   };
 
-  if (loading) return <div className="flex justify-center py-10"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
-  if (!logs.length) return <p className="text-sm text-muted-foreground text-center py-10">ยังไม่มีประวัติการส่งอีเมล</p>;
+  if (loading) return <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
+
+  if (!logs.length) return (
+    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+      <Mail className="h-10 w-10 opacity-20" />
+      <p className="text-sm font-medium">ยังไม่มีประวัติการส่งอีเมล</p>
+      <p className="text-xs text-center max-w-[240px]">
+        อีเมลที่ส่งผ่านปุ่ม "ส่งอีเมล" ด้านบน จะปรากฏที่นี่
+      </p>
+    </div>
+  );
+
+  const sentCount   = logs.filter(l => l.status === "sent").length;
+  const failedCount = logs.filter(l => l.status !== "sent").length;
 
   return (
-    <div className="space-y-1.5">
-      {logs.map((log) => (
-        <div key={log.id} className="rounded-xl border bg-card px-4 py-3 hover:bg-muted/20 transition-colors">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-medium truncate flex-1">{log.subject || "—"}</p>
-            <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-              log.status === "sent"
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                : "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
-            }`}>
-              {log.status === "sent" ? "✓ ส่งแล้ว" : "✗ ล้มเหลว"}
-            </span>
+    <div className="space-y-3">
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "ส่งทั้งหมด", value: logs.length,   color: "text-primary" },
+          { label: "สำเร็จ",      value: sentCount,     color: "text-emerald-600" },
+          { label: "ล้มเหลว",     value: failedCount,   color: failedCount > 0 ? "text-red-600" : "text-muted-foreground" },
+        ].map(s => (
+          <div key={s.label} className="rounded-xl border bg-card py-3 text-center">
+            <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
           </div>
-          <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="truncate">{log.recipient_name ? `${log.recipient_name} · ` : ""}{log.recipient_email}</span>
-            <span className="shrink-0">{fmtDate(log.created_at)}</span>
+        ))}
+      </div>
+
+      {/* Log list */}
+      <div className="space-y-2">
+        {logs.map((log) => (
+          <div key={log.id} className="rounded-xl border bg-card px-4 py-3.5 hover:bg-muted/20 transition-colors">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                  log.status === "sent"
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                    : "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                }`}>
+                  <Mail className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold truncate">{log.subject || "—"}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5 truncate">
+                    {log.recipient_name ? `${log.recipient_name} · ` : ""}{log.recipient_email}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">{fmtDate(log.created_at)}</p>
+                </div>
+              </div>
+              <span className={`shrink-0 self-start flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                log.status === "sent"
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  : "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+              }`}>
+                {log.status === "sent"
+                  ? <><CheckCircle2 className="h-3 w-3" /> ส่งแล้ว</>
+                  : <><AlertTriangle className="h-3 w-3" /> ล้มเหลว</>}
+              </span>
+            </div>
+            {log.error_message && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 rounded-lg px-3 py-2">
+                {log.error_message}
+              </p>
+            )}
           </div>
-          {log.error_message && (
-            <p className="mt-1.5 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 rounded px-2 py-1">{log.error_message}</p>
-          )}
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
