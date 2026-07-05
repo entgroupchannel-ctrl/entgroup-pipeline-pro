@@ -329,17 +329,17 @@ function LeadDetailPage() {
         <div className="flex gap-2">
           <Button
             size="sm"
-            className="bg-emerald-600 text-white hover:bg-emerald-700"
-            onClick={() => changeStage("won" as LeadStage)}
+            className="border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
+            onClick={() => setWonConfirmOpen(true)}
           >
-            ชนะ
+            <Trophy className="mr-1.5 h-3.5 w-3.5" /> ชนะ
           </Button>
           <Button
             size="sm"
-            variant="destructive"
-            onClick={() => changeStage("lost" as LeadStage)}
+            className="border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
+            onClick={() => setLostConfirmOpen(true)}
           >
-            แพ้
+            <XCircle className="mr-1.5 h-3.5 w-3.5" /> แพ้
           </Button>
         </div>
       </div>
