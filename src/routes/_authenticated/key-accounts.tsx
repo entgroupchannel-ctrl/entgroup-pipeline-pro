@@ -129,6 +129,8 @@ function KeyAccountsPage() {
   const [logType, setLogType] = useState("meeting");
   const [logNote, setLogNote] = useState("");
   const [addDealOpen, setAddDealOpen] = useState(false);
+  const [accPage, setAccPage] = useState(1);
+  const ACC_PAGE_SIZE = 20;
 
 
 
@@ -214,6 +216,17 @@ function KeyAccountsPage() {
       return true;
     });
   }, [accounts, activities, q, filter]);
+
+  useEffect(() => {
+    setAccPage(1);
+  }, [q, filter]);
+
+  const accTotalPages = Math.max(1, Math.ceil(filteredAccounts.length / ACC_PAGE_SIZE));
+  const accPageSafe = Math.min(accPage, accTotalPages);
+  const pagedAccounts = filteredAccounts.slice(
+    (accPageSafe - 1) * ACC_PAGE_SIZE,
+    accPageSafe * ACC_PAGE_SIZE,
+  );
 
   const selectedActs = selected ? getAccActivities(selected) : [];
   const selectedTarget = selected?.target?.[0] ?? DEFAULT_TARGET;
@@ -332,7 +345,7 @@ function KeyAccountsPage() {
         </div>
 
         <div style={{ flex: 1, overflowY: "auto" }}>
-          {filteredAccounts.map((acc) => {
+          {pagedAccounts.map((acc) => {
             const target = acc.target?.[0] ?? DEFAULT_TARGET;
             const health = calcHealth(target, getAccActivities(acc));
             const dot = health >= 80 ? "#639922" : health >= 50 ? "#BA7517" : "#E24B4A";
@@ -401,7 +414,61 @@ function KeyAccountsPage() {
             );
           })}
         </div>
+
+        {accTotalPages > 1 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "8px 12px",
+              borderTop: "0.5px solid var(--border)",
+              fontSize: 11,
+              color: "var(--text-muted)",
+              gap: 8,
+            }}
+          >
+            <span>
+              {(accPageSafe - 1) * ACC_PAGE_SIZE + 1}–
+              {Math.min(accPageSafe * ACC_PAGE_SIZE, filteredAccounts.length)} / {filteredAccounts.length}
+            </span>
+            <div style={{ display: "flex", gap: 4 }}>
+              <button
+                onClick={() => setAccPage((p) => Math.max(1, p - 1))}
+                disabled={accPageSafe <= 1}
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 6,
+                  border: "0.5px solid var(--border)",
+                  background: "transparent",
+                  cursor: accPageSafe <= 1 ? "not-allowed" : "pointer",
+                  opacity: accPageSafe <= 1 ? 0.4 : 1,
+                }}
+              >
+                ก่อนหน้า
+              </button>
+              <span style={{ padding: "3px 8px" }}>
+                {accPageSafe} / {accTotalPages}
+              </span>
+              <button
+                onClick={() => setAccPage((p) => Math.min(accTotalPages, p + 1))}
+                disabled={accPageSafe >= accTotalPages}
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 6,
+                  border: "0.5px solid var(--border)",
+                  background: "transparent",
+                  cursor: accPageSafe >= accTotalPages ? "not-allowed" : "pointer",
+                  opacity: accPageSafe >= accTotalPages ? 0.4 : 1,
+                }}
+              >
+                ถัดไป
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
 
       {/* RIGHT PANEL */}
       {selected ? (
@@ -699,8 +766,18 @@ function DealsTab({ leads, onAddDeal }: { leads: any[]; onAddDeal: () => void })
     cancelled: { bg: "#F1EFE8", text: "#5F5E5A" },
   };
 
-  const activeLeads = leads.filter((l) => l.stage !== "lost");
-  const wonLeads = leads.filter((l) => l.stage === "won");
+  const sortedLeads = useMemo(
+    () =>
+      [...leads].sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return tb - ta;
+      }),
+    [leads],
+  );
+
+  const activeLeads = sortedLeads.filter((l) => l.stage !== "lost");
+  const wonLeads = sortedLeads.filter((l) => l.stage === "won");
 
   const totalExpected = activeLeads.reduce(
     (s, l) => s + Number(l.expected_value ?? 0),
@@ -710,11 +787,21 @@ function DealsTab({ leads, onAddDeal }: { leads: any[]; onAddDeal: () => void })
     (s, l) => s + Number(l.expected_value ?? 0),
     0,
   );
-  const allQTs = leads.flatMap((l) => l.quotations ?? []);
+  const allQTs = sortedLeads.flatMap((l) => l.quotations ?? []);
   const totalQT = allQTs.reduce((s, q) => s + Number(q.grand_total ?? 0), 0);
 
+  const DEALS_PAGE_SIZE = 5;
+  const [dealsPage, setDealsPage] = useState(1);
+  const dealsTotalPages = Math.max(1, Math.ceil(sortedLeads.length / DEALS_PAGE_SIZE));
+  const dealsPageSafe = Math.min(dealsPage, dealsTotalPages);
+  const pagedLeads = sortedLeads.slice(
+    (dealsPageSafe - 1) * DEALS_PAGE_SIZE,
+    dealsPageSafe * DEALS_PAGE_SIZE,
+  );
+
   const [expanded, setExpanded] = useState<Set<string>>(
-    new Set(leads.slice(0, 1).map((l) => l.id)),
+    // เริ่มต้นเปิดเฉพาะดีลล่าสุด (ใหม่สุด) — ที่เหลือหุบไว้
+    new Set(sortedLeads.slice(0, 1).map((l) => l.id)),
   );
 
   const toggle = (id: string) =>
@@ -757,25 +844,40 @@ function DealsTab({ leads, onAddDeal }: { leads: any[]; onAddDeal: () => void })
       {/* Header */}
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-          โอกาสขาย (Opportunities)
+          โอกาสขาย (Opportunities) · เรียงจากใหม่ไปเก่า
         </span>
-        <button
-          onClick={onAddDeal}
-          className="flex items-center gap-1 text-xs border rounded px-2.5 py-1 hover:bg-muted transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" /> เพิ่มดีล
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setExpanded(new Set(pagedLeads.map((l) => l.id)))}
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            กางทั้งหมด
+          </button>
+          <span className="text-muted-foreground/40">·</span>
+          <button
+            onClick={() => setExpanded(new Set())}
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            หุบทั้งหมด
+          </button>
+          <button
+            onClick={onAddDeal}
+            className="ml-2 flex items-center gap-1 text-xs border rounded px-2.5 py-1 hover:bg-muted transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" /> เพิ่มดีล
+          </button>
+        </div>
       </div>
 
       {/* Empty state */}
-      {leads.length === 0 && (
+      {sortedLeads.length === 0 && (
         <div className="text-center py-10 text-sm text-muted-foreground">
           ยังไม่มีดีลสำหรับ Account นี้
         </div>
       )}
 
       {/* Deal cards */}
-      {leads.map((lead) => {
+      {pagedLeads.map((lead) => {
         const isOpen = expanded.has(lead.id);
         const qts: any[] = lead.quotations ?? [];
         const leadQtTotal = qts.reduce(
@@ -918,15 +1020,44 @@ function DealsTab({ leads, onAddDeal }: { leads: any[]; onAddDeal: () => void })
         );
       })}
 
+      {/* Pagination */}
+      {dealsTotalPages > 1 && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-3">
+          <span>
+            แสดง {(dealsPageSafe - 1) * DEALS_PAGE_SIZE + 1}–
+            {Math.min(dealsPageSafe * DEALS_PAGE_SIZE, sortedLeads.length)} จาก {sortedLeads.length} ดีล
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setDealsPage((p) => Math.max(1, p - 1))}
+              disabled={dealsPageSafe <= 1}
+              className="px-2 py-1 border rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ก่อนหน้า
+            </button>
+            <span className="px-2">
+              {dealsPageSafe} / {dealsTotalPages}
+            </span>
+            <button
+              onClick={() => setDealsPage((p) => Math.min(dealsTotalPages, p + 1))}
+              disabled={dealsPageSafe >= dealsTotalPages}
+              className="px-2 py-1 border rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ถัดไป
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Grand total */}
-      {leads.length > 0 && (
+      {sortedLeads.length > 0 && (
         <div className="flex items-center justify-between rounded-xl border bg-muted/20 px-4 py-3">
           <div>
             <div className="text-[13px] text-muted-foreground">
               มูลค่ารวมทั้งหมด (จากใบเสนอราคา)
             </div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
-              จาก {allQTs.length} ใบเสนอราคา ใน {leads.length} deals
+              จาก {allQTs.length} ใบเสนอราคา ใน {sortedLeads.length} deals
             </div>
           </div>
           <div className="text-xl font-medium">฿{totalQT.toLocaleString()}</div>
