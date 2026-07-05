@@ -54,6 +54,7 @@ function AuthenticatedLayout() {
           <header className="flex h-14 items-center gap-2 border-b bg-background px-4">
             <SidebarTrigger />
             <div className="ml-2 text-sm font-medium text-muted-foreground">ENTGROUP CRM</div>
+            <div className="ml-auto"><PreferencesToggle /></div>
           </header>
           <main className="min-w-0 flex-1 overflow-auto">
             <Outlet />
