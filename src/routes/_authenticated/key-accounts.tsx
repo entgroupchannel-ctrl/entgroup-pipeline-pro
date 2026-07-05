@@ -454,9 +454,8 @@ function KeyAccountsPage() {
             )}
             {tab === "ดีลที่เกี่ยวข้อง" && (
               <DealsTab
-                account={selected}
                 leads={getAccLeads(selected)}
-                onAddDeal={() => {/* navigate to pipeline */}}
+                onAddDeal={() => setTab("บันทึกกิจกรรม")}
               />
             )}
 
@@ -625,15 +624,7 @@ function ActivityTab({
   );
 }
 
-function DealsTab({
-  account,
-  leads,
-  onAddDeal,
-}: {
-  account: KeyAccount;
-  leads: any[];
-  onAddDeal: () => void;
-}) {
+function DealsTab({ leads, onAddDeal }: { leads: any[]; onAddDeal: () => void }) {
   const STAGE_LABEL: Record<string, string> = {
     new: "ใหม่",
     qualified: "คัดกรอง",
@@ -684,32 +675,18 @@ function DealsTab({
   const wonLeads = leads.filter((l) => l.stage === "won");
 
   const totalExpected = activeLeads.reduce(
-    (s: number, l: any) => s + Number(l.expected_value ?? 0),
+    (s, l) => s + Number(l.expected_value ?? 0),
     0,
   );
-
   const totalWon = wonLeads.reduce(
-    (s: number, l: any) => s + Number(l.expected_value ?? 0),
+    (s, l) => s + Number(l.expected_value ?? 0),
     0,
   );
-
-  const totalQT = leads.reduce(
-    (s: number, l: any) =>
-      s +
-      (l.quotations ?? []).reduce(
-        (qs: number, q: any) => qs + Number(q.grand_total ?? 0),
-        0,
-      ),
-    0,
-  );
-
-  const qtCount = leads.reduce(
-    (s: number, l: any) => s + (l.quotations ?? []).length,
-    0,
-  );
+  const allQTs = leads.flatMap((l) => l.quotations ?? []);
+  const totalQT = allQTs.reduce((s, q) => s + Number(q.grand_total ?? 0), 0);
 
   const [expanded, setExpanded] = useState<Set<string>>(
-    new Set([leads[0]?.id].filter(Boolean)),
+    new Set(leads.slice(0, 1).map((l) => l.id)),
   );
 
   const toggle = (id: string) =>
@@ -721,11 +698,11 @@ function DealsTab({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Summary bar */}
+      {/* Summary */}
       <div className="grid grid-cols-4 gap-2">
         {[
-          { label: "deals ทั้งหมด", value: leads.length, sub: "รายการ" },
-          { label: "ใบเสนอราคา", value: qtCount, sub: "รายการ" },
+          { label: "deals ทั้งหมด", value: String(leads.length), sub: "รายการ" },
+          { label: "ใบเสนอราคา", value: String(allQTs.length), sub: "รายการ" },
           {
             label: "มูลค่าคาดหวัง",
             value: `฿${totalExpected.toLocaleString()}`,
@@ -749,7 +726,7 @@ function DealsTab({
         ))}
       </div>
 
-      {/* Section header */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
           โอกาสขาย (Opportunities)
@@ -762,126 +739,125 @@ function DealsTab({
         </button>
       </div>
 
-      {/* Deal cards */}
-      {leads.length === 0 ? (
+      {/* Empty state */}
+      {leads.length === 0 && (
         <div className="text-center py-10 text-sm text-muted-foreground">
           ยังไม่มีดีลสำหรับ Account นี้
         </div>
-      ) : (
-        leads.map((lead: any) => {
-          const isOpen = expanded.has(lead.id);
-          const qts: any[] = lead.quotations ?? [];
-          const leadTotal = qts.reduce(
-            (s: number, q: any) => s + Number(q.grand_total ?? 0),
-            0,
-          );
-          const pct = STAGE_PCT[lead.stage] ?? 0;
-          const stageColor = STAGE_COLOR[lead.stage] ?? "#888780";
-          const isWon = lead.stage === "won";
-          const isLost = lead.stage === "lost";
+      )}
 
-          return (
+      {/* Deal cards */}
+      {leads.map((lead) => {
+        const isOpen = expanded.has(lead.id);
+        const qts: any[] = lead.quotations ?? [];
+        const leadQtTotal = qts.reduce(
+          (s: number, q: any) => s + Number(q.grand_total ?? 0),
+          0,
+        );
+        const stageColor = STAGE_COLOR[lead.stage] ?? "#888780";
+        const pct = STAGE_PCT[lead.stage] ?? 0;
+        const isDone = lead.stage === "won" || lead.stage === "lost";
+
+        return (
+          <div
+            key={lead.id}
+            className="rounded-xl border bg-card overflow-hidden"
+            style={{ opacity: isDone ? 0.75 : 1 }}
+          >
+            {/* Card header */}
             <div
-              key={lead.id}
-              className="rounded-xl border bg-card overflow-hidden"
-              style={{ opacity: isWon || isLost ? 0.7 : 1 }}
+              className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors border-b"
+              onClick={() => toggle(lead.id)}
             >
-              {/* Header */}
               <div
-                className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors border-b"
-                onClick={() => toggle(lead.id)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold shrink-0"
+                style={{ background: `${stageColor}20`, color: stageColor }}
               >
-                <div
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold shrink-0"
+                {(lead.title ?? "?").slice(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium truncate">{lead.title}</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  {qts.length} ใบเสนอราคา
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-sm font-medium">
+                  {lead.expected_value
+                    ? `฿${Number(lead.expected_value).toLocaleString()}`
+                    : "—"}
+                </div>
+                <span
+                  className="inline-block text-[10px] px-2 py-0.5 rounded font-medium mt-1"
                   style={{ background: `${stageColor}20`, color: stageColor }}
                 >
-                  {(lead.title ?? "?").slice(0, 2).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-medium truncate">
-                    {lead.title}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                    {qts.length} ใบเสนอราคา
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="text-sm font-medium">
-                    {lead.expected_value
-                      ? `฿${Number(lead.expected_value).toLocaleString()}`
-                      : "—"}
-                  </div>
-                  <span
-                    className="inline-block text-[10px] px-2 py-0.5 rounded font-medium mt-1"
-                    style={{ background: `${stageColor}20`, color: stageColor }}
-                  >
-                    {STAGE_LABEL[lead.stage] ?? lead.stage}
-                  </span>
-                </div>
-                <ChevronDown
-                  className={`h-4 w-4 text-muted-foreground transition-transform shrink-0 ${
-                    isOpen ? "rotate-180" : ""
-                  }`}
-                />
+                  {STAGE_LABEL[lead.stage] ?? lead.stage}
+                </span>
               </div>
+              <ChevronDown
+                className={`h-4 w-4 text-muted-foreground transition-transform shrink-0 ${
+                  isOpen ? "rotate-180" : ""
+                }`}
+              />
+            </div>
 
-              {/* Body (expanded) */}
-              {isOpen && (
-                <div className="px-4 pb-4">
-                  {/* Progress bar */}
-                  {!isLost && (
-                    <div className="mt-3">
-                      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{ width: `${pct}%`, background: stageColor }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
-                        {["ใหม่", "คัดกรอง", "เสนอราคา", "เจรจา", "ปิดขาย"].map((s) => (
-                          <span key={s}>{s}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Quotations */}
+            {/* Card body */}
+            {isOpen && (
+              <div className="px-4 pb-4">
+                {/* Pipeline progress */}
+                {lead.stage !== "lost" && (
                   <div className="mt-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                        ใบเสนอราคาในดีลนี้
-                      </span>
+                    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${pct}%`, background: stageColor }}
+                      />
                     </div>
-                    {qts.length === 0 ? (
-                      <div className="text-center py-3 text-xs text-muted-foreground border rounded-lg">
-                        ยังไม่มีใบเสนอราคา
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-1.5">
-                        {qts.map((q: any) => {
-                          const sc = STATUS_COLOR[q.status] ?? STATUS_COLOR.draft;
-                          return (
-                            <div
-                              key={q.id}
-                              className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2"
+                    <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
+                      {["ใหม่", "คัดกรอง", "เสนอราคา", "เจรจา", "ปิดขาย"].map((s) => (
+                        <span key={s}>{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Quotations section */}
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                      ใบเสนอราคาในดีลนี้
+                    </span>
+                  </div>
+                  {qts.length === 0 ? (
+                    <div className="text-center py-3 text-xs text-muted-foreground border rounded-lg border-dashed">
+                      ยังไม่มีใบเสนอราคา
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      {qts.map((q: any) => {
+                        const sc = STATUS_COLOR[q.status] ?? STATUS_COLOR.draft;
+                        return (
+                          <div
+                            key={q.id}
+                            className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2"
+                          >
+                            <span className="font-mono text-[11px] font-semibold text-muted-foreground min-w-[110px]">
+                              {q.quotation_no ?? "—"}
+                            </span>
+                            <span className="text-xs text-muted-foreground flex-1 truncate">
+                              {q.title ?? "—"}
+                            </span>
+                            <span className="text-xs font-medium min-w-[80px] text-right">
+                              {q.grand_total
+                                ? `฿${Number(q.grand_total).toLocaleString()}`
+                                : "—"}
+                            </span>
+                            <span
+                              className="text-[10px] px-2 py-0.5 rounded min-w-[56px] text-center font-medium"
+                              style={{ background: sc.bg, color: sc.text }}
                             >
-                              <span className="font-mono text-[11px] font-semibold text-muted-foreground min-w-[110px]">
-                                {q.quotation_no ?? "—"}
-                              </span>
-                              <span className="text-xs text-muted-foreground flex-1 truncate">
-                                {q.title ?? "—"}
-                              </span>
-                              <span className="text-xs font-medium min-w-[80px] text-right">
-                                {q.grand_total
-                                  ? `฿${Number(q.grand_total).toLocaleString()}`
-                                  : "—"}
-                              </span>
-                              <span
-                                className="text-[10px] px-2 py-0.5 rounded min-w-[56px] text-center font-medium"
-                                style={{ background: sc.bg, color: sc.text }}
-                              >
-                                {STATUS_LABEL[q.status] ?? q.status}
-                              </span>
+                              {STATUS_LABEL[q.status] ?? q.status}
+                            </span>
                             {q.flowaccount_url && (
                               <a
                                 href={q.flowaccount_url}
@@ -889,43 +865,40 @@ function DealsTab({
                                 rel="noreferrer"
                                 className="text-[11px] text-primary hover:underline shrink-0"
                               >
-                                  ดู
-                                </a>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                                ดู
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
-                    {/* Subtotal */}
-                    {qts.length > 0 && (
-                      <div className="flex justify-between items-center px-3 py-2 border-t mt-2">
-                        <span className="text-[11px] text-muted-foreground">
-                          รวมในดีลนี้
-                        </span>
-                        <span className="text-[13px] font-medium">
-                          ฿{leadTotal.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  {/* Subtotal */}
+                  {qts.length > 0 && (
+                    <div className="flex justify-between items-center px-3 py-2 border-t mt-2">
+                      <span className="text-[11px] text-muted-foreground">รวมในดีลนี้</span>
+                      <span className="text-[13px] font-medium">
+                        ฿{leadQtTotal.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })
-      )}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {/* Grand total */}
       {leads.length > 0 && (
-        <div className="flex items-center justify-between rounded-xl border bg-muted/20 px-4 py-3 mt-2">
+        <div className="flex items-center justify-between rounded-xl border bg-muted/20 px-4 py-3">
           <div>
             <div className="text-[13px] text-muted-foreground">
               มูลค่ารวมทั้งหมด (จากใบเสนอราคา)
             </div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
-              จาก {qtCount} ใบเสนอราคา ใน {leads.length} deals
+              จาก {allQTs.length} ใบเสนอราคา ใน {leads.length} deals
             </div>
           </div>
           <div className="text-xl font-medium">฿{totalQT.toLocaleString()}</div>
@@ -934,6 +907,7 @@ function DealsTab({
     </div>
   );
 }
+
 
 function SummaryCard({
   label,
