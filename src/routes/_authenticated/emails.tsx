@@ -167,7 +167,7 @@ function RecipientSelector({
         .or(`name.ilike.%${q}%,email.ilike.%${q}%,account_id.in.(${
           // also search by company name
           await crmDb().from("accounts").select("id").ilike("name", `%${q}%`).limit(20)
-            .then(r => (r.data ?? []).map((a: any) => a.id).join(",") || "00000000-0000-0000-0000-000000000000")
+            .then((r: any) => (r.data ?? []).map((a: any) => a.id).join(",") || "00000000-0000-0000-0000-000000000000")
         })`)
         .limit(20);
       const accountIds = [...new Set((data ?? []).map((c: any) => c.account_id).filter(Boolean))];
