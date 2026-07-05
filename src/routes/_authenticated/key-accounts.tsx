@@ -43,7 +43,6 @@ interface KeyAccount {
   industry: string | null;
   owner_id: string | null;
   is_key_account: boolean;
-  owner?: { full_name: string | null } | null;
   leads?: {
     id: string;
     title: string;
@@ -61,6 +60,7 @@ interface KeyAccount {
   }[];
   target?: KeyAccountTarget[];
 }
+
 
 
 interface ActivityRow {
@@ -106,6 +106,7 @@ function KeyAccountsPage() {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<KeyAccount[]>([]);
   const [activities, setActivities] = useState<ActivityRow[]>([]);
+  const [profileMap, setProfileMap] = useState<Map<string, string | null>>(new Map());
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("ทั้งหมด");
   const [selected, setSelected] = useState<KeyAccount | null>(null);
@@ -113,6 +114,7 @@ function KeyAccountsPage() {
   const [logOpen, setLogOpen] = useState(false);
   const [logType, setLogType] = useState("meeting");
   const [logNote, setLogNote] = useState("");
+
 
   const load = async () => {
     const now = new Date();
@@ -134,7 +136,6 @@ function KeyAccountsPage() {
       crmDb().from("user_profiles").select("id, full_name"),
     ]);
 
-
     if (accRes.error) {
       toast.error("โหลด Key Accounts ไม่สำเร็จ");
       return;
@@ -143,10 +144,11 @@ function KeyAccountsPage() {
     const profileMap = new Map<string, string | null>(
       (profilesRes.data ?? []).map((p: any) => [p.id, p.full_name]),
     );
+    setProfileMap(profileMap);
+
     const raw = (accRes.data ?? []) as any[];
     const accs: KeyAccount[] = raw.map((a) => ({
       ...a,
-      owner: a.owner_id ? { full_name: profileMap.get(a.owner_id) ?? null } : null,
     }));
 
     const leadIds = accs.flatMap((a) => (a.leads ?? []).map((l) => l.id)).filter(Boolean);
@@ -165,6 +167,7 @@ function KeyAccountsPage() {
     setActivities(acts);
     setSelected((prev) => (prev ? accs.find((a) => a.id === prev.id) ?? null : null));
   };
+
 
 
   useEffect(() => {
@@ -363,7 +366,7 @@ function KeyAccountsPage() {
                     {acc.name}
                   </div>
                   <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                    {acc.owner?.full_name ?? "—"}
+                    {acc.owner_id ? profileMap.get(acc.owner_id) ?? "—" : "—"}
                   </div>
                 </div>
                 <div
@@ -399,7 +402,7 @@ function KeyAccountsPage() {
                   {selected.name}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                  {selected.industry ?? "—"} · {selected.owner?.full_name ?? "—"}
+                  {selected.industry ?? "—"} · {selected.owner_id ? profileMap.get(selected.owner_id) ?? "—" : "—"}
                 </div>
               </div>
               <Button size="sm" onClick={() => setLogOpen(true)}>
