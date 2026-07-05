@@ -2,6 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Search, Plus, Building2, Crown, Trash2, Download, ExternalLink } from "lucide-react";
 import { RowActions, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
+import { AccountEmailDialog } from "@/components/accounts/AccountEmailDialog";
+import { Mail } from "lucide-react";
 import { exportToCsv, accountsToRows } from "@/lib/export-csv";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -78,6 +80,7 @@ function AccountsPage() {
   const [q, setQ] = useState("");
   const [industryFilter, setIndustryFilter] = useState("ทั้งหมด");
   const [newOpen, setNewOpen] = useState(false);
+  const [emailTarget, setEmailTarget] = useState<{ id: string; name: string } | null>(null);
 
   const load = async () => {
     // Supabase default limit = 1,000 — must fetch all pages manually
@@ -294,11 +297,20 @@ function AccountsPage() {
                       </td>
 
                       <td className="px-3 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                        <RowActions actions={[
-                          stdOpen(() => navigate({ to: "/accounts/$accountId", params: { accountId: a.id } })),
-                          stdDupe(() => duplicateAccount(a)),
-                          ...(canDelete ? [stdDelete(() => deleteAccount(a.id))] : []),
-                        ]} />
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setEmailTarget({ id: a.id, name: a.name }); }}
+                            title="ส่งอีเมล"
+                            className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                          </button>
+                          <RowActions actions={[
+                            stdOpen(() => navigate({ to: "/accounts/$accountId", params: { accountId: a.id } })),
+                            stdDupe(() => duplicateAccount(a)),
+                            ...(canDelete ? [stdDelete(() => deleteAccount(a.id))] : []),
+                          ]} />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -320,6 +332,16 @@ function AccountsPage() {
       <p className="text-xs text-muted-foreground text-center">
         คลิกแถวเพื่อดูรายละเอียดบริษัท
       </p>
+
+      {/* Email dialog */}
+      {emailTarget && (
+        <AccountEmailDialog
+          open={!!emailTarget}
+          onOpenChange={(v) => { if (!v) setEmailTarget(null); }}
+          accountId={emailTarget.id}
+          accountName={emailTarget.name}
+        />
+      )}
 
       <NewAccountDialog open={newOpen} onOpenChange={setNewOpen} onSaved={() => { setNewOpen(false); load(); }} />
     </div>
