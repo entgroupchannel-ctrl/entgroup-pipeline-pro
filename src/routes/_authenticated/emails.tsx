@@ -257,30 +257,30 @@ function RecipientSelector({
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <Label className="text-xs shrink-0">ผู้รับ</Label>
-        {/* Mode toggle */}
-        <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-0.5 ml-auto">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <Label className="text-sm font-semibold shrink-0">ผู้รับอีเมล</Label>
+        {/* Mode toggle — segmented control matching ปฏิทิน/รายการ style */}
+        <div className="inline-flex items-center rounded-xl border border-border bg-muted/40 p-1 shadow-sm">
           <button
             onClick={() => { onModeChange("contact"); onClear(); setQuery(""); setResults([]); }}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
               mode === "contact"
-                ? "bg-background shadow-sm text-foreground"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary text-primary-foreground shadow-md"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/60"
             }`}
           >
-            <Users className="h-3 w-3" /> รายชื่อ
+            <Users className="h-4 w-4" /> รายชื่อผู้ติดต่อ
           </button>
           <button
             onClick={() => { onModeChange("lead"); onClear(); setQuery(""); setResults([]); }}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
               mode === "lead"
-                ? "bg-background shadow-sm text-foreground"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary text-primary-foreground shadow-md"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/60"
             }`}
           >
-            <Briefcase className="h-3 w-3" /> ดีล/Lead
+            <Briefcase className="h-4 w-4" /> ดีล / Lead
           </button>
         </div>
       </div>
@@ -961,10 +961,15 @@ function EmailsPage() {
             </div>
 
             {/* Send button */}
-            <Button onClick={handleSend} disabled={sending || !to || !subject || !body} className="w-full">
+            <Button
+              onClick={handleSend}
+              disabled={sending || !to || !subject || !body}
+              size="lg"
+              className="w-full h-12 text-base font-semibold shadow-md hover:shadow-lg transition-shadow"
+            >
               {sending
-                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังส่ง…</>
-                : <><Send className="mr-2 h-4 w-4" />ส่งอีเมล{pendingAttachments.length > 0 ? ` (${pendingAttachments.length} ไฟล์แนบ)` : ""}</>}
+                ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />กำลังส่ง…</>
+                : <><Send className="mr-2 h-5 w-5" />ส่งอีเมล{pendingAttachments.length > 0 ? ` (${pendingAttachments.length} ไฟล์แนบ)` : ""}</>}
             </Button>
           </div>
         </div>
