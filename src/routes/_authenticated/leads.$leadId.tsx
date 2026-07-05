@@ -1027,7 +1027,7 @@ function CallDialog({ open, onOpenChange, contactPhone, leadId, ownerId, onLogge
   );
 }
 
-function LineDialog({ open, onOpenChange, contactLineId, leadId, ownerId, onLogged }: { open: boolean; onOpenChange: (v: boolean) => void; contactLineId: string | null; leadId: string; ownerId: string | null; onLogged: () => void }) {
+function LineDialog({ open, onOpenChange, contactLineId, contactLineName, leadId, ownerId, onLogged }: { open: boolean; onOpenChange: (v: boolean) => void; contactLineId: string | null; contactLineName: string | null; leadId: string; ownerId: string | null; onLogged: () => void }) {
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -1051,16 +1051,16 @@ function LineDialog({ open, onOpenChange, contactLineId, leadId, ownerId, onLogg
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>ส่ง LINE</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           {contactLineId && (
             <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2">
-              <span className="text-sm font-medium text-[#06C755]">{contactLineId}</span>
+              <span className="text-sm font-medium">{contactLineName ?? contactLineId ?? "ไม่ทราบ LINE ID"}</span>
               <a
-                href={`https://line.me/ti/p/${contactLineId}`}
+                href={`https://line.me/ti/p/~${contactLineId}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-md bg-[#06C755] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#05a847]"
@@ -1069,6 +1069,7 @@ function LineDialog({ open, onOpenChange, contactLineId, leadId, ownerId, onLogg
               </a>
             </div>
           )}
+          {contactLineId && <p className="text-xs text-muted-foreground">LINE: {contactLineId}</p>}
           <div>
             <Label className="text-xs">บันทึกข้อความที่ส่ง</Label>
             <Textarea rows={3} placeholder="สรุปข้อความที่ส่งไป..." value={body} onChange={(e) => setBody(e.target.value)} />
