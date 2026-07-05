@@ -112,18 +112,24 @@ function RecipientSelector({
   const loadRecent = async () => {
     setSearching(true);
     if (mode === "contact") {
+      // Load contacts that have email first, then recent
       const { data } = await crmDb()
         .from("contacts")
         .select("id, name, email, position, account_id")
+        .not("email", "is", null)
         .order("created_at", { ascending: false })
         .limit(20);
       const accountIds = [...new Set((data ?? []).map((c: any) => c.account_id).filter(Boolean))];
-      let accountMap: Record<string, string> = {};
+      let accountMap: Record<string, {name:string; industry:string|null}> = {};
       if (accountIds.length) {
-        const { data: accs } = await crmDb().from("accounts").select("id,name").in("id", accountIds);
-        accountMap = Object.fromEntries((accs ?? []).map((a: any) => [a.id, a.name]));
+        const { data: accs } = await crmDb().from("accounts").select("id,name,industry").in("id", accountIds);
+        accountMap = Object.fromEntries((accs ?? []).map((a: any) => [a.id, {name: a.name, industry: a.industry}]));
       }
-      const enriched = (data ?? []).map((c: any) => ({ ...c, company_name: accountMap[c.account_id] ?? "" }));
+      const enriched = (data ?? []).map((c: any) => ({
+        ...c,
+        company_name: accountMap[c.account_id]?.name ?? "",
+        industry: accountMap[c.account_id]?.industry ?? "",
+      }));
       setAllItems(enriched);
       setResults(enriched);
     } else {
@@ -161,22 +167,30 @@ function RecipientSelector({
     if (!q.trim() || q.trim().length < 2) { setResults(allItems); return; }
     setSearching(true);
     if (mode === "contact") {
+      // Search accounts by name first
+      const { data: accsByName } = await crmDb().from("accounts").select("id,name,industry").ilike("name", `%${q}%`).limit(20);
+      const accIds = (accsByName ?? []).map((a: any) => a.id);
+      const accIdStr = accIds.length > 0 ? accIds.join(",") : "00000000-0000-0000-0000-000000000000";
+
       const { data } = await crmDb()
         .from("contacts")
         .select("id, name, email, position, account_id")
-        .or(`name.ilike.%${q}%,email.ilike.%${q}%,account_id.in.(${
-          // also search by company name
-          await crmDb().from("accounts").select("id").ilike("name", `%${q}%`).limit(20)
-            .then((r: any) => (r.data ?? []).map((a: any) => a.id).join(",") || "00000000-0000-0000-0000-000000000000")
-        })`)
+        .or(`name.ilike.%${q}%,email.ilike.%${q}%,account_id.in.(${accIdStr})`)
         .limit(20);
-      const accountIds = [...new Set((data ?? []).map((c: any) => c.account_id).filter(Boolean))];
-      let accountMap: Record<string, string> = {};
-      if (accountIds.length) {
-        const { data: accs } = await crmDb().from("accounts").select("id,name").in("id", accountIds);
-        accountMap = Object.fromEntries((accs ?? []).map((a: any) => [a.id, a.name]));
+
+      const accountIds = [...new Set((data ?? []).map((c: any) => c.account_id).filter(Boolean))] as string[];
+      let accountMap: Record<string, {name:string; industry:string|null}> = {};
+      for (const a of (accsByName ?? [])) accountMap[a.id] = {name: a.name, industry: a.industry};
+      const remaining = accountIds.filter((id) => !accountMap[id]);
+      if (remaining.length) {
+        const { data: accs } = await crmDb().from("accounts").select("id,name,industry").in("id", remaining);
+        for (const a of (accs ?? [])) accountMap[a.id] = {name: a.name, industry: a.industry};
       }
-      setResults((data ?? []).map((c: any) => ({ ...c, company_name: accountMap[c.account_id] ?? "" })));
+      setResults((data ?? []).map((c: any) => ({
+        ...c,
+        company_name: accountMap[c.account_id]?.name ?? "",
+        industry: accountMap[c.account_id]?.industry ?? "",
+      })));
     } else {
       // Search accounts first
       const { data: matchedAccs } = await crmDb().from("accounts").select("id,name").ilike("name", `%${q}%`).limit(20);
@@ -287,9 +301,12 @@ function RecipientSelector({
               </>
             ) : (
               <>
-                <div className="text-sm font-medium truncate">{selected.name}</div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {selected.company_name ? `${selected.company_name} · ` : ""}{to || "ไม่มีอีเมล"}
+                <div className="text-sm font-semibold truncate">{selected.company_name || selected.name}</div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span>{selected.name}</span>
+                  {selected.position && <span>· {selected.position}</span>}
+                  <span>·</span>
+                  {to ? <span className="text-primary/70">{to}</span> : <span className="text-amber-600">ไม่มีอีเมล</span>}
                 </div>
               </>
             )}
@@ -355,9 +372,16 @@ function RecipientSelector({
                     <>
                       <Users className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium">{item.name}</div>
+                        {/* Row 1: company name (primary) */}
+                        <div className="text-sm font-semibold truncate">{item.company_name || "—"}</div>
+                        {/* Row 2: contact name + position */}
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          {item.company_name && <span>{item.company_name} ·</span>}
+                          <span className="font-medium text-foreground/70">{item.name}</span>
+                          {item.position && <span>· {item.position}</span>}
+                          {item.industry && <span className="rounded bg-muted px-1 text-[10px]">{item.industry}</span>}
+                        </div>
+                        {/* Row 3: email */}
+                        <div className="text-xs mt-0.5">
                           {item.email ? (
                             <span className="text-primary/70">{item.email}</span>
                           ) : (
