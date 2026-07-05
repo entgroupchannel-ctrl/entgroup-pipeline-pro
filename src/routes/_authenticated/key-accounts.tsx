@@ -9,6 +9,7 @@ import {
   Mail,
   FileText,
   Users,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { crmDb } from "@/lib/crm";
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+
 
 export const Route = createFileRoute("/_authenticated/key-accounts")({
   component: KeyAccountsPage,
@@ -42,9 +44,24 @@ interface KeyAccount {
   owner_id: string | null;
   is_key_account: boolean;
   owner?: { full_name: string | null } | null;
-  leads?: { id: string; expected_value: number | null }[];
+  leads?: {
+    id: string;
+    title: string;
+    stage: string;
+    expected_value: number | null;
+    created_at: string;
+    quotations: {
+      id: string;
+      quotation_no: string | null;
+      title: string | null;
+      grand_total: number | null;
+      status: string | null;
+      flowaccount_quotation_url: string | null;
+    }[];
+  }[];
   target?: KeyAccountTarget[];
 }
+
 
 interface ActivityRow {
   lead_id: string;
@@ -106,13 +123,17 @@ function KeyAccountsPage() {
         .from("accounts")
         .select(
           `id, name, industry, owner_id, is_key_account,
-           leads ( id, expected_value ),
+           leads (
+             id, title, stage, expected_value, created_at,
+             quotations ( id, quotation_no, title, grand_total, status, flowaccount_quotation_url )
+           ),
            target:key_account_targets ( visit_target, call_target, line_target, email_target, quote_target )`,
         )
         .eq("is_key_account", true)
         .order("name"),
       crmDb().from("user_profiles").select("id, full_name"),
     ]);
+
 
     if (accRes.error) {
       toast.error("โหลด Key Accounts ไม่สำเร็จ");
@@ -156,7 +177,10 @@ function KeyAccountsPage() {
     return activities.filter((a) => ids.has(a.lead_id));
   };
 
+  const getAccLeads = (acc: KeyAccount) => (acc as any).leads ?? [];
+
   const filteredAccounts = useMemo(() => {
+
     const ql = q.trim().toLowerCase();
     return accounts.filter((a) => {
       if (ql && !a.name.toLowerCase().includes(ql)) return false;
@@ -425,10 +449,13 @@ function KeyAccountsPage() {
               </div>
             )}
             {tab === "ดีลที่เกี่ยวข้อง" && (
-              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                {selected.leads?.length ?? 0} ดีล
-              </div>
+              <DealsTab
+                account={selected}
+                leads={getAccLeads(selected)}
+                onAddDeal={() => {/* navigate to pipeline */}}
+              />
             )}
+
             {tab === "บันทึก" && (
               <div style={{ fontSize: 12, color: "var(--text-muted)" }}>ยังไม่มีบันทึก</div>
             )}
@@ -590,6 +617,316 @@ function ActivityTab({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function DealsTab({
+  account,
+  leads,
+  onAddDeal,
+}: {
+  account: KeyAccount;
+  leads: any[];
+  onAddDeal: () => void;
+}) {
+  const STAGE_LABEL: Record<string, string> = {
+    new: "ใหม่",
+    qualified: "คัดกรอง",
+    proposal: "เสนอราคา",
+    negotiation: "เจรจา",
+    closing: "ปิดขาย",
+    won: "ชนะ",
+    lost: "แพ้",
+  };
+
+  const STAGE_PCT: Record<string, number> = {
+    new: 10,
+    qualified: 25,
+    proposal: 45,
+    negotiation: 65,
+    closing: 85,
+    won: 100,
+    lost: 0,
+  };
+
+  const STAGE_COLOR: Record<string, string> = {
+    new: "#888780",
+    qualified: "#378ADD",
+    proposal: "#639922",
+    negotiation: "#185FA5",
+    closing: "#BA7517",
+    won: "#3B6D11",
+    lost: "#E24B4A",
+  };
+
+  const STATUS_LABEL: Record<string, string> = {
+    draft: "ร่าง",
+    sent: "ส่งแล้ว",
+    accepted: "อนุมัติ",
+    rejected: "ปฏิเสธ",
+    cancelled: "ยกเลิก",
+  };
+
+  const STATUS_COLOR: Record<string, { bg: string; text: string }> = {
+    draft: { bg: "#F1EFE8", text: "#5F5E5A" },
+    sent: { bg: "#E6F1FB", text: "#185FA5" },
+    accepted: { bg: "#EAF3DE", text: "#27500A" },
+    rejected: { bg: "#FCEBEB", text: "#A32D2D" },
+    cancelled: { bg: "#F1EFE8", text: "#5F5E5A" },
+  };
+
+  const activeLeads = leads.filter((l) => l.stage !== "lost");
+  const wonLeads = leads.filter((l) => l.stage === "won");
+
+  const totalExpected = activeLeads.reduce(
+    (s: number, l: any) => s + Number(l.expected_value ?? 0),
+    0,
+  );
+
+  const totalWon = wonLeads.reduce(
+    (s: number, l: any) => s + Number(l.expected_value ?? 0),
+    0,
+  );
+
+  const totalQT = leads.reduce(
+    (s: number, l: any) =>
+      s +
+      (l.quotations ?? []).reduce(
+        (qs: number, q: any) => qs + Number(q.grand_total ?? 0),
+        0,
+      ),
+    0,
+  );
+
+  const qtCount = leads.reduce(
+    (s: number, l: any) => s + (l.quotations ?? []).length,
+    0,
+  );
+
+  const [expanded, setExpanded] = useState<Set<string>>(
+    new Set([leads[0]?.id].filter(Boolean)),
+  );
+
+  const toggle = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Summary bar */}
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { label: "deals ทั้งหมด", value: leads.length, sub: "รายการ" },
+          { label: "ใบเสนอราคา", value: qtCount, sub: "รายการ" },
+          {
+            label: "มูลค่าคาดหวัง",
+            value: `฿${totalExpected.toLocaleString()}`,
+            sub: "active deals",
+            color: "#185FA5",
+          },
+          {
+            label: "ชนะแล้ว",
+            value: `฿${totalWon.toLocaleString()}`,
+            sub: `${wonLeads.length} deal`,
+            color: "#3B6D11",
+          },
+        ].map(({ label, value, sub, color }) => (
+          <div key={label} className="rounded-lg bg-muted/40 p-3">
+            <div className="text-[11px] text-muted-foreground mb-1">{label}</div>
+            <div className="text-lg font-medium" style={color ? { color } : {}}>
+              {value}
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Section header */}
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+          โอกาสขาย (Opportunities)
+        </span>
+        <button
+          onClick={onAddDeal}
+          className="flex items-center gap-1 text-xs border rounded px-2.5 py-1 hover:bg-muted transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" /> เพิ่มดีล
+        </button>
+      </div>
+
+      {/* Deal cards */}
+      {leads.length === 0 ? (
+        <div className="text-center py-10 text-sm text-muted-foreground">
+          ยังไม่มีดีลสำหรับ Account นี้
+        </div>
+      ) : (
+        leads.map((lead: any) => {
+          const isOpen = expanded.has(lead.id);
+          const qts: any[] = lead.quotations ?? [];
+          const leadTotal = qts.reduce(
+            (s: number, q: any) => s + Number(q.grand_total ?? 0),
+            0,
+          );
+          const pct = STAGE_PCT[lead.stage] ?? 0;
+          const stageColor = STAGE_COLOR[lead.stage] ?? "#888780";
+          const isWon = lead.stage === "won";
+          const isLost = lead.stage === "lost";
+
+          return (
+            <div
+              key={lead.id}
+              className="rounded-xl border bg-card overflow-hidden"
+              style={{ opacity: isWon || isLost ? 0.7 : 1 }}
+            >
+              {/* Header */}
+              <div
+                className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors border-b"
+                onClick={() => toggle(lead.id)}
+              >
+                <div
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold shrink-0"
+                  style={{ background: `${stageColor}20`, color: stageColor }}
+                >
+                  {(lead.title ?? "?").slice(0, 2).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-medium truncate">
+                    {lead.title}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    {qts.length} ใบเสนอราคา
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-sm font-medium">
+                    {lead.expected_value
+                      ? `฿${Number(lead.expected_value).toLocaleString()}`
+                      : "—"}
+                  </div>
+                  <span
+                    className="inline-block text-[10px] px-2 py-0.5 rounded font-medium mt-1"
+                    style={{ background: `${stageColor}20`, color: stageColor }}
+                  >
+                    {STAGE_LABEL[lead.stage] ?? lead.stage}
+                  </span>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 text-muted-foreground transition-transform shrink-0 ${
+                    isOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </div>
+
+              {/* Body (expanded) */}
+              {isOpen && (
+                <div className="px-4 pb-4">
+                  {/* Progress bar */}
+                  {!isLost && (
+                    <div className="mt-3">
+                      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${pct}%`, background: stageColor }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
+                        {["ใหม่", "คัดกรอง", "เสนอราคา", "เจรจา", "ปิดขาย"].map((s) => (
+                          <span key={s}>{s}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Quotations */}
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                        ใบเสนอราคาในดีลนี้
+                      </span>
+                    </div>
+                    {qts.length === 0 ? (
+                      <div className="text-center py-3 text-xs text-muted-foreground border rounded-lg">
+                        ยังไม่มีใบเสนอราคา
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        {qts.map((q: any) => {
+                          const sc = STATUS_COLOR[q.status] ?? STATUS_COLOR.draft;
+                          return (
+                            <div
+                              key={q.id}
+                              className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2"
+                            >
+                              <span className="font-mono text-[11px] font-semibold text-muted-foreground min-w-[110px]">
+                                {q.quotation_no ?? "—"}
+                              </span>
+                              <span className="text-xs text-muted-foreground flex-1 truncate">
+                                {q.title ?? "—"}
+                              </span>
+                              <span className="text-xs font-medium min-w-[80px] text-right">
+                                {q.grand_total
+                                  ? `฿${Number(q.grand_total).toLocaleString()}`
+                                  : "—"}
+                              </span>
+                              <span
+                                className="text-[10px] px-2 py-0.5 rounded min-w-[56px] text-center font-medium"
+                                style={{ background: sc.bg, color: sc.text }}
+                              >
+                                {STATUS_LABEL[q.status] ?? q.status}
+                              </span>
+                              {q.flowaccount_quotation_url && (
+                                <a
+                                  href={q.flowaccount_quotation_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[11px] text-primary hover:underline shrink-0"
+                                >
+                                  ดู
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Subtotal */}
+                    {qts.length > 0 && (
+                      <div className="flex justify-between items-center px-3 py-2 border-t mt-2">
+                        <span className="text-[11px] text-muted-foreground">
+                          รวมในดีลนี้
+                        </span>
+                        <span className="text-[13px] font-medium">
+                          ฿{leadTotal.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+
+      {/* Grand total */}
+      {leads.length > 0 && (
+        <div className="flex items-center justify-between rounded-xl border bg-muted/20 px-4 py-3 mt-2">
+          <div>
+            <div className="text-[13px] text-muted-foreground">
+              มูลค่ารวมทั้งหมด (จากใบเสนอราคา)
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              จาก {qtCount} ใบเสนอราคา ใน {leads.length} deals
+            </div>
+          </div>
+          <div className="text-xl font-medium">฿{totalQT.toLocaleString()}</div>
+        </div>
+      )}
     </div>
   );
 }
