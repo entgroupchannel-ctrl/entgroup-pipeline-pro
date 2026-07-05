@@ -17,6 +17,7 @@ import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { formatThaiDate } from "@/lib/format";
 import { ListPagination, usePagination } from "@/components/list-pagination";
+import { usePermissions } from "@/lib/permissions";
 
 export const Route = createFileRoute("/_authenticated/accounts/")({
   component: AccountsPage,
@@ -86,6 +87,9 @@ function AccountsPage() {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const isManager = role === "manager" || role === "admin";
+  const { can } = usePermissions();
+  const canCreate = can("account.create");
+  const canDelete = can("account.delete");
   const isAdmin = role === "admin"; // admin = super admin (highest role)
 
   const [accounts, setAccounts] = useState<Account[] | null>(null);
@@ -226,9 +230,11 @@ function AccountsPage() {
               <Download className="mr-1.5 h-4 w-4" /> Export CSV
             </Button>
           )}
-          <Button size="sm" onClick={() => setNewOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" /> เพิ่มบริษัท
-          </Button>
+          {canCreate && (
+            <Button size="sm" onClick={() => setNewOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" /> เพิ่มบริษัท
+            </Button>
+          )}
         </div>
       </div>
 
@@ -270,7 +276,7 @@ function AccountsPage() {
         total={filtered?.length ?? 0}
         onSelectAll={selectAll}
         onClearAll={clearAll}
-        actions={[{ label: "ลบที่เลือก", icon: <Trash2 className="h-3.5 w-3.5" />, onClick: bulkDelete, variant: "danger" }]}
+        actions={canDelete ? [{ label: "ลบที่เลือก", icon: <Trash2 className="h-3.5 w-3.5" />, onClick: bulkDelete, variant: "danger" }] : []}
       />
 
       {filtered === null ? (
@@ -400,7 +406,7 @@ function AccountsPage() {
                         <RowActions actions={[
                           stdOpen(() => navigate({ to: "/accounts/$accountId", params: { accountId: a.id } })),
                           stdDupe(() => duplicateAccount(a)),
-                          stdDelete(() => deleteAccount(a.id)),
+                          ...(canDelete ? [stdDelete(() => deleteAccount(a.id))] : []),
                         ]} />
                       </td>
                     </tr>
