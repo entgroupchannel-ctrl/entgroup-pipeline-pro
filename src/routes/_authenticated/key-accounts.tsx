@@ -101,23 +101,33 @@ function KeyAccountsPage() {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    const accRes = await crmDb()
-      .from("accounts")
-      .select(
-        `id, name, industry, owner_id, is_key_account,
-         owner:owner_id ( full_name ),
-         leads ( id, expected_value ),
-         target:key_account_targets ( visit_target, call_target, line_target, email_target, quote_target )`,
-      )
-      .eq("is_key_account", true)
-      .order("name");
+    const [accRes, profilesRes] = await Promise.all([
+      crmDb()
+        .from("accounts")
+        .select(
+          `id, name, industry, owner_id, is_key_account,
+           leads ( id, expected_value ),
+           target:key_account_targets ( visit_target, call_target, line_target, email_target, quote_target )`,
+        )
+        .eq("is_key_account", true)
+        .order("name"),
+      crmDb().from("user_profiles").select("id, full_name"),
+    ]);
 
     if (accRes.error) {
       toast.error("โหลด Key Accounts ไม่สำเร็จ");
       return;
     }
 
-    const accs = (accRes.data ?? []) as unknown as KeyAccount[];
+    const profileMap = new Map<string, string | null>(
+      (profilesRes.data ?? []).map((p: any) => [p.id, p.full_name]),
+    );
+    const raw = (accRes.data ?? []) as any[];
+    const accs: KeyAccount[] = raw.map((a) => ({
+      ...a,
+      owner: a.owner_id ? { full_name: profileMap.get(a.owner_id) ?? null } : null,
+    }));
+
     const leadIds = accs.flatMap((a) => (a.leads ?? []).map((l) => l.id)).filter(Boolean);
 
     let acts: ActivityRow[] = [];
@@ -134,6 +144,7 @@ function KeyAccountsPage() {
     setActivities(acts);
     setSelected((prev) => (prev ? accs.find((a) => a.id === prev.id) ?? null : null));
   };
+
 
   useEffect(() => {
     load();
