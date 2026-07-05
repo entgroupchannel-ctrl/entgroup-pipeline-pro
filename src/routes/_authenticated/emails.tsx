@@ -122,6 +122,7 @@ function EmailsPage() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [tplName, setTplName] = useState("");
   const [tplPickerOpen, setTplPickerOpen] = useState(false);
+  const [tplSearch, setTplSearch] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<{id:string;filename:string;mime_type:string;public_url:string;size:number}[]>([]);
 
   const loadTemplates = async () => {
@@ -284,36 +285,88 @@ function EmailsPage() {
     }
   };
 
+  // Template grouping (computed)
+  const CATS = ["แนะนำองค์กร","ใบเสนอราคา","Follow Up","สินค้าและบริการ","โปรโมชัน","ทั่วไป"];
+  const systemTpls   = templates.filter((t) => t.is_system);
+  const personalTpls = templates.filter((t) => !t.is_system);
+  const tplFiltered  = templates.filter((t) =>
+    !tplSearch.trim() ||
+    t.name.toLowerCase().includes(tplSearch.toLowerCase()) ||
+    t.category.toLowerCase().includes(tplSearch.toLowerCase())
+  );
+
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-            <Mail className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold">ส่งอีเมล</h1>
-            <p className="text-xs text-muted-foreground">ร่างด้วย AI แล้วส่งหาลูกค้าได้เลย</p>
+    <div className="flex h-full overflow-hidden">
+
+      {/* ── LEFT: Template panel ── */}
+      <div className="w-64 shrink-0 border-r bg-muted/10 flex flex-col overflow-hidden">
+        <div className="border-b px-4 py-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Email Templates</h2>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="ค้นหา template..."
+              value={tplSearch}
+              onChange={(e) => setTplSearch(e.target.value)}
+              className="pl-8 h-7 text-xs"
+            />
           </div>
         </div>
-
-        {/* AI status pill */}
-        {aiCfg && (
-          <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs border ${
-            aiReady
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-400"
-              : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-400"
-          }`}>
-            {aiReady
-              ? <CheckCircle2 className="h-3.5 w-3.5" />
-              : <AlertTriangle className="h-3.5 w-3.5" />}
-            {aiReady
-              ? `AI พร้อม · ${aiCfg.model.replace("claude-", "").replace("-4-6", " 4.6").replace("-4-5-20251001", " 4.5")}`
-              : "AI ยังไม่พร้อม"}
-          </div>
-        )}
+        <div className="flex-1 overflow-y-auto py-2">
+          {tplFiltered.length === 0 ? (
+            <p className="px-4 py-6 text-xs text-muted-foreground text-center">ไม่พบ template</p>
+          ) : (
+            <>
+              {/* System templates grouped by category */}
+              {CATS.map((cat) => {
+                const catTpls = tplFiltered.filter((t) => t.is_system && t.category === cat);
+                if (!catTpls.length) return null;
+                return (
+                  <div key={cat} className="mb-3">
+                    <p className="px-4 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">{cat}</p>
+                    {catTpls.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => applyTemplate(t)}
+                        className="flex w-full items-start gap-2 px-4 py-2.5 text-left hover:bg-primary/5 hover:text-primary transition-colors group"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate group-hover:text-primary">{t.name}</p>
+                          <p className="text-[10px] text-muted-foreground truncate mt-0.5">{t.subject}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+              {/* Personal templates */}
+              {personalTpls.filter((t) => !tplSearch.trim() || t.name.toLowerCase().includes(tplSearch.toLowerCase())).length > 0 && (
+                <div className="mb-3 border-t pt-2">
+                  <p className="px-4 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">ส่วนตัว</p>
+                  {personalTpls
+                    .filter((t) => !tplSearch.trim() || t.name.toLowerCase().includes(tplSearch.toLowerCase()))
+                    .map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => applyTemplate(t)}
+                        className="flex w-full items-start gap-2 px-4 py-2.5 text-left hover:bg-primary/5 hover:text-primary transition-colors group"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate group-hover:text-primary">{t.name}</p>
+                          <p className="text-[10px] text-muted-foreground truncate mt-0.5">{t.subject}</p>
+                        </div>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
+
+      {/* ── CENTER + RIGHT ── */}
+      <div className="flex-1 overflow-auto">
+      <div className="mx-auto max-w-4xl space-y-4 p-6">
 
       {/* AI config warning banner */}
       <AIStatusBanner aiCfg={aiCfg} role={role ?? "sales"} />
@@ -322,7 +375,19 @@ function EmailsPage() {
         {/* ── Compose panel ── */}
         <div className="lg:col-span-2 space-y-5">
           <div className="rounded-xl border bg-card p-5 space-y-4">
-            <h2 className="text-sm font-semibold">ร่างอีเมลใหม่</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold">ร่างอีเมลใหม่</h2>
+              {aiCfg && (
+                <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] border ${
+                  aiReady
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400"
+                    : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-400"
+                }`}>
+                  {aiReady ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                  {aiReady ? `AI พร้อม` : "AI ยังไม่พร้อม"}
+                </div>
+              )}
+            </div>
 
             {/* Contact search */}
             <div className="space-y-1.5">
@@ -388,52 +453,13 @@ function EmailsPage() {
             {/* Step compose */}
             {step === "compose" && (
               <>
-                {/* Template picker from DB */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs text-muted-foreground">เริ่มด้วย template</Label>
-                    <button onClick={() => setTplPickerOpen((v) => !v)} className="text-xs text-primary hover:underline">
-                      {tplPickerOpen ? "ซ่อน" : `ดู template ทั้งหมด (${templates.length})`}
-                    </button>
+                {/* Template hint — sidebar is the picker */}
+                {!subject && !body && (
+                  <div className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2.5 text-xs text-muted-foreground">
+                    <Mail className="h-3.5 w-3.5 shrink-0" />
+                    คลิก template ด้านซ้ายเพื่อเริ่มต้น หรือพิมพ์ข้อความที่ต้องการสื่อด้านล่าง
                   </div>
-                  {/* Quick pills — system templates only */}
-                  <div className="flex flex-wrap gap-1.5">
-                    {templates.filter((t) => t.is_system).slice(0, 5).map((t) => (
-                      <button key={t.id} onClick={() => applyTemplate(t)}
-                        className="rounded-full border px-2.5 py-1 text-xs hover:bg-muted hover:border-primary transition-colors">
-                        {t.name}
-                      </button>
-                    ))}
-                  </div>
-                  {/* Expanded template picker */}
-                  {tplPickerOpen && (
-                    <div className="rounded-xl border bg-card p-3 space-y-3 max-h-64 overflow-y-auto">
-                      {["แนะนำองค์กร","ใบเสนอราคา","Follow Up","สินค้าและบริการ","โปรโมชัน","ทั่วไป"].map((cat) => {
-                        const catTpls = templates.filter((t) => t.category === cat);
-                        if (!catTpls.length) return null;
-                        return (
-                          <div key={cat}>
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">{cat}</p>
-                            <div className="space-y-1">
-                              {catTpls.map((t) => (
-                                <button key={t.id} onClick={() => applyTemplate(t)}
-                                  className="flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left hover:bg-muted transition-colors group">
-                                  <span className={`mt-0.5 text-[10px] font-medium shrink-0 rounded px-1.5 py-0.5 ${t.is_system ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"}`}>
-                                    {t.is_system ? "กลาง" : "ส่วนตัว"}
-                                  </span>
-                                  <div className="min-w-0">
-                                    <p className="text-xs font-medium">{t.name}</p>
-                                    <p className="text-[10px] text-muted-foreground truncate">{t.subject}</p>
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                )}
 
                 <div className="space-y-1.5">
                   <Label>สิ่งที่ต้องการสื่อ</Label>
@@ -631,6 +657,9 @@ function EmailsPage() {
             )}
           </div>
         </div>
+      </div>
+
+      </div>
       </div>
 
       {/* Save template dialog */}
