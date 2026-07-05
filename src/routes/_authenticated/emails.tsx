@@ -616,6 +616,7 @@ function EmailsPage() {
           body:        body.trim(),
           lead_id:     leadId,
           contact_id:  recipientMode === "contact" ? selected?.id : selected?.contact_id,
+          source:      "emails_page",
           attachments: attachments.length > 0 ? attachments : undefined,
           cc:          cc.trim() || undefined,
           bcc:         bcc.trim() || undefined,
