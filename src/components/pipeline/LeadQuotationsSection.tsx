@@ -14,6 +14,7 @@ import {
   FAImportToQuotationDialog,
 } from "@/routes/_authenticated/quotations";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface Props {
   leadId: string;
@@ -22,6 +23,7 @@ interface Props {
 
 export function LeadQuotationsSection({ leadId, accountId }: Props) {
   const { role } = useAuth();
+  const confirm = useConfirm();
   const isManager = role === "manager" || role === "admin";
 
   const [rows, setRows] = useState<Quotation[]>([]);
@@ -51,7 +53,14 @@ export function LeadQuotationsSection({ leadId, accountId }: Props) {
   };
 
   const deleteQuotation = async (id: string) => {
-    if (!window.confirm("ลบใบเสนอราคานี้ออกจากรายการ?")) return;
+    const ok = await confirm({
+      title: "ลบใบเสนอราคา?",
+      description: "รายการนี้จะถูกลบออกจากระบบ ไม่สามารถกู้คืนได้",
+      confirmLabel: "ลบ",
+      cancelLabel: "ยกเลิก",
+      variant: "danger",
+    });
+    if (!ok) return;
     const { error } = await crmDb().from("quotations").delete().eq("id", id);
     if (error) return toast.error("ลบไม่สำเร็จ", { description: error.message });
     toast.success("ลบใบเสนอราคาแล้ว");
