@@ -6,18 +6,18 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const CRM_ROLES = ["sales", "manager", "admin"] as const;
 const SUPER_ADMIN_EMAILS = ["therdpoom@entgroup.co.th"];
 
-async function assertAdmin(userId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+async function assertAdmin(supabase: any, userId: string) {
   // super admin bypass
   try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u } = await supabaseAdmin.auth.admin.getUserById(userId);
     const email = (u?.user?.email ?? "").toLowerCase();
     if (SUPER_ADMIN_EMAILS.includes(email)) return;
   } catch { /* fall through */ }
-  // check crm.user_profiles role
-  const { data, error } = await supabaseAdmin
-    .schema("crm" as any)
-    .from("user_profiles" as any)
+  // check crm.user_profiles role (authenticated user client, RLS applies)
+  const { data, error } = await (supabase as any)
+    .schema("crm")
+    .from("user_profiles")
     .select("role")
     .eq("id", userId)
     .maybeSingle();
@@ -53,7 +53,7 @@ export const inviteCrmUser = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // find or create auth user
@@ -164,7 +164,7 @@ export const inviteCrmUser = createServerFn({ method: "POST" })
 export const listPendingInvites = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 500 });
     if (error) throw new Error(error.message);
@@ -183,7 +183,7 @@ export const resendCrmInvite = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ email: z.string().trim().email() }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email);
     if (error) throw new Error(error.message);
@@ -196,7 +196,7 @@ export const deactivateCrmUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ user_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     if (data.user_id === context.userId) throw new Error("ปิดบัญชีตัวเองไม่ได้");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin

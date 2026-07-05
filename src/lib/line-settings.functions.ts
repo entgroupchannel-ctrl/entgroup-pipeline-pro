@@ -3,11 +3,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-async function assertAdmin(userId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await (supabaseAdmin as any)
+async function assertAdmin(supabase: any, userId: string) {
+  const { data, error } = await (supabase as any)
     .schema("crm").from("user_profiles")
     .select("role").eq("id", userId).maybeSingle();
+  if (error) throw new Error(`ตรวจสอบสิทธิ์ไม่สำเร็จ: ${error.message}`);
   if ((data as any)?.role !== "admin") throw new Error("Forbidden: admin only");
 }
 
@@ -28,7 +28,7 @@ function mask(v: string | null | undefined) {
 export const loadLineSettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const row = await loadRow(supabaseAdmin);
     return {
@@ -65,7 +65,7 @@ export const saveLineSettings = createServerFn({ method: "POST" })
     }).parse(input)
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const payload: Record<string, any> = {
@@ -100,7 +100,7 @@ export const saveLineSettings = createServerFn({ method: "POST" })
 export const testLineConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const row = await loadRow(supabaseAdmin);
 
@@ -137,7 +137,7 @@ export const testLineConnection = createServerFn({ method: "POST" })
 export const loadLineMappings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data, error } = await (supabaseAdmin as any)
@@ -165,7 +165,7 @@ export const saveLineMapping = createServerFn({ method: "POST" })
     }).parse(input)
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error } = await (supabaseAdmin as any)
@@ -190,7 +190,7 @@ export const deleteLineMapping = createServerFn({ method: "POST" })
     z.object({ line_uid: z.string().min(1) }).parse(input)
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error } = await (supabaseAdmin as any)
