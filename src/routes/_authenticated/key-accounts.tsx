@@ -10,6 +10,8 @@ import {
   FileText,
   Users,
   ChevronDown,
+  FileDown,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { crmDb } from "@/lib/crm";
@@ -23,6 +25,16 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { fetchFADocuments, type FADocument } from "@/lib/flowaccount-client";
+
 
 
 export const Route = createFileRoute("/_authenticated/key-accounts")({
