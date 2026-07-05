@@ -123,13 +123,17 @@ function KeyAccountsPage() {
         .from("accounts")
         .select(
           `id, name, industry, owner_id, is_key_account,
-           leads ( id, expected_value ),
+           leads (
+             id, title, stage, expected_value, created_at,
+             quotations ( id, quotation_no, title, grand_total, status, flowaccount_quotation_url )
+           ),
            target:key_account_targets ( visit_target, call_target, line_target, email_target, quote_target )`,
         )
         .eq("is_key_account", true)
         .order("name"),
       crmDb().from("user_profiles").select("id, full_name"),
     ]);
+
 
     if (accRes.error) {
       toast.error("โหลด Key Accounts ไม่สำเร็จ");
