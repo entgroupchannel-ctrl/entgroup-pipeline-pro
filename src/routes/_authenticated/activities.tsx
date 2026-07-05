@@ -91,6 +91,11 @@ function ActivitiesPage() {
     }
   }, [rows, filter]);
 
+  const {
+    page, setPage, pageSize, setPageSize, totalPages,
+    total: pagedTotal, paged: pageItems,
+  } = usePagination(filtered ?? [], 25);
+
   return (
     <div className="p-6 page-fade-in">
       <div className="mb-4">
