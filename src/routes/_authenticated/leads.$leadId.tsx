@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_authenticated/leads/$leadId")({
 
 const PIPELINE_STAGES: LeadStage[] = ACTIVE_STAGES;
 
-interface UP { id: string; full_name: string | null; role: string; email?: string | null }
+interface UP { id: string; full_name: string | null; role: string; email?: string | null; is_active?: boolean | null }
 
 function LeadDetailPage() {
   const { leadId } = Route.useParams();
