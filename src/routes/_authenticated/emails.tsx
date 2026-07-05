@@ -103,38 +103,36 @@ function RecipientSelector({
   to, onToChange, toName, onToNameChange,
 }: RecipientSelectorProps) {
   const [query, setQuery] = useState("");
+  const [allItems, setAllItems] = useState<any[]>([]);  // preloaded 20 recent
   const [results, setResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  const search = async (q: string) => {
-    if (!q.trim()) { setResults([]); return; }
+  // Load 20 recent items on mount and mode change
+  const loadRecent = async () => {
     setSearching(true);
     if (mode === "contact") {
-      const { data, error: contactErr } = await crmDb()
+      const { data } = await crmDb()
         .from("contacts")
         .select("id, name, email, position, account_id")
-        .or(`name.ilike.%${q}%,email.ilike.%${q}%`)
-        .limit(8);
-      if (contactErr) { console.error("[email search] contacts error:", contactErr); setSearching(false); return; }
-      console.log("[email search] contacts found:", data?.length, "for query:", q);
-      // Fetch account names for matched contacts
+        .order("created_at", { ascending: false })
+        .limit(20);
       const accountIds = [...new Set((data ?? []).map((c: any) => c.account_id).filter(Boolean))];
       let accountMap: Record<string, string> = {};
       if (accountIds.length) {
         const { data: accs } = await crmDb().from("accounts").select("id,name").in("id", accountIds);
         accountMap = Object.fromEntries((accs ?? []).map((a: any) => [a.id, a.name]));
       }
-      setResults((data ?? []).map((c: any) => ({ ...c, company_name: accountMap[c.account_id] ?? "" })));
+      const enriched = (data ?? []).map((c: any) => ({ ...c, company_name: accountMap[c.account_id] ?? "" }));
+      setAllItems(enriched);
+      setResults(enriched);
     } else {
-      // Lead mode: search leads by title or account name
       const { data: leadsData } = await crmDb()
         .from("leads")
-        .select("id, title, stage, expected_value, contact_id, account_id")
-        .ilike("title", `%${q}%`)
+        .select("id, title, deal_number, stage, expected_value, contact_id, account_id")
         .not("stage", "in", "(won,lost)")
         .order("updated_at", { ascending: false })
-        .limit(8);
-      // Enrich with account + contact
+        .limit(20);
       const accountIds = [...new Set((leadsData ?? []).map((l: any) => l.account_id).filter(Boolean))];
       const contactIds = [...new Set((leadsData ?? []).map((l: any) => l.contact_id).filter(Boolean))];
       let accountMap: Record<string, any> = {};
@@ -147,52 +145,128 @@ function RecipientSelector({
         const { data: cts } = await crmDb().from("contacts").select("id,name,email").in("id", contactIds);
         contactMap = Object.fromEntries((cts ?? []).map((c: any) => [c.id, c]));
       }
-      setResults((leadsData ?? []).map((l: any) => ({
+      const enriched = (leadsData ?? []).map((l: any) => ({
         ...l,
         account: l.account_id ? accountMap[l.account_id] : null,
         contact: l.contact_id ? contactMap[l.contact_id] : null,
+      }));
+      setAllItems(enriched);
+      setResults(enriched);
+    }
+    setSearching(false);
+  };
+
+  // Search against DB when query >= 2 chars, else show recent
+  const searchRemote = async (q: string) => {
+    if (!q.trim() || q.trim().length < 2) { setResults(allItems); return; }
+    setSearching(true);
+    if (mode === "contact") {
+      const { data } = await crmDb()
+        .from("contacts")
+        .select("id, name, email, position, account_id")
+        .or(`name.ilike.%${q}%,email.ilike.%${q}%,account_id.in.(${
+          // also search by company name
+          await crmDb().from("accounts").select("id").ilike("name", `%${q}%`).limit(20)
+            .then(r => (r.data ?? []).map((a: any) => a.id).join(",") || "00000000-0000-0000-0000-000000000000")
+        })`)
+        .limit(20);
+      const accountIds = [...new Set((data ?? []).map((c: any) => c.account_id).filter(Boolean))];
+      let accountMap: Record<string, string> = {};
+      if (accountIds.length) {
+        const { data: accs } = await crmDb().from("accounts").select("id,name").in("id", accountIds);
+        accountMap = Object.fromEntries((accs ?? []).map((a: any) => [a.id, a.name]));
+      }
+      setResults((data ?? []).map((c: any) => ({ ...c, company_name: accountMap[c.account_id] ?? "" })));
+    } else {
+      // Search accounts first
+      const { data: matchedAccs } = await crmDb().from("accounts").select("id,name").ilike("name", `%${q}%`).limit(20);
+      const matchedAccIds = (matchedAccs ?? []).map((a: any) => a.id);
+      let leadsQuery = crmDb()
+        .from("leads")
+        .select("id, title, deal_number, stage, expected_value, contact_id, account_id")
+        .not("stage", "in", "(won,lost)")
+        .order("updated_at", { ascending: false })
+        .limit(20);
+      if (matchedAccIds.length > 0) {
+        leadsQuery = leadsQuery.or(`title.ilike.%${q}%,deal_number.ilike.%${q}%,account_id.in.(${matchedAccIds.join(",")})`);
+      } else {
+        leadsQuery = leadsQuery.or(`title.ilike.%${q}%,deal_number.ilike.%${q}%`);
+      }
+      const { data: leadsData } = await leadsQuery;
+      const accountIds = [...new Set((leadsData ?? []).map((l: any) => l.account_id).filter(Boolean))];
+      const contactIds = [...new Set((leadsData ?? []).map((l: any) => l.contact_id).filter(Boolean))];
+      let accountMap: Record<string, any> = {};
+      let contactMap: Record<string, any> = {};
+      if (accountIds.length) {
+        const { data: accs } = await crmDb().from("accounts").select("id,name").in("id", accountIds);
+        accountMap = Object.fromEntries((accs ?? []).map((a: any) => [a.id, a]));
+      }
+      if (contactIds.length) {
+        const { data: cts } = await crmDb().from("contacts").select("id,name,email").in("id", contactIds);
+        contactMap = Object.fromEntries((cts ?? []).map((c: any) => [c.id, c]));
+      }
+      // fallback contact via account
+      const accsWithNoContact = accountIds.filter(aid => {
+        const lead = (leadsData ?? []).find((l: any) => l.account_id === aid);
+        return lead && !lead.contact_id;
+      });
+      const accContactMap: Record<string, any> = {};
+      if (accsWithNoContact.length) {
+        const { data: accCts } = await crmDb().from("contacts").select("id,name,email,account_id").in("account_id", accsWithNoContact).limit(50);
+        for (const c of (accCts ?? [])) {
+          if (c.email && !accContactMap[c.account_id]) accContactMap[c.account_id] = c;
+        }
+      }
+      setResults((leadsData ?? []).map((l: any) => ({
+        ...l,
+        account: l.account_id ? accountMap[l.account_id] : null,
+        contact: l.contact_id ? contactMap[l.contact_id] : (l.account_id ? accContactMap[l.account_id] : null),
       })));
     }
     setSearching(false);
   };
 
+  useEffect(() => { loadRecent(); }, [mode]);
+
   useEffect(() => {
-    if (query.trim().length < 2) { setResults([]); return; }
-    const t = setTimeout(() => search(query), 450);
+    if (!open) return;
+    if (!query.trim() || query.trim().length < 2) { setResults(allItems); return; }
+    const t = setTimeout(() => searchRemote(query), 400);
     return () => clearTimeout(t);
-  }, [query, mode]);
+  }, [query, mode, open]);
 
   const handleSelect = (item: any) => {
     onSelect(item, mode);
     setQuery("");
     setResults([]);
+    setOpen(false);
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Label className="text-sm font-semibold shrink-0">ผู้รับอีเมล</Label>
-        {/* Mode toggle — segmented control matching ปฏิทิน/รายการ style */}
-        <div className="inline-flex items-center rounded-xl border border-border bg-muted/40 p-1 shadow-sm">
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Label className="text-xs shrink-0">ผู้รับ</Label>
+        {/* Mode toggle */}
+        <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-0.5 ml-auto">
           <button
             onClick={() => { onModeChange("contact"); onClear(); setQuery(""); setResults([]); }}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
               mode === "contact"
-                ? "bg-primary text-primary-foreground shadow-md"
-                : "text-muted-foreground hover:text-foreground hover:bg-background/60"
+                ? "bg-background shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Users className="h-4 w-4" /> รายชื่อผู้ติดต่อ
+            <Users className="h-3 w-3" /> รายชื่อ
           </button>
           <button
             onClick={() => { onModeChange("lead"); onClear(); setQuery(""); setResults([]); }}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
               mode === "lead"
-                ? "bg-primary text-primary-foreground shadow-md"
-                : "text-muted-foreground hover:text-foreground hover:bg-background/60"
+                ? "bg-background shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Briefcase className="h-4 w-4" /> ดีล / Lead
+            <Briefcase className="h-3 w-3" /> ดีล/Lead
           </button>
         </div>
       </div>
@@ -230,15 +304,25 @@ function RecipientSelector({
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-8 text-sm"
-              placeholder={mode === "contact" ? "พิมพ์ชื่อหรืออีเมล (อย่างน้อย 2 ตัว)…" : "พิมพ์ชื่อบริษัท หรือเลขดีล (อย่างน้อย 2 ตัว)…"}
+              placeholder={mode === "contact" ? "ค้นหาชื่อ บริษัท หรืออีเมล…" : "ค้นหาชื่อบริษัท เลขดีล หรือชื่อ Lead…"}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setOpen(true)}
+              onBlur={() => setTimeout(() => setOpen(false), 200)}
+              autoComplete="off"
             />
             {searching && <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
 
-          {results.length > 0 && (
-            <div className="rounded-lg border bg-popover shadow-md divide-y max-h-52 overflow-y-auto">
+          {open && results.length > 0 && (
+            <div className="rounded-lg border bg-popover shadow-md overflow-hidden max-h-64">
+              <div className="border-b bg-muted/30 px-3 py-1.5 flex items-center justify-between">
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                  {query.trim().length >= 2 ? `ผลการค้นหา "${query}"` : mode === "contact" ? "รายชื่อล่าสุด 20 รายการ" : "ดีลล่าสุด 20 รายการ"}
+                </span>
+                <span className="text-[10px] text-muted-foreground">{results.length} รายการ</span>
+              </div>
+              <div className="divide-y overflow-y-auto max-h-52">
               {results.map((item) => (
                 <button
                   key={item.id}
@@ -285,6 +369,7 @@ function RecipientSelector({
                   )}
                 </button>
               ))}
+              </div>
             </div>
           )}
 
@@ -852,15 +937,10 @@ function EmailsPage() {
             </div>
 
             {/* Send button */}
-            <Button
-              onClick={handleSend}
-              disabled={sending || !to || !subject || !body}
-              size="lg"
-              className="w-full h-12 text-base font-semibold shadow-md hover:shadow-lg transition-shadow"
-            >
+            <Button onClick={handleSend} disabled={sending || !to || !subject || !body} className="w-full">
               {sending
-                ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />กำลังส่ง…</>
-                : <><Send className="mr-2 h-5 w-5" />ส่งอีเมล{pendingAttachments.length > 0 ? ` (${pendingAttachments.length} ไฟล์แนบ)` : ""}</>}
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังส่ง…</>
+                : <><Send className="mr-2 h-4 w-4" />ส่งอีเมล{pendingAttachments.length > 0 ? ` (${pendingAttachments.length} ไฟล์แนบ)` : ""}</>}
             </Button>
           </div>
         </div>
