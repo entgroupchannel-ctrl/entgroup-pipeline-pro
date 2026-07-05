@@ -1,7 +1,7 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { Loader2, TrendingUp, Trophy, Clock, CalendarPlus, Phone, Mail, MessageCircle, StickyNote, CheckCircle2 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
+import { Loader2, TrendingUp, Trophy, Clock, CalendarPlus, Phone, Mail, MessageCircle, StickyNote, CheckCircle2, BarChart3, BarChartHorizontal, PieChart as PieChartIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type LeadStage } from "@/lib/crm";
@@ -28,8 +28,21 @@ interface DashData {
   activities: any[];
 }
 
+const STAGE_COLORS: Record<LeadStage, string> = {
+  new: "oklch(0.7 0.02 260)",
+  qualified: "oklch(0.62 0.18 255)",
+  proposal: "oklch(0.58 0.22 300)",
+  negotiation: "oklch(0.6 0.13 195)",
+  closing: "oklch(0.75 0.16 75)",
+  won: "oklch(0.65 0.18 155)",
+  lost: "oklch(0.62 0.22 25)",
+};
+
+type ChartMode = "horizontal" | "vertical" | "pie";
+
 function Dashboard() {
   const [data, setData] = useState<DashData | null>(null);
+  const [chartMode, setChartMode] = useState<ChartMode>("horizontal");
 
   useEffect(() => {
     (async () => {
@@ -119,22 +132,53 @@ function Dashboard() {
       </div>
 
       <div className="rounded-xl border bg-card p-5">
-        <h2 className="mb-4 text-sm font-semibold">Pipeline by Stage</h2>
-        <div style={{ width: "100%", height: 280 }}>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold">Pipeline by Stage</h2>
+          <div className="inline-flex rounded-lg border bg-muted/40 p-0.5">
+            <ChartModeBtn active={chartMode === "horizontal"} onClick={() => setChartMode("horizontal")} icon={<BarChartHorizontal className="h-3.5 w-3.5" />} label="แนวนอน" />
+            <ChartModeBtn active={chartMode === "vertical"} onClick={() => setChartMode("vertical")} icon={<BarChart3 className="h-3.5 w-3.5" />} label="แนวตั้ง" />
+            <ChartModeBtn active={chartMode === "pie"} onClick={() => setChartMode("pie")} icon={<PieChartIcon className="h-3.5 w-3.5" />} label="วงกลม" />
+          </div>
+        </div>
+        <div style={{ width: "100%", height: 320 }}>
           <ResponsiveContainer>
-            <BarChart data={stageData} layout="vertical" margin={{ left: 20, right: 20 }}>
-              <XAxis type="number" tickFormatter={(v) => new Intl.NumberFormat("th-TH", { notation: "compact" }).format(v)} className="text-xs" />
-              <YAxis dataKey="stage" type="category" width={90} className="text-xs" />
-              <Tooltip formatter={(v: any) => formatBaht(Number(v))} cursor={{ fill: "hsl(var(--muted))" }} />
-              <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                {stageData.map((d) => (
-                  <Cell key={d.key} className={`stage-fill-${d.key}`} />
-                ))}
-              </Bar>
-            </BarChart>
+            {chartMode === "pie" ? (
+              <PieChart>
+                <Tooltip formatter={(v: any) => formatBaht(Number(v))} />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                <Pie data={stageData.filter((d) => d.value > 0)} dataKey="value" nameKey="stage" cx="50%" cy="45%" innerRadius={55} outerRadius={100} paddingAngle={2} stroke="var(--card)" strokeWidth={2}>
+                  {stageData.filter((d) => d.value > 0).map((d) => (
+                    <Cell key={d.key} fill={STAGE_COLORS[d.key as LeadStage]} />
+                  ))}
+                </Pie>
+              </PieChart>
+            ) : chartMode === "vertical" ? (
+              <BarChart data={stageData} margin={{ left: 10, right: 20, top: 10, bottom: 10 }}>
+                <XAxis dataKey="stage" className="text-xs" tick={{ fontSize: 11 }} />
+                <YAxis tickFormatter={(v) => new Intl.NumberFormat("th-TH", { notation: "compact" }).format(v)} className="text-xs" />
+                <Tooltip formatter={(v: any) => formatBaht(Number(v))} cursor={{ fill: "color-mix(in oklab, var(--muted) 60%, transparent)" }} />
+                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                  {stageData.map((d) => (
+                    <Cell key={d.key} fill={STAGE_COLORS[d.key as LeadStage]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            ) : (
+              <BarChart data={stageData} layout="vertical" margin={{ left: 20, right: 20 }}>
+                <XAxis type="number" tickFormatter={(v) => new Intl.NumberFormat("th-TH", { notation: "compact" }).format(v)} className="text-xs" />
+                <YAxis dataKey="stage" type="category" width={90} className="text-xs" />
+                <Tooltip formatter={(v: any) => formatBaht(Number(v))} cursor={{ fill: "color-mix(in oklab, var(--muted) 60%, transparent)" }} />
+                <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                  {stageData.map((d) => (
+                    <Cell key={d.key} fill={STAGE_COLORS[d.key as LeadStage]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            )}
           </ResponsiveContainer>
         </div>
       </div>
+
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="rounded-xl border bg-card p-5 xl:col-span-2">
@@ -221,6 +265,19 @@ function KpiCard({ label, value, sub, icon, tone }: { label: string; value: stri
       <div className="mt-3 text-2xl font-semibold tabular-nums">{value}</div>
       {sub && <div className="mt-1 text-xs text-muted-foreground">{sub}</div>}
     </div>
+  );
+}
+
+function ChartModeBtn({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition ${active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 
