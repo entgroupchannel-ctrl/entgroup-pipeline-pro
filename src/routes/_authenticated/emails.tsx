@@ -178,10 +178,10 @@ function RecipientSelector({
         .or(`name.ilike.%${q}%,email.ilike.%${q}%,account_id.in.(${accIdStr})`)
         .limit(20);
 
-      const accountIds = [...new Set((data ?? []).map((c: any) => c.account_id).filter(Boolean))];
+      const accountIds = [...new Set((data ?? []).map((c: any) => c.account_id).filter(Boolean))] as string[];
       let accountMap: Record<string, {name:string; industry:string|null}> = {};
       for (const a of (accsByName ?? [])) accountMap[a.id] = {name: a.name, industry: a.industry};
-      const remaining = accountIds.filter((id: string) => !accountMap[id]);
+      const remaining = accountIds.filter((id) => !accountMap[id]);
       if (remaining.length) {
         const { data: accs } = await crmDb().from("accounts").select("id,name,industry").in("id", remaining);
         for (const a of (accs ?? [])) accountMap[a.id] = {name: a.name, industry: a.industry};
