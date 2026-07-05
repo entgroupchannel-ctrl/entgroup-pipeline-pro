@@ -366,7 +366,7 @@ function KeyAccountsPage() {
                     {acc.name}
                   </div>
                   <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                    {profileMap.get(acc.owner_id) ?? "—"}
+                    {acc.owner_id ? profileMap.get(acc.owner_id) ?? "—" : "—"}
                   </div>
                 </div>
                 <div
@@ -402,7 +402,7 @@ function KeyAccountsPage() {
                   {selected.name}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                  {selected.industry ?? "—"} · {profileMap.get(selected.owner_id) ?? "—"}
+                  {selected.industry ?? "—"} · {selected.owner_id ? profileMap.get(selected.owner_id) ?? "—" : "—"}
                 </div>
               </div>
               <Button size="sm" onClick={() => setLogOpen(true)}>
