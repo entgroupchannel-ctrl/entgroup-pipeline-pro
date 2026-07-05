@@ -345,7 +345,7 @@ function KeyAccountsPage() {
         </div>
 
         <div style={{ flex: 1, overflowY: "auto" }}>
-          {filteredAccounts.map((acc) => {
+          {pagedAccounts.map((acc) => {
             const target = acc.target?.[0] ?? DEFAULT_TARGET;
             const health = calcHealth(target, getAccActivities(acc));
             const dot = health >= 80 ? "#639922" : health >= 50 ? "#BA7517" : "#E24B4A";
