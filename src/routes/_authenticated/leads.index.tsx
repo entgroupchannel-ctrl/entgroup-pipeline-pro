@@ -3,21 +3,19 @@ import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import {
   Loader2, Search, Plus, TrendingUp, Calendar, ChevronLeft, ChevronRight,
-  BarChart2, Trophy, AlertTriangle, DollarSign,
-Trash2, Download,} from "lucide-react";
+  BarChart2, Trophy, AlertTriangle, DollarSign, FileText, ArrowRight,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { crmDb, STAGE_LABEL_TH, ACTIVE_STAGES, OUTCOME_STAGES, type Lead, type LeadStage } from "@/lib/crm";
 import { formatBaht, formatThaiDate } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { NewLeadDialog } from "@/components/pipeline/NewLeadDialog";
-import { RowActions, BulkActionBar, stdOpen, stdDupe, stdDelete } from "@/components/ui/row-actions";
+import { RowActions, stdOpen, stdDupe, stdDelete } from "@/components/ui/row-actions";
 import { exportToCsv, leadsToRows } from "@/lib/export-csv";
 import { usePermissions } from "@/lib/permissions";
 import { ListPagination, usePagination } from "@/components/list-pagination";
@@ -37,16 +35,6 @@ const searchSchema = z.object({
 type PeriodMode = "all" | "month" | "quarter" | "year";
 
 const ALL_STAGES: LeadStage[] = [...ACTIVE_STAGES, ...OUTCOME_STAGES];
-
-const STAGE_COLOR: Record<LeadStage, string> = {
-  new:         "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  qualified:   "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
-  proposal:    "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
-  negotiation: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
-  closing:     "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
-  won:         "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-  lost:        "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
-};
 
 const MONTH_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
 const QUARTER_MONTHS: Record<number, [number, number]> = { 1:[1,3], 2:[4,6], 3:[7,9], 4:[10,12] };
@@ -90,7 +78,6 @@ function LeadsPage() {
   const { can } = usePermissions();
   const canCreate  = can("lead.create");
   const canDelete  = can("lead.delete");
-  const canBulkDel = can("lead.delete");
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
 
@@ -99,7 +86,6 @@ function LeadsPage() {
   const [accountsMap, setAccountsMap] = useState<Map<string, string>>(new Map());
   const [profilesMap, setProfilesMap] = useState<Map<string, { name: string; initials: string }>>(new Map());
   const [newOpen, setNewOpen]       = useState(false);
-  const [selected, setSelected]     = useState<Set<string>>(new Set());
 
   // ── period state ────────────────────────────────────────────────────────────
   const mode    = (search.period ?? "all") as PeriodMode;
@@ -167,7 +153,6 @@ function LeadsPage() {
     if (!range) return leads;
     const [start, end] = range;
     return leads.filter((l) => {
-      // filter by expected_close_date (or created_at if no close date)
       const dateStr = l.expected_close_date ?? l.created_at;
       const d = new Date(dateStr);
       return d >= start && d < end;
@@ -183,10 +168,9 @@ function LeadsPage() {
       if (stageFilter !== "active" && stageFilter !== "all" && l.stage !== stageFilter) return false;
       if (ownerFilter !== "all" && l.owner_id !== ownerFilter) return false;
       if (!needle) return true;
-      return (
-        l.title.toLowerCase().includes(needle) ||
-        (l.account_id ? (accountsMap.get(l.account_id) ?? "").toLowerCase().includes(needle) : false)
-      );
+      const dealText = ((l as any).deal_number ?? l.title ?? "").toLowerCase();
+      const accountName = l.account_id ? (accountsMap.get(l.account_id) ?? "").toLowerCase() : "";
+      return dealText.includes(needle) || accountName.includes(needle);
     });
   }, [periodLeads, stageFilter, ownerFilter, qFilter, accountsMap]);
 
@@ -209,11 +193,6 @@ function LeadsPage() {
     return { pipeline, wonRevenue, lostValue, wonCount: won.length, lostCount: lost.length, activeCount: active.length, totalCount: src.length, winRate };
   }, [periodLeads]);
 
-  // ── bulk actions ─────────────────────────────────────────────────────────────
-  const toggleSelect = (id: string) => setSelected(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
-  const selectAll = () => setSelected(new Set((filtered ?? []).map(l => l.id)));
-  const clearAll  = () => setSelected(new Set());
-
   const duplicateLead = async (l: Lead) => {
     const { error } = await crmDb().from("leads").insert({
       title: `${l.title} (สำเนา)`, stage: "new",
@@ -232,15 +211,6 @@ function LeadsPage() {
     toast.success("ลบแล้ว"); load();
   };
 
-  const bulkDelete = async () => {
-    const _ok = await confirm({ title: `ลบ ${selected.size} รายการ?`, variant: "danger" });
-    if (!_ok) return;
-    const ids = Array.from(selected);
-    const { error } = await crmDb().from("leads").delete().in("id", ids);
-    if (error) { toast.error("ลบไม่สำเร็จ"); return; }
-    toast.success(`ลบ ${ids.length} รายการแล้ว`); clearAll(); load();
-  };
-
   const handleExport = () => {
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
     const rows = leadsToRows(filtered, accountsMap, profilesMap, STAGE_LABEL_TH);
@@ -256,7 +226,7 @@ function LeadsPage() {
       {/* ── Header ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">รายการดีล</h1>
+          <h1 className="text-xl font-semibold text-foreground">รายการดีล</h1>
           <p className="text-xs text-muted-foreground">
             {filtered == null ? "กำลังโหลด…" : `${filtered.length} ดีล`}
             {mode !== "all" && ` · ${periodLabel(mode, year, month, quarter)}`}
@@ -264,7 +234,7 @@ function LeadsPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleExport} disabled={!filtered?.length}>
-            <Download className="mr-1.5 h-4 w-4" /> Export CSV
+            <ArrowRight className="mr-1.5 h-4 w-4 rotate-90" /> Export CSV
           </Button>
           {canCreate && (
             <Button size="sm" onClick={() => setNewOpen(true)}>
@@ -276,8 +246,7 @@ function LeadsPage() {
 
       {/* ── Period selector ── */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Mode pills */}
-        <div className="flex rounded-lg border bg-muted/30 p-0.5 gap-0.5">
+        <div className="flex rounded-md border bg-muted/30 p-0.5 gap-0.5">
           {([
             { key: "all",     label: "ทั้งหมด", icon: <BarChart2 className="h-3.5 w-3.5" /> },
             { key: "month",   label: "รายเดือน", icon: <Calendar className="h-3.5 w-3.5" /> },
@@ -287,9 +256,9 @@ function LeadsPage() {
             <button
               key={key}
               onClick={() => setSearch({ period: key === "all" ? undefined : key })}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 mode === key
-                  ? "bg-background shadow-sm text-foreground"
+                  ? "bg-background shadow-sm text-foreground border border-border"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -298,13 +267,12 @@ function LeadsPage() {
           ))}
         </div>
 
-        {/* Period navigator */}
         {mode !== "all" && (
-          <div className="flex items-center gap-1 rounded-lg border bg-background px-2 py-1">
+          <div className="flex items-center gap-1 rounded-md border bg-background px-2 py-1">
             <button onClick={prevPeriod} className="rounded p-0.5 hover:bg-muted">
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="min-w-[96px] text-center text-sm font-semibold">
+            <span className="min-w-[96px] text-center text-sm font-medium">
               {periodLabel(mode, year, month, quarter)}
             </span>
             <button onClick={nextPeriod} className="rounded p-0.5 hover:bg-muted">
@@ -313,7 +281,6 @@ function LeadsPage() {
           </div>
         )}
 
-        {/* Quick year picker */}
         {mode === "year" && (
           <Select value={String(year)} onValueChange={(v) => setSearch({ py: v })}>
             <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
@@ -326,7 +293,6 @@ function LeadsPage() {
           </Select>
         )}
 
-        {/* Quick quarter picker */}
         {mode === "quarter" && (
           <Select value={String(quarter)} onValueChange={(v) => setSearch({ pq: v })}>
             <SelectTrigger className="h-8 w-20 text-xs"><SelectValue /></SelectTrigger>
@@ -337,53 +303,43 @@ function LeadsPage() {
         )}
       </div>
 
-      {/* ── Period KPI bar ── */}
+      {/* ── Period KPI bar (neutral) ── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <PeriodKpiCard icon={<BarChart2 className="h-4 w-4" />} label="ดีลทั้งหมด"   value={String(kpi.totalCount)}      unit="ดีล" />
         <PeriodKpiCard icon={<TrendingUp className="h-4 w-4" />} label="Active"       value={String(kpi.activeCount)}    unit="ดีล" />
-        <PeriodKpiCard icon={<DollarSign className="h-4 w-4" />} label="Pipeline"     value={formatBaht(kpi.pipeline)}   highlight="blue" />
-        <PeriodKpiCard icon={<Trophy className="h-4 w-4" />}     label="ชนะ"          value={formatBaht(kpi.wonRevenue)} unit={`(${kpi.wonCount} ดีล)`} highlight="green" />
-        <PeriodKpiCard icon={<AlertTriangle className="h-4 w-4" />} label="แพ้"       value={formatBaht(kpi.lostValue)}  unit={`(${kpi.lostCount} ดีล)`} highlight="red" />
-        <PeriodKpiCard icon={<Trophy className="h-4 w-4" />}     label="Win Rate"
-          value={kpi.winRate != null ? `${kpi.winRate}%` : "—"}
-          highlight={kpi.winRate != null ? (kpi.winRate >= 50 ? "green" : "red") : undefined} />
+        <PeriodKpiCard icon={<DollarSign className="h-4 w-4" />} label="Pipeline"     value={formatBaht(kpi.pipeline)} />
+        <PeriodKpiCard icon={<Trophy className="h-4 w-4" />}     label="ชนะ"          value={formatBaht(kpi.wonRevenue)} unit={`(${kpi.wonCount} ดีล)`} />
+        <PeriodKpiCard icon={<AlertTriangle className="h-4 w-4" />} label="แพ้"       value={formatBaht(kpi.lostValue)}  unit={`(${kpi.lostCount} ดีล)`} />
+        <PeriodKpiCard icon={<FileText className="h-4 w-4" />}     label="Win Rate"
+          value={kpi.winRate != null ? `${kpi.winRate}%` : "—"} />
       </div>
 
-      {/* ── Stage + search + owner filters ── */}
+      {/* ── Filters ── */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            className="h-9 w-56 pl-8 text-sm"
+            className="h-9 w-56 pl-8 text-sm bg-background"
             placeholder="ค้นหาดีล / บริษัท"
             value={qFilter}
             onChange={(e) => setSearch({ q: e.target.value || undefined })}
           />
         </div>
 
-        <div className="flex flex-wrap gap-1">
-          {([
-            { key: "active", label: "Active" },
-            { key: "all",    label: "ทั้งหมด" },
-            ...ALL_STAGES.map(s => ({ key: s, label: STAGE_LABEL_TH[s] })),
-          ] as { key: string; label: string }[]).map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setSearch({ stage: key === "active" ? undefined : key })}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                stageFilter === key
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "bg-background hover:bg-muted"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <Select value={stageFilter} onValueChange={(v) => setSearch({ stage: v === "active" ? undefined : v })}>
+          <SelectTrigger className="h-9 w-36 text-xs bg-background">
+            <SelectValue placeholder="Stage" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="all">ทั้งหมด</SelectItem>
+            {ALL_STAGES.map(s => <SelectItem key={s} value={s}>{STAGE_LABEL_TH[s]}</SelectItem>)}
+          </SelectContent>
+        </Select>
 
         {isManager && (
           <Select value={ownerFilter} onValueChange={(v) => setSearch({ owner: v === "all" ? undefined : v })}>
-            <SelectTrigger className="h-9 w-40 text-xs"><SelectValue placeholder="Sales ทั้งหมด" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-40 text-xs bg-background"><SelectValue placeholder="Sales ทั้งหมด" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Sales ทั้งหมด</SelectItem>
               {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
@@ -391,15 +347,6 @@ function LeadsPage() {
           </Select>
         )}
       </div>
-
-      {/* ── Bulk bar ── */}
-      <BulkActionBar
-        count={selected.size}
-        total={filtered?.length ?? 0}
-        onSelectAll={selectAll}
-        onClearAll={clearAll}
-        actions={canBulkDel ? [{ label: "ลบที่เลือก", icon: <Trash2 className="h-3.5 w-3.5" />, onClick: bulkDelete, variant: "danger" }] : []}
-      />
 
       {/* ── Table ── */}
       {filtered === null ? (
@@ -412,79 +359,59 @@ function LeadsPage() {
           ไม่พบดีลในช่วงนี้
         </div>
       ) : (
-        <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                  <th className="px-3 py-2.5 w-8">
-                    <Checkbox
-                      checked={!!filtered.length && selected.size === filtered.length}
-                      onCheckedChange={(v) => v ? selectAll() : clearAll()}
-                    />
-                  </th>
-                  <th className="px-4 py-2.5 text-left font-medium">ชื่อดีล</th>
-                  <th className="px-4 py-2.5 text-left font-medium">บริษัท</th>
-                  <th className="px-4 py-2.5 text-center font-medium">Stage</th>
-                  <th className="px-4 py-2.5 text-right font-medium">มูลค่า</th>
-                  <th className="px-4 py-2.5 text-left font-medium">ปิดคาดหวัง</th>
-                  <th className="px-4 py-2.5 text-left font-medium">ที่มา</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Sales</th>
-                  <th className="px-4 py-2.5 text-left font-medium">อัปเดต</th>
-                  <th className="px-2 py-2.5 w-8" />
+                <tr className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
+                  <th className="px-4 py-3 text-left font-medium w-28">วันที่</th>
+                  <th className="px-4 py-3 text-left font-medium">เลขที่ดีล</th>
+                  <th className="px-4 py-3 text-left font-medium">บริษัท</th>
+                  <th className="px-4 py-3 text-right font-medium">มูลค่า</th>
+                  <th className="px-4 py-3 text-left font-medium w-32">สถานะ</th>
+                  <th className="px-3 py-3 text-right w-16" />
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-border">
                 {pageItems.map((l) => {
-                  const owner       = l.owner_id    ? profilesMap.get(l.owner_id)   : null;
                   const accountName = l.account_id  ? accountsMap.get(l.account_id) : null;
+                  const dealNumber = (l as any).deal_number as string | undefined;
+                  const note = l.title && l.title !== dealNumber ? l.title : null;
                   const overdue = l.expected_close_date && ACTIVE_STAGES.includes(l.stage) &&
                     new Date(l.expected_close_date).getTime() < Date.now();
 
                   return (
-                    <tr key={l.id} className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected.has(l.id) ? "bg-primary/5" : ""}`} onClick={() => navigate({ to: "/leads/$leadId", params: { leadId: l.id } })}>
-                      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={selected.has(l.id)} onCheckedChange={() => toggleSelect(l.id)} />
+                    <tr
+                      key={l.id}
+                      className="group hover:bg-muted/40 transition-colors cursor-pointer"
+                      onClick={() => navigate({ to: "/leads/$leadId", params: { leadId: l.id } })}
+                    >
+                      <td className="px-4 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
+                        {formatThaiDate(l.created_at)}
                       </td>
-                      <td className="px-4 py-3 max-w-[220px]">
-                        <span className="font-mono text-xs font-semibold text-primary">{(l as any).deal_number ?? l.title}</span>
-                        {(l as any).deal_number && l.title && l.title !== (l as any).deal_number && (
-                          <span className="truncate block text-xs text-muted-foreground mt-0.5">{l.title}</span>
+                      <td className="px-4 py-3.5">
+                        <span className="font-mono text-sm font-medium text-foreground">{dealNumber ?? l.title}</span>
+                        {note && (
+                          <span className="block text-xs text-muted-foreground truncate max-w-[260px] mt-0.5">{note}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 max-w-[160px]">
-                        <span className="truncate block text-xs text-muted-foreground">{accountName ?? "—"}</span>
+                      <td className="px-4 py-3.5 text-sm text-foreground">
+                        <span className="truncate block max-w-[220px]">{accountName ?? "—"}</span>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${STAGE_COLOR[l.stage]}`}>
+                      <td className="px-4 py-3.5 text-right text-sm font-medium tabular-nums whitespace-nowrap">
+                        {l.expected_value != null ? formatBaht(l.expected_value) : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-4 py-3.5 w-32">
+                        <span className={`inline-flex items-center text-xs ${
+                          l.stage === "won" ? "text-emerald-600" :
+                          l.stage === "lost" ? "text-red-600" :
+                          overdue ? "text-red-600 font-medium" : "text-muted-foreground"
+                        }`}>
                           {STAGE_LABEL_TH[l.stage]}
+                          {overdue && l.stage !== "lost" && l.stage !== "won" && " (เลยกำหนด)"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right font-medium">
-                        {l.expected_value != null
-                          ? formatBaht(l.expected_value)
-                          : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-xs">
-                        {l.expected_close_date ? (
-                          <span className={overdue ? "font-medium text-red-600" : "text-muted-foreground"}>
-                            {formatThaiDate(l.expected_close_date)}{overdue ? " ⚠" : ""}
-                          </span>
-                        ) : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{l.source ?? "—"}</td>
-                      <td className="px-4 py-3">
-                        {owner ? (
-                          <div className="flex items-center gap-1.5">
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="bg-primary/10 text-[10px] text-primary">{owner.initials}</AvatarFallback>
-                            </Avatar>
-                            <span className="text-xs text-muted-foreground truncate max-w-[80px]">{owner.name}</span>
-                          </div>
-                        ) : <span className="text-xs text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{formatThaiDate(l.updated_at)}</td>
-                      <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-3 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                         <RowActions actions={[
                           stdOpen(() => navigate({ to: "/leads/$leadId", params: { leadId: l.id } })),
                           stdDupe(() => duplicateLead(l)),
@@ -508,6 +435,10 @@ function LeadsPage() {
         </div>
       )}
 
+      <p className="text-xs text-muted-foreground text-center">
+        คลิกแถวเพื่อดูรายละเอียดดีล
+      </p>
+
       <NewLeadDialog open={newOpen} onOpenChange={setNewOpen} onCreated={load} />
     </div>
   );
@@ -515,25 +446,18 @@ function LeadsPage() {
 
 // ── Period KPI card ───────────────────────────────────────────────────────────
 
-function PeriodKpiCard({ icon, label, value, unit, highlight }: {
+function PeriodKpiCard({ icon, label, value, unit }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   unit?: string;
-  highlight?: "green" | "blue" | "red";
 }) {
-  const colors = {
-    green: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300",
-    blue:  "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300",
-    red:   "border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300",
-  };
-  const cls = highlight ? colors[highlight] : "";
   return (
-    <div className={`rounded-xl border p-4 ${highlight ? cls : "bg-card"}`}>
-      <div className={`flex items-center gap-1.5 text-xs font-medium ${highlight ? "" : "text-muted-foreground"}`}>
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
         {icon} {label}
       </div>
-      <div className={`mt-1.5 text-lg font-bold tabular-nums ${highlight ? "" : ""}`}>{value}</div>
+      <div className="mt-1.5 text-lg font-bold tabular-nums text-foreground">{value}</div>
       {unit && <div className="text-[11px] text-muted-foreground">{unit}</div>}
     </div>
   );
