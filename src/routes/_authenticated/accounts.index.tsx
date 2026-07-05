@@ -188,52 +188,55 @@ function AccountsPage() {
   };
 
   return (
-    <div className="p-6 page-fade-in space-y-5">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex h-full flex-col page-fade-in">
+      {/* Header — aligned with Pipeline / B2B */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b bg-background">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">รายชื่อลูกค้า</h1>
-          <p className="text-xs text-muted-foreground">
-            {filtered == null ? "กำลังโหลด…" : `${filtered.length} บริษัท`}
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            รายชื่อลูกค้า
+            {filtered != null && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-[10px] font-bold text-primary">
+                {filtered.length}
+              </span>
+            )}
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            บริษัทและองค์กรลูกค้าทั้งหมดในระบบ
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="h-8 w-64 pl-8 text-xs"
+              placeholder="ค้นหาชื่อ / อุตสาหกรรม / เลขผู้เสียภาษี"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          <Select value={industryFilter} onValueChange={setIndustryFilter}>
+            <SelectTrigger className="h-8 w-40 text-xs">
+              <SelectValue placeholder="อุตสาหกรรม" />
+            </SelectTrigger>
+            <SelectContent>
+              {INDUSTRIES.map((ind) => <SelectItem key={ind} value={ind}>{ind}</SelectItem>)}
+            </SelectContent>
+          </Select>
           {isAdmin && (
-            <Button variant="outline" size="sm" onClick={handleExport} disabled={!filtered?.length} title="เฉพาะ Admin เท่านั้น">
-              <Download className="mr-1.5 h-4 w-4" /> Export CSV
+            <Button variant="outline" size="sm" className="h-8" onClick={handleExport} disabled={!filtered?.length} title="เฉพาะ Admin เท่านั้น">
+              <Download className="mr-1.5 h-3.5 w-3.5" /> Export
             </Button>
           )}
           {canCreate && (
-            <Button size="sm" onClick={() => setNewOpen(true)}>
-              <Plus className="mr-1.5 h-4 w-4" /> เพิ่มบริษัท
+            <Button size="sm" className="h-8" onClick={() => setNewOpen(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> เพิ่มบริษัท
             </Button>
           )}
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="h-9 w-72 pl-8 text-sm bg-background"
-            placeholder="ค้นหาชื่อบริษัท / อุตสาหกรรม / เลขประจำตัวผู้เสียภาษี"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
-
-        <Select value={industryFilter} onValueChange={setIndustryFilter}>
-          <SelectTrigger className="h-9 w-44 text-xs bg-background">
-            <SelectValue placeholder="อุตสาหกรรม" />
-          </SelectTrigger>
-          <SelectContent>
-            {INDUSTRIES.map((ind) => <SelectItem key={ind} value={ind}>{ind}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* List */}
+      {/* Content */}
+      <div className="flex-1 overflow-auto p-6 space-y-4">
       {filtered === null ? (
         <div className="flex justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
