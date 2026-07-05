@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { activityIcon, formatThaiDate, ACTIVITY_TYPE_LABEL, type Activity, type ActivityType } from "@/lib/activities";
+import { ListPagination, usePagination } from "@/components/list-pagination";
 
 const searchSchema = z.object({
   filter: z.enum(["all", "overdue", "today", "pending", "done"]).optional(),
