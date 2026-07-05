@@ -261,26 +261,26 @@ function RecipientSelector({
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Label className="text-sm font-semibold shrink-0">ผู้รับอีเมล</Label>
         {/* Mode toggle — segmented control matching ปฏิทิน/รายการ style */}
-        <div className="inline-flex items-center rounded-xl border border-border bg-muted/40 p-1 shadow-sm">
+        <div className="inline-flex items-center rounded-lg border border-border bg-muted/40 p-0.5">
           <button
             onClick={() => { onModeChange("contact"); onClear(); setQuery(""); setResults([]); }}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
               mode === "contact"
-                ? "bg-primary text-primary-foreground shadow-md"
+                ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-background/60"
             }`}
           >
-            <Users className="h-4 w-4" /> รายชื่อผู้ติดต่อ
+            <Users className="h-3.5 w-3.5" /> รายชื่อผู้ติดต่อ
           </button>
           <button
             onClick={() => { onModeChange("lead"); onClear(); setQuery(""); setResults([]); }}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
               mode === "lead"
-                ? "bg-primary text-primary-foreground shadow-md"
+                ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-background/60"
             }`}
           >
-            <Briefcase className="h-4 w-4" /> ดีล / Lead
+            <Briefcase className="h-3.5 w-3.5" /> ดีล / Lead
           </button>
         </div>
       </div>
