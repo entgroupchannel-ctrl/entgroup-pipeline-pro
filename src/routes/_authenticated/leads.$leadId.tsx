@@ -814,6 +814,7 @@ function LeadDetailPage() {
         open={lineOpen}
         onOpenChange={setLineOpen}
         contactLineId={contact?.line_id ?? null}
+        contactLineName={contact?.name ?? null}
         leadId={lead.id}
         ownerId={user?.id ?? null}
         onLogged={load}
