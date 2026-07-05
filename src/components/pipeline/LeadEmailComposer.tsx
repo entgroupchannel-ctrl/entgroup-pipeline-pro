@@ -223,25 +223,57 @@ export function LeadEmailComposer({
         {/* ── Step: Compose (Brief) ── */}
         {step === "compose" && (
           <div className="space-y-4">
-            {/* Quick briefs */}
+            {/* Template picker */}
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">เริ่มด้วย template</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {QUICK_BRIEFS.map((q) => (
-                  <button
-                    key={q.label}
-                    onClick={() => setBrief(q.text)}
-                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                      brief === q.text
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted"
-                    }`}
-                  >
-                    {q.label}
-                  </button>
-                ))}
+              <Label className="text-xs text-muted-foreground">เลือกเทมเพลตอีเมล</Label>
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                {TEMPLATES.map((t) => {
+                  const Icon = t.icon;
+                  const active = template === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => pickTemplate(t.id)}
+                      className={`flex flex-col items-center justify-center gap-1 rounded-md border px-2 py-2 text-xs transition-colors ${
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "bg-background hover:bg-muted"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="text-[11px] leading-tight">{t.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
+
+            {/* Tone + Length */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">โทนภาษา</Label>
+                <Select value={tone} onValueChange={setTone}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TONE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">ความยาว</Label>
+                <Select value={length} onValueChange={setLength}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {LENGTH_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
 
             {/* Brief input */}
             <div className="space-y-1.5">
