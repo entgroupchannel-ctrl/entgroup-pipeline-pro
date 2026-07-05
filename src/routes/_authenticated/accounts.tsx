@@ -89,12 +89,13 @@ function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [leadsCount, setLeadsCount] = useState<Map<string, number>>(new Map());
   const [q, setQ] = useState("");
+  const [industryFilter, setIndustryFilter] = useState("ทั้งหมด");
   const [newOpen, setNewOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = async () => {
     const [accRes, leadsRes] = await Promise.all([
-      crmDb().from("accounts").select("*").order("name"),
+      crmDb().from("accounts").select("*, tax_id, industry, full_address, zip_code, credit_days, account_type").order("name"),
       crmDb().from("leads").select("id,account_id"),
     ]);
     if (accRes.error) return toast.error("โหลดบริษัทไม่สำเร็จ", { description: accRes.error.message });
