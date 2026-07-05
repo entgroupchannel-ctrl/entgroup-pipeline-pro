@@ -7,7 +7,7 @@ import { Link } from "@tanstack/react-router";
 import {
   ChevronDown, ChevronUp, Phone, Mail, MessageCircle, Users,
   FileText, CalendarDays, Star, AlertTriangle, CheckCircle2,
-  Clock, ArrowRight,
+  Clock, ArrowRight, Pencil, ExternalLink,
 } from "lucide-react";
 import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
@@ -256,18 +256,56 @@ export function MyDayPanel({ defaultOpen = true, onRefresh }: Props) {
               {upcomingEvents.slice(0, 5).map((ev, i) => {
                 const Icon = ev.type === "birthday" ? Cake : ev.type === "company_anniv" ? CalendarDays : Star;
                 const badge = ev.days === 0 ? "วันนี้ 🎉" : ev.days === 1 ? "พรุ่งนี้" : `อีก ${ev.days} วัน`;
-                const badgeColor = ev.days === 0 ? "bg-red-100 text-red-700" : ev.days <= 7 ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700";
+                const badgeColor = ev.days === 0 ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300" : ev.days <= 7 ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
                 const typeLabel = ev.type === "birthday" ? "วันเกิด" : ev.type === "company_anniv" ? "ครบรอบก่อตั้ง" : "ครบรอบลูกค้า";
                 return (
-                  <div key={i} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/40">
-                    <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-xs font-medium">{ev.label}</div>
-                      <div className="text-[10px] text-muted-foreground">{typeLabel}</div>
+                  <div key={i} className="rounded-lg px-2 py-1.5 hover:bg-muted/40 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-xs font-medium">{ev.label}</div>
+                        <div className="text-[10px] text-muted-foreground">{typeLabel}</div>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${badgeColor}`}>
+                        {badge}
+                      </span>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${badgeColor}`}>
-                      {badge}
-                    </span>
+                    {/* Action buttons */}
+                    <div className="mt-1 flex gap-1 pl-5">
+                      {ev.accountId && (
+                        <Link
+                          to="/leads/$leadId"
+                          params={{ leadId: ev.accountId }}
+                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/10 transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="h-2.5 w-2.5" />
+                          ดูดีล
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => {
+                          setLogLeadId(ev.accountId);
+                          setLogKind("call");
+                          setLogOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
+                      >
+                        <Phone className="h-2.5 w-2.5" />
+                        โทรอวยพร
+                      </button>
+                      <button
+                        onClick={() => {
+                          setLogLeadId(ev.accountId);
+                          setLogKind("line");
+                          setLogOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30 transition-colors"
+                      >
+                        <MessageCircle className="h-2.5 w-2.5" />
+                        ส่ง LINE
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -282,19 +320,49 @@ export function MyDayPanel({ defaultOpen = true, onRefresh }: Props) {
               loading={loading}
             >
               {staleDeals.map((d) => (
-                <Link
-                  key={d.id}
-                  to="/leads/$leadId"
-                  params={{ leadId: d.id }}
-                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/40 transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs font-medium">{d.title}</div>
-                    <div className="text-[10px] text-muted-foreground">{d.account}</div>
+                <div key={d.id} className="rounded-lg px-2 py-1.5 hover:bg-muted/40 transition-colors">
+                  <Link
+                    to="/leads/$leadId"
+                    params={{ leadId: d.id }}
+                    className="flex items-center gap-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs font-medium text-primary">{d.title}</div>
+                      <div className="text-[10px] text-muted-foreground">{d.account}</div>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                      d.days >= 14 ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                    }`}>
+                      {d.days} วัน
+                    </span>
+                    <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  </Link>
+                  {/* Quick action */}
+                  <div className="mt-1 flex gap-1 pl-1">
+                    <button
+                      onClick={() => { setLogLeadId(d.id); setLogKind("call"); setLogOpen(true); }}
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
+                    >
+                      <Phone className="h-2.5 w-2.5" />
+                      โทร
+                    </button>
+                    <button
+                      onClick={() => { setLogLeadId(d.id); setLogKind("line"); setLogOpen(true); }}
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30 transition-colors"
+                    >
+                      <MessageCircle className="h-2.5 w-2.5" />
+                      LINE
+                    </button>
+                    <button
+                      onClick={() => { setLogLeadId(d.id); setLogKind("note"); setLogOpen(true); }}
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
+                    >
+                      <Pencil className="h-2.5 w-2.5" />
+                      บันทึก
+                    </button>
                   </div>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">{d.days} วัน</span>
-                  <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-                </Link>
+                </div>
               ))}
             </Section>
           </div>
