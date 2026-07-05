@@ -602,6 +602,77 @@ function LeadDetailPage() {
 
         {/* RIGHT */}
         <aside className="w-full shrink-0 space-y-4 lg:w-[340px]">
+          {account && (
+            <div className="rounded-xl border bg-card p-4 space-y-3">
+              {/* Header row */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Crown className="h-4 w-4 text-amber-600" />
+                  Key Account
+                </div>
+                <button
+                  onClick={toggleKeyAccount}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                    account.is_key_account ? "bg-amber-500" : "bg-muted"
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    account.is_key_account ? "translate-x-4" : "translate-x-0.5"
+                  }`} />
+                </button>
+              </div>
+              {account.is_key_account && (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    Sales ที่ดูแล {account.name}
+                  </p>
+                  {/* รายชื่อ Sales ที่ดูแล */}
+                  <div className="space-y-2">
+                    {keyOwners.map((ko) => (
+                      <div key={ko.id} className="flex items-start gap-2 rounded-lg bg-muted/40 px-3 py-2">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-semibold text-amber-700">
+                          {(ko.user?.full_name ?? "?").slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium">{ko.user?.full_name ?? "—"}</div>
+                          {ko.contact?.name && (
+                            <div className="text-[10px] text-muted-foreground">
+                              Contact: {ko.contact.name}
+                              {ko.contact.phone && ` · ${ko.contact.phone}`}
+                            </div>
+                          )}
+                          {ko.note && <div className="text-[10px] text-muted-foreground mt-0.5">{ko.note}</div>}
+                        </div>
+                        {(role === "admin" || role === "manager") && (
+                          <button
+                            onClick={() => removeKeyOwner(ko.id)}
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {keyOwners.length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        ยังไม่มี Sales ดูแล Account นี้
+                      </p>
+                    )}
+                  </div>
+                  {/* ปุ่มเพิ่ม Sales */}
+                  {(role === "admin" || role === "manager") && (
+                    <button
+                      onClick={() => setKeyOwnerOpen(true)}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-amber-300 py-2 text-xs text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> เพิ่ม Sales ดูแล
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           <div className="rounded-xl border bg-card">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <div className="flex items-center gap-2 text-sm font-semibold">
