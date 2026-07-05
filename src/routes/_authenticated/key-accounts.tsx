@@ -766,8 +766,18 @@ function DealsTab({ leads, onAddDeal }: { leads: any[]; onAddDeal: () => void })
     cancelled: { bg: "#F1EFE8", text: "#5F5E5A" },
   };
 
-  const activeLeads = leads.filter((l) => l.stage !== "lost");
-  const wonLeads = leads.filter((l) => l.stage === "won");
+  const sortedLeads = useMemo(
+    () =>
+      [...leads].sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return tb - ta;
+      }),
+    [leads],
+  );
+
+  const activeLeads = sortedLeads.filter((l) => l.stage !== "lost");
+  const wonLeads = sortedLeads.filter((l) => l.stage === "won");
 
   const totalExpected = activeLeads.reduce(
     (s, l) => s + Number(l.expected_value ?? 0),
@@ -777,11 +787,21 @@ function DealsTab({ leads, onAddDeal }: { leads: any[]; onAddDeal: () => void })
     (s, l) => s + Number(l.expected_value ?? 0),
     0,
   );
-  const allQTs = leads.flatMap((l) => l.quotations ?? []);
+  const allQTs = sortedLeads.flatMap((l) => l.quotations ?? []);
   const totalQT = allQTs.reduce((s, q) => s + Number(q.grand_total ?? 0), 0);
 
+  const DEALS_PAGE_SIZE = 5;
+  const [dealsPage, setDealsPage] = useState(1);
+  const dealsTotalPages = Math.max(1, Math.ceil(sortedLeads.length / DEALS_PAGE_SIZE));
+  const dealsPageSafe = Math.min(dealsPage, dealsTotalPages);
+  const pagedLeads = sortedLeads.slice(
+    (dealsPageSafe - 1) * DEALS_PAGE_SIZE,
+    dealsPageSafe * DEALS_PAGE_SIZE,
+  );
+
   const [expanded, setExpanded] = useState<Set<string>>(
-    new Set(leads.slice(0, 1).map((l) => l.id)),
+    // เริ่มต้นเปิดเฉพาะดีลล่าสุด (ใหม่สุด) — ที่เหลือหุบไว้
+    new Set(sortedLeads.slice(0, 1).map((l) => l.id)),
   );
 
   const toggle = (id: string) =>
