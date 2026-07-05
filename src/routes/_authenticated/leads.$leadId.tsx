@@ -55,6 +55,8 @@ function LeadDetailPage() {
   const [faDoc, setFaDoc] = useState<FADocument | null>(null);
   const [faImportOpen, setFaImportOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
+  const [callOpen, setCallOpen] = useState(false);
+  const [lineOpen, setLineOpen] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
