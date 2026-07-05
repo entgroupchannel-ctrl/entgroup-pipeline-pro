@@ -28,8 +28,21 @@ interface DashData {
   activities: any[];
 }
 
+const STAGE_COLORS: Record<LeadStage, string> = {
+  new: "oklch(0.7 0.02 260)",
+  qualified: "oklch(0.62 0.18 255)",
+  proposal: "oklch(0.58 0.22 300)",
+  negotiation: "oklch(0.6 0.13 195)",
+  closing: "oklch(0.75 0.16 75)",
+  won: "oklch(0.65 0.18 155)",
+  lost: "oklch(0.62 0.22 25)",
+};
+
+type ChartMode = "horizontal" | "vertical" | "pie";
+
 function Dashboard() {
   const [data, setData] = useState<DashData | null>(null);
+  const [chartMode, setChartMode] = useState<ChartMode>("horizontal");
 
   useEffect(() => {
     (async () => {
