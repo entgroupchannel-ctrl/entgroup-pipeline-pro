@@ -38,7 +38,7 @@ export function leadsToRows(
   stageLabel: Record<string, string>,
 ) {
   return leads.map((l) => ({
-    "ชื่อดีล":          l.title ?? "",
+    "เลขที่ดีล":         l.deal_number ?? l.title ?? "",
     "บริษัท":           l.account_id ? (accountsMap.get(l.account_id) ?? "") : "",
     "Stage":            stageLabel[l.stage] ?? l.stage ?? "",
     "มูลค่า (บาท)":     l.expected_value ?? "",

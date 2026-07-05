@@ -229,7 +229,7 @@ function Dashboard() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{a.subject ?? a.type}</div>
                     <div className="truncate text-xs text-muted-foreground">
-                      {lead?.title ?? "-"} {owner ? `· ${owner}` : ""}
+                      {lead?.deal_number ?? lead?.title ?? "-"} {owner ? `· ${owner}` : ""}
                     </div>
                     <div className="text-[11px] text-muted-foreground">
                       {formatDistanceToNow(new Date(a.created_at), { addSuffix: true, locale: th })}

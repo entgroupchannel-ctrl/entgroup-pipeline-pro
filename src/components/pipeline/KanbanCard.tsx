@@ -129,7 +129,14 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
         >
           <GripVertical className="h-4 w-4" />
         </div>
-        <h3 className="line-clamp-2 text-sm font-semibold leading-snug flex-1">{lead.title}</h3>
+        <div className="flex-1 min-w-0">
+          {lead.deal_number && (
+            <div className="font-mono text-[11px] text-primary/70 mb-0.5">{lead.deal_number}</div>
+          )}
+          <h3 className="line-clamp-2 text-sm font-semibold leading-snug">
+            {lead.account?.name ?? lead.title}
+          </h3>
+        </div>
         <LineBadge count={lineUnread} />
         <div
           onClick={(e) => e.stopPropagation()}
