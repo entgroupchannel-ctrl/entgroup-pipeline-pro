@@ -1,11 +1,11 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  KanbanSquare,
+  Kanban,
   List,
   Building2,
   FileText,
   CalendarCheck,
-  BarChart2,
+  LayoutDashboard,
   Settings,
   LogOut,
   Target,
