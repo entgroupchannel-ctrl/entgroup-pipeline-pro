@@ -852,10 +852,15 @@ function EmailsPage() {
             </div>
 
             {/* Send button */}
-            <Button onClick={handleSend} disabled={sending || !to || !subject || !body} className="w-full">
+            <Button
+              onClick={handleSend}
+              disabled={sending || !to || !subject || !body}
+              size="lg"
+              className="w-full h-12 text-base font-semibold shadow-md hover:shadow-lg transition-shadow"
+            >
               {sending
-                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังส่ง…</>
-                : <><Send className="mr-2 h-4 w-4" />ส่งอีเมล{pendingAttachments.length > 0 ? ` (${pendingAttachments.length} ไฟล์แนบ)` : ""}</>}
+                ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />กำลังส่ง…</>
+                : <><Send className="mr-2 h-5 w-5" />ส่งอีเมล{pendingAttachments.length > 0 ? ` (${pendingAttachments.length} ไฟล์แนบ)` : ""}</>}
             </Button>
           </div>
         </div>
