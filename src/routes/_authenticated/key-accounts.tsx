@@ -217,6 +217,17 @@ function KeyAccountsPage() {
     });
   }, [accounts, activities, q, filter]);
 
+  useEffect(() => {
+    setAccPage(1);
+  }, [q, filter]);
+
+  const accTotalPages = Math.max(1, Math.ceil(filteredAccounts.length / ACC_PAGE_SIZE));
+  const accPageSafe = Math.min(accPage, accTotalPages);
+  const pagedAccounts = filteredAccounts.slice(
+    (accPageSafe - 1) * ACC_PAGE_SIZE,
+    accPageSafe * ACC_PAGE_SIZE,
+  );
+
   const selectedActs = selected ? getAccActivities(selected) : [];
   const selectedTarget = selected?.target?.[0] ?? DEFAULT_TARGET;
   const selectedHealth = selected ? calcHealth(selectedTarget, selectedActs) : 0;
