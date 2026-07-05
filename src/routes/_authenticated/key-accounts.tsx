@@ -43,7 +43,6 @@ interface KeyAccount {
   industry: string | null;
   owner_id: string | null;
   is_key_account: boolean;
-  owner?: { full_name: string | null } | null;
   leads?: {
     id: string;
     title: string;
@@ -61,6 +60,7 @@ interface KeyAccount {
   }[];
   target?: KeyAccountTarget[];
 }
+
 
 
 interface ActivityRow {
