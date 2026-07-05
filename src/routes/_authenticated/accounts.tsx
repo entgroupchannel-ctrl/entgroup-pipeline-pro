@@ -97,7 +97,7 @@ function AccountsPage() {
 
   const load = async () => {
     const [accRes, leadsRes] = await Promise.all([
-      crmDb().from("accounts").select("*, tax_id, industry, full_address, zip_code, credit_days, account_type, contacts(id, name, is_primary)").order("name"),
+      crmDb().from("accounts").select("*, tax_id, industry, full_address, zip_code, credit_days, account_type").order("name"),
       crmDb().from("leads").select("id,account_id"),
     ]);
     if (accRes.error) return toast.error("โหลดบริษัทไม่สำเร็จ", { description: accRes.error.message });
@@ -326,12 +326,7 @@ function AccountsPage() {
                       ) : <span className="text-muted-foreground">—</span>}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {((a as any).contacts?.find((c: any) => c.is_primary)?.name ?? (a as any).contacts?.[0]?.name ?? null) ? (
-                        <div className="flex items-center gap-1.5">
-                          <User className="h-3 w-3 shrink-0 text-muted-foreground/60" />
-                          <span className="truncate max-w-[120px]">{((a as any).contacts?.find((c: any) => c.is_primary)?.name ?? (a as any).contacts?.[0]?.name ?? null)}</span>
-                        </div>
-                      ) : <span>—</span>}
+                      <span className="text-muted-foreground/50">—</span>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {a.phone ?? "—"}
