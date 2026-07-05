@@ -24,6 +24,7 @@ import { formatThaiDate as formatThaiDay } from "@/lib/format";
 import { fetchFADocument, type FADocument } from "@/lib/flowaccount-client";
 import { FAImportModal } from "@/components/flowaccount/FAImportModal";
 import { LeadQuotationsSection } from "@/components/pipeline/LeadQuotationsSection";
+import { LeadB2BSection } from "@/components/pipeline/LeadB2BSection";
 import { LeadEmailComposer } from "@/components/pipeline/LeadEmailComposer";
 import { FileDown } from "lucide-react";
 
@@ -619,6 +620,25 @@ function LeadDetailPage() {
             companyName={account?.name}
             onSent={load}
           />
+
+          {/* B2B Request details — show only if this lead came from B2B */}
+          {lead?.b2b_request_id && (
+            <div className="rounded-xl border bg-card">
+              <div className="flex items-center gap-2 border-b px-4 py-3">
+                <span className="text-sm font-semibold">🛒 B2B Request</span>
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                  {lead.b2b_quote_number}
+                </span>
+              </div>
+              <div className="p-4">
+                <LeadB2BSection
+                  b2bRequestId={lead.b2b_request_id}
+                  b2bSnapshot={lead.b2b_data}
+                  flowaccountUrl={form.flowaccount_quotation_url || null}
+                />
+              </div>
+            </div>
+          )}
 
           <LeadQuotationsSection leadId={leadId} accountId={lead.account_id} />
 
