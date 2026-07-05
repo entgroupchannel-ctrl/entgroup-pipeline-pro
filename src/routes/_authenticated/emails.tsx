@@ -1,8 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Mail, Sparkles, Send, Loader2, RotateCcw, Search, Save, Trash2 } from "lucide-react";
+import {
+  Mail, Sparkles, Send, Loader2, RotateCcw, Search, Save, Trash2,
+  AlertTriangle, CheckCircle2, Settings,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +21,7 @@ import {
 import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { draftLeadEmail, sendLeadEmail } from "@/lib/lead-email.functions";
+import { loadAISettings, type AISettings } from "@/lib/ai-settings.functions";
 
 const TEMPLATES_KEY = "email_templates";
 type SavedTemplate = { id: string; name: string; subject: string; body: string; created_at: string };
@@ -44,11 +48,60 @@ const QUICK_BRIEFS = [
   { label: "แจ้งโปรโมชัน",        text: "แจ้งโปรโมชันพิเศษที่น่าสนใจสำหรับลูกค้า ไม่กดดัน เปิดให้ถาม" },
 ];
 
-function EmailsPage() {
-  const { user, profile } = useAuth() as any;
+// ── AI Status Banner ──────────────────────────────────────────────────────────
 
-  const doDraft = useServerFn(draftLeadEmail);
-  const doSend  = useServerFn(sendLeadEmail);
+function AIStatusBanner({ aiCfg, role }: { aiCfg: AISettings | null; role: string }) {
+  if (!aiCfg) return null;
+
+  // ready
+  if (aiCfg.isActive && aiCfg.emailDraftEnabled && aiCfg.keyStatus === "ok") return null;
+
+  const isAdmin = role === "admin";
+
+  // determine problem
+  const problem =
+    !aiCfg.hasKey         ? "ยังไม่มี Claude API Key" :
+    aiCfg.keyStatus === "invalid" ? "Claude API Key ไม่ถูกต้อง" :
+    !aiCfg.isActive       ? "Claude AI ยังปิดอยู่" :
+    !aiCfg.emailDraftEnabled ? "ฟีเจอร์ร่างอีเมลถูกปิด" :
+    "ไม่สามารถเชื่อมต่อ AI ได้";
+
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+          AI ร่างอีเมลไม่พร้อมใช้งาน — {problem}
+        </p>
+        <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+          {isAdmin
+            ? "ไปที่ ตั้งค่า > AI ✦ เพื่อกำหนดค่า"
+            : "ติดต่อ Admin เพื่อเปิดใช้งาน"}
+        </p>
+      </div>
+      {isAdmin && (
+        <Link to="/settings">
+          <Button size="sm" variant="outline" className="shrink-0 h-7 text-xs gap-1">
+            <Settings className="h-3.5 w-3.5" /> ตั้งค่า AI
+          </Button>
+        </Link>
+      )}
+    </div>
+  );
+}
+
+// ── Main Page ────────────────────────────────────────────────────────────────
+
+function EmailsPage() {
+  const { user, profile, role } = useAuth() as any;
+
+  const doDraft     = useServerFn(draftLeadEmail);
+  const doSend      = useServerFn(sendLeadEmail);
+  const doLoadAI    = useServerFn(loadAISettings);
+
+  // AI config state
+  const [aiCfg, setAiCfg] = useState<AISettings | null>(null);
+  const aiReady = aiCfg?.isActive && aiCfg?.emailDraftEnabled && aiCfg?.keyStatus === "ok";
 
   // contact lookup
   const [contactQuery, setContactQuery] = useState("");
@@ -74,6 +127,11 @@ function EmailsPage() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [tplName, setTplName] = useState("");
   useEffect(() => { setTemplates(loadTemplates()); }, []);
+
+  // Load AI config once on mount
+  useEffect(() => {
+    doLoadAI().then((cfg) => setAiCfg(cfg as AISettings)).catch(() => {});
+  }, []);
 
   const applyTemplate = (t: SavedTemplate) => {
     setSubject(t.subject);
@@ -152,6 +210,7 @@ function EmailsPage() {
       setBody(result.body);
       setStep("preview");
     } catch (e: any) {
+      // Server returns descriptive Thai messages — show them directly
       toast.error("AI ร่างอีเมลไม่สำเร็จ", { description: e?.message });
     } finally {
       setDrafting(false);
@@ -186,7 +245,7 @@ function EmailsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
+    <div className="mx-auto max-w-5xl space-y-4 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -198,7 +257,26 @@ function EmailsPage() {
             <p className="text-xs text-muted-foreground">ร่างด้วย AI แล้วส่งหาลูกค้าได้เลย</p>
           </div>
         </div>
+
+        {/* AI status pill */}
+        {aiCfg && (
+          <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs border ${
+            aiReady
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-400"
+              : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-400"
+          }`}>
+            {aiReady
+              ? <CheckCircle2 className="h-3.5 w-3.5" />
+              : <AlertTriangle className="h-3.5 w-3.5" />}
+            {aiReady
+              ? `AI พร้อม · ${aiCfg.model.replace("claude-", "").replace("-4-6", " 4.6").replace("-4-5-20251001", " 4.5")}`
+              : "AI ยังไม่พร้อม"}
+          </div>
+        )}
       </div>
+
+      {/* AI config warning banner */}
+      <AIStatusBanner aiCfg={aiCfg} role={role ?? "sales"} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* ── Compose panel ── */}
@@ -301,11 +379,25 @@ function EmailsPage() {
                   />
                 </div>
 
-                <Button onClick={handleDraft} disabled={drafting || !brief.trim()} className="w-full">
+                <Button
+                  onClick={handleDraft}
+                  disabled={drafting || !brief.trim() || !aiReady}
+                  className="w-full"
+                  title={!aiReady ? "AI ยังไม่พร้อม — ตั้งค่าก่อน" : undefined}
+                >
                   {drafting
                     ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังร่าง…</>
                     : <><Sparkles className="mr-2 h-4 w-4" />ให้ AI ร่างให้</>}
                 </Button>
+
+                {/* Inline hint if AI not ready */}
+                {!aiReady && aiCfg !== null && (
+                  <p className="text-center text-xs text-muted-foreground">
+                    {role === "admin"
+                      ? <>AI ยังไม่พร้อม — <Link to="/settings" className="text-primary hover:underline">ตั้งค่า AI ✦</Link></>
+                      : "AI ยังไม่พร้อม — ติดต่อ Admin"}
+                  </p>
+                )}
               </>
             )}
 
@@ -407,35 +499,51 @@ function EmailsPage() {
           </div>
         </div>
 
-        {/* ── History panel ── */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold">ส่งล่าสุด</h2>
-          {logs.length === 0 ? (
-            <p className="text-xs text-muted-foreground">ยังไม่มีประวัติการส่ง</p>
-          ) : (
-            <div className="space-y-2">
-              {logs.map((log) => (
-                <div key={log.id} className="rounded-lg border bg-card p-3 space-y-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-xs font-medium line-clamp-1">{log.subject || "—"}</span>
-                    <Badge
-                      variant={log.status === "sent" ? "default" : "destructive"}
-                      className="shrink-0 text-[10px]"
-                    >
-                      {log.status === "sent" ? "ส่งแล้ว" : "ล้มเหลว"}
-                    </Badge>
-                  </div>
-                  <div className="text-xs text-muted-foreground">{log.recipient_email}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(log.created_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}
-                  </div>
-                  {log.error_message && (
-                    <div className="text-xs text-destructive">{log.error_message}</div>
-                  )}
-                </div>
-              ))}
+        {/* ── History + AI info panel ── */}
+        <div className="space-y-4">
+          {/* AI config card */}
+          {aiCfg && aiReady && (
+            <div className="rounded-xl border bg-card p-3 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                <CheckCircle2 className="h-3.5 w-3.5" /> AI พร้อมใช้งาน
+              </div>
+              <div className="text-[11px] text-muted-foreground space-y-0.5">
+                <div>โมเดล: <span className="font-medium">{aiCfg.model}</span></div>
+                <div>ความยาว: <span className="font-medium">สูงสุด {aiCfg.maxTokens.toLocaleString()} tokens</span></div>
+              </div>
             </div>
           )}
+
+          {/* History */}
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold">ส่งล่าสุด</h2>
+            {logs.length === 0 ? (
+              <p className="text-xs text-muted-foreground">ยังไม่มีประวัติการส่ง</p>
+            ) : (
+              <div className="space-y-2">
+                {logs.map((log) => (
+                  <div key={log.id} className="rounded-lg border bg-card p-3 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs font-medium line-clamp-1">{log.subject || "—"}</span>
+                      <Badge
+                        variant={log.status === "sent" ? "default" : "destructive"}
+                        className="shrink-0 text-[10px]"
+                      >
+                        {log.status === "sent" ? "ส่งแล้ว" : "ล้มเหลว"}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground">{log.recipient_email}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(log.created_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}
+                    </div>
+                    {log.error_message && (
+                      <div className="text-xs text-destructive">{log.error_message}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

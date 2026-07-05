@@ -10,6 +10,8 @@ function trimKey(v: string | undefined) {
   return v.trim().replace(/^["']|["']$/g, "");
 }
 
+// ── Load Resend email config from crm.integrations (id='email') ───────────────
+
 async function loadEmailConfig(supabaseAdmin: any) {
   const { data } = await (supabaseAdmin as any)
     .schema("crm").from("integrations")
@@ -22,32 +24,23 @@ async function loadEmailConfig(supabaseAdmin: any) {
   return { key, fromEmail, company, replyTo, isActive };
 }
 
+// ── Load Claude AI config from crm.integrations (id='claude_ai') ──────────────
+
+async function loadClaudeConfig(supabaseAdmin: any) {
+  const { data } = await (supabaseAdmin as any)
+    .schema("crm").from("integrations")
+    .select("*").eq("id", "claude_ai").maybeSingle();
+
+  const apiKey            = trimKey(data?.claude_api_key || process.env.ANTHROPIC_API_KEY || "");
+  const model             = (data?.ai_model as string)       || "claude-sonnet-4-6";
+  const maxTokens         = (data?.max_tokens as number)      || 1000;
+  const isActive          = data?.is_active          ?? false;
+  const emailDraftEnabled = data?.email_draft_enabled ?? true;
+
+  return { apiKey, model, maxTokens, isActive, emailDraftEnabled };
+}
+
 // ── AI draft email ─────────────────────────────────────────────────────────────
-
-const TONE_MAP: Record<string, string> = {
-  formal:   "สุภาพทางการ ใช้ภาษาเป็นทางการ เหมาะกับลูกค้าองค์กรใหญ่หรือติดต่อครั้งแรก",
-  friendly: "สุภาพเป็นกันเอง อบอุ่น เหมือนคุยกับลูกค้าที่รู้จักกันดี",
-  concise:  "กระชับ ตรงประเด็น ไม่อ้อมค้อม เน้นข้อมูลสำคัญ",
-  warm:     "อบอุ่นเป็นมิตร แสดงความใส่ใจและขอบคุณลูกค้า",
-  persuasive:"โน้มน้าวอย่างมืออาชีพ เน้นคุณค่าและประโยชน์ที่ลูกค้าจะได้รับ",
-};
-
-const LENGTH_MAP: Record<string, string> = {
-  short:  "สั้นมาก 2-3 ประโยค ไม่เกิน 60 คำ",
-  medium: "ปานกลาง 4-6 ประโยค ประมาณ 80-150 คำ",
-  long:   "ยาว มีรายละเอียดครบ 7-10 ประโยค ประมาณ 180-260 คำ",
-};
-
-const TEMPLATE_MAP: Record<string, string> = {
-  meeting:      "นัดหมายประชุม เสนอวัน-เวลา และหัวข้อที่จะคุย",
-  followup:     "ติดตามผลหลังคุยครั้งล่าสุด ถามความคืบหน้าและข้อสงสัย",
-  thanks:       "ขอบคุณลูกค้าหลังประชุม/สั่งซื้อ สรุปประเด็นและ next step",
-  quotation:    "แจ้งว่าได้ส่งใบเสนอราคาให้แล้ว ขอให้ตรวจสอบและแจ้งผล",
-  introduction: "แนะนำตัว/บริษัท และเสนอโอกาสความร่วมมือ",
-  reminder:     "เตือนอย่างสุภาพเรื่องที่ยังค้างอยู่ เช่น เอกสาร/การตัดสินใจ",
-  promotion:    "แจ้งโปรโมชัน/ข้อเสนอพิเศษ ไม่กดดัน เปิดให้สอบถาม",
-  custom:       "",
-};
 
 export const draftLeadEmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -59,14 +52,28 @@ export const draftLeadEmail = createServerFn({ method: "POST" })
       company_name: z.string().optional(),
       stage:        z.string().optional(),
       sender_name:  z.string().optional(),
-      tone:         z.string().optional(),
-      length:       z.string().optional(),
-      template:     z.string().optional(),
     }).parse(input)
   )
   .handler(async ({ data }) => {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error("ANTHROPIC_API_KEY ยังไม่ได้ตั้งค่า");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const ai = await loadClaudeConfig(supabaseAdmin);
+
+    // Guard: check settings in order of clarity
+    if (!ai.apiKey) {
+      throw new Error(
+        "ยังไม่ได้ตั้งค่า Claude API Key — ไปที่ ตั้งค่า > AI ✦ เพื่อกรอก key"
+      );
+    }
+    if (!ai.isActive) {
+      throw new Error(
+        "ฟีเจอร์ AI ยังปิดอยู่ — ไปที่ ตั้งค่า > AI ✦ แล้วเปิดสวิตช์"
+      );
+    }
+    if (!ai.emailDraftEnabled) {
+      throw new Error(
+        "ฟีเจอร์ร่างอีเมลด้วย AI ถูกปิดอยู่ — ไปที่ ตั้งค่า > AI ✦ เพื่อเปิด"
+      );
+    }
 
     const contextParts = [
       data.company_name ? `บริษัทลูกค้า: ${data.company_name}` : null,
@@ -76,24 +83,11 @@ export const draftLeadEmail = createServerFn({ method: "POST" })
       data.sender_name  ? `ชื่อผู้ส่ง: ${data.sender_name}`     : null,
     ].filter(Boolean).join("\n");
 
-    const toneDesc     = TONE_MAP[data.tone ?? "friendly"]     ?? TONE_MAP.friendly;
-    const lengthDesc   = LENGTH_MAP[data.length ?? "medium"]   ?? LENGTH_MAP.medium;
-    const templateDesc = data.template && TEMPLATE_MAP[data.template]
-      ? TEMPLATE_MAP[data.template] : "";
-
-    const maxTokens = data.length === "short" ? 400 : data.length === "long" ? 1200 : 800;
-
     const prompt = `คุณเป็น Sales Professional ของบริษัท ENTGROUP
 ช่วยร่างอีเมลภาษาไทยแบบมืออาชีพ ตามข้อมูลต่อไปนี้
 
-${contextParts ? `== ข้อมูลลูกค้า ==\n${contextParts}\n` : ""}${templateDesc ? `== ประเภทอีเมล ==\n${templateDesc}\n\n` : ""}== สิ่งที่ต้องการสื่อ ==
+${contextParts ? `== ข้อมูลลูกค้า ==\n${contextParts}\n` : ""}== สิ่งที่ต้องการสื่อ ==
 ${data.brief}
-
-== โทน ==
-${toneDesc}
-
-== ความยาว ==
-${lengthDesc}
 
 กรุณาตอบในรูปแบบ JSON เท่านั้น ไม่มี markdown หรือ backtick:
 {
@@ -102,27 +96,33 @@ ${lengthDesc}
 }
 
 หลักการ:
-- ยึดโทนและความยาวตามที่ระบุด้านบนอย่างเคร่งครัด
+- ใช้ภาษาสุภาพ เป็นกันเอง ไม่เป็นทางการเกินไป
+- ไม่ยาวเกิน 5-7 ประโยค
 - ปิดท้ายด้วยการเปิดให้ตอบกลับ
 - ถ้ามีชื่อผู้ติดต่อ ให้ขึ้นต้นด้วย "เรียน คุณ[ชื่อ],"`;
 
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
+        "Content-Type":      "application/json",
+        "x-api-key":         ai.apiKey,
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: maxTokens,
+        model:      ai.model,
+        max_tokens: ai.maxTokens,
         messages: [{ role: "user", content: prompt }],
       }),
     });
 
     if (!resp.ok) {
-      const err = await resp.text().catch(() => "");
-      throw new Error(`AI ตอบกลับ ${resp.status}: ${err}`);
+      const errText = await resp.text().catch(() => "");
+      if (resp.status === 401) {
+        throw new Error(
+          "Claude API Key ไม่ถูกต้องหรือหมดอายุ — ไปที่ ตั้งค่า > AI ✦ เพื่ออัปเดต key"
+        );
+      }
+      throw new Error(`AI ตอบกลับ ${resp.status}: ${errText.slice(0, 120)}`);
     }
 
     const json: any = await resp.json();
@@ -134,11 +134,9 @@ ${lengthDesc}
       const parsed = JSON.parse(cleaned);
       return { subject: parsed.subject ?? "", body: parsed.body ?? "" };
     } catch {
-      // fallback: return raw as body
       return { subject: "", body: raw };
     }
   });
-
 
 // ── Send email via Resend + log ────────────────────────────────────────────────
 
@@ -194,16 +192,16 @@ export const sendLeadEmail = createServerFn({ method: "POST" })
     await (supabaseAdmin as any)
       .schema("crm").from("email_send_log")
       .insert({
-        recipient_email:    data.to,
-        template_name:      "lead_email_manual",
-        subject:            data.subject,
-        status:             resp.ok ? "sent" : "failed",
+        recipient_email:     data.to,
+        template_name:       "lead_email_manual",
+        subject:             data.subject,
+        status:              resp.ok ? "sent" : "failed",
         provider_message_id: respBody?.id ?? null,
-        error_message:      resp.ok ? null : (respBody?.message ?? `HTTP ${resp.status}`),
-        related_id:         data.lead_id    ?? null,
-        related_type:       data.lead_id    ? "lead"    :
-                            data.contact_id ? "contact" : null,
-        triggered_by:       context.userId,
+        error_message:       resp.ok ? null : (respBody?.message ?? `HTTP ${resp.status}`),
+        related_id:          data.lead_id    ?? null,
+        related_type:        data.lead_id    ? "lead"    :
+                             data.contact_id ? "contact" : null,
+        triggered_by:        context.userId,
         metadata: {
           contact_id: data.contact_id ?? null,
           lead_id:    data.lead_id    ?? null,
