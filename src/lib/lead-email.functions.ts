@@ -24,6 +24,31 @@ async function loadEmailConfig(supabaseAdmin: any) {
 
 // ── AI draft email ─────────────────────────────────────────────────────────────
 
+const TONE_MAP: Record<string, string> = {
+  formal:   "สุภาพทางการ ใช้ภาษาเป็นทางการ เหมาะกับลูกค้าองค์กรใหญ่หรือติดต่อครั้งแรก",
+  friendly: "สุภาพเป็นกันเอง อบอุ่น เหมือนคุยกับลูกค้าที่รู้จักกันดี",
+  concise:  "กระชับ ตรงประเด็น ไม่อ้อมค้อม เน้นข้อมูลสำคัญ",
+  warm:     "อบอุ่นเป็นมิตร แสดงความใส่ใจและขอบคุณลูกค้า",
+  persuasive:"โน้มน้าวอย่างมืออาชีพ เน้นคุณค่าและประโยชน์ที่ลูกค้าจะได้รับ",
+};
+
+const LENGTH_MAP: Record<string, string> = {
+  short:  "สั้นมาก 2-3 ประโยค ไม่เกิน 60 คำ",
+  medium: "ปานกลาง 4-6 ประโยค ประมาณ 80-150 คำ",
+  long:   "ยาว มีรายละเอียดครบ 7-10 ประโยค ประมาณ 180-260 คำ",
+};
+
+const TEMPLATE_MAP: Record<string, string> = {
+  meeting:      "นัดหมายประชุม เสนอวัน-เวลา และหัวข้อที่จะคุย",
+  followup:     "ติดตามผลหลังคุยครั้งล่าสุด ถามความคืบหน้าและข้อสงสัย",
+  thanks:       "ขอบคุณลูกค้าหลังประชุม/สั่งซื้อ สรุปประเด็นและ next step",
+  quotation:    "แจ้งว่าได้ส่งใบเสนอราคาให้แล้ว ขอให้ตรวจสอบและแจ้งผล",
+  introduction: "แนะนำตัว/บริษัท และเสนอโอกาสความร่วมมือ",
+  reminder:     "เตือนอย่างสุภาพเรื่องที่ยังค้างอยู่ เช่น เอกสาร/การตัดสินใจ",
+  promotion:    "แจ้งโปรโมชัน/ข้อเสนอพิเศษ ไม่กดดัน เปิดให้สอบถาม",
+  custom:       "",
+};
+
 export const draftLeadEmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
@@ -34,6 +59,9 @@ export const draftLeadEmail = createServerFn({ method: "POST" })
       company_name: z.string().optional(),
       stage:        z.string().optional(),
       sender_name:  z.string().optional(),
+      tone:         z.string().optional(),
+      length:       z.string().optional(),
+      template:     z.string().optional(),
     }).parse(input)
   )
   .handler(async ({ data }) => {
@@ -48,12 +76,24 @@ export const draftLeadEmail = createServerFn({ method: "POST" })
       data.sender_name  ? `ชื่อผู้ส่ง: ${data.sender_name}`     : null,
     ].filter(Boolean).join("\n");
 
+    const toneDesc     = TONE_MAP[data.tone ?? "friendly"]     ?? TONE_MAP.friendly;
+    const lengthDesc   = LENGTH_MAP[data.length ?? "medium"]   ?? LENGTH_MAP.medium;
+    const templateDesc = data.template && TEMPLATE_MAP[data.template]
+      ? TEMPLATE_MAP[data.template] : "";
+
+    const maxTokens = data.length === "short" ? 400 : data.length === "long" ? 1200 : 800;
+
     const prompt = `คุณเป็น Sales Professional ของบริษัท ENTGROUP
 ช่วยร่างอีเมลภาษาไทยแบบมืออาชีพ ตามข้อมูลต่อไปนี้
 
-${contextParts ? `== ข้อมูลลูกค้า ==\n${contextParts}\n` : ""}
-== สิ่งที่ต้องการสื่อ ==
+${contextParts ? `== ข้อมูลลูกค้า ==\n${contextParts}\n` : ""}${templateDesc ? `== ประเภทอีเมล ==\n${templateDesc}\n\n` : ""}== สิ่งที่ต้องการสื่อ ==
 ${data.brief}
+
+== โทน ==
+${toneDesc}
+
+== ความยาว ==
+${lengthDesc}
 
 กรุณาตอบในรูปแบบ JSON เท่านั้น ไม่มี markdown หรือ backtick:
 {
@@ -62,8 +102,7 @@ ${data.brief}
 }
 
 หลักการ:
-- ใช้ภาษาสุภาพ เป็นกันเอง ไม่เป็นทางการเกินไป
-- ไม่ยาวเกิน 5-7 ประโยค
+- ยึดโทนและความยาวตามที่ระบุด้านบนอย่างเคร่งครัด
 - ปิดท้ายด้วยการเปิดให้ตอบกลับ
 - ถ้ามีชื่อผู้ติดต่อ ให้ขึ้นต้นด้วย "เรียน คุณ[ชื่อ],"`;
 
@@ -76,7 +115,7 @@ ${data.brief}
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 800,
+        max_tokens: maxTokens,
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -99,6 +138,7 @@ ${data.brief}
       return { subject: "", body: raw };
     }
   });
+
 
 // ── Send email via Resend + log ────────────────────────────────────────────────
 
