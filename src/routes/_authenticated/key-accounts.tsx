@@ -449,10 +449,13 @@ function KeyAccountsPage() {
               </div>
             )}
             {tab === "ดีลที่เกี่ยวข้อง" && (
-              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                {selected.leads?.length ?? 0} ดีล
-              </div>
+              <DealsTab
+                account={selected}
+                leads={getAccLeads(selected)}
+                onAddDeal={() => {/* navigate to pipeline */}}
+              />
             )}
+
             {tab === "บันทึก" && (
               <div style={{ fontSize: 12, color: "var(--text-muted)" }}>ยังไม่มีบันทึก</div>
             )}
