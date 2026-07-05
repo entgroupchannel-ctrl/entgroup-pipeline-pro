@@ -86,7 +86,7 @@ function AccountsPage() {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const isManager = role === "manager" || role === "admin";
-  const isAdmin = role === "admin";
+  const isAdmin = role === "admin"; // admin = super admin (highest role)
 
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [leadsCount, setLeadsCount] = useState<Map<string, number>>(new Map());
@@ -97,7 +97,7 @@ function AccountsPage() {
 
   const load = async () => {
     const [accRes, leadsRes] = await Promise.all([
-      crmDb().from("accounts").select("*, tax_id, industry, full_address, zip_code, credit_days, account_type").order("name"),
+      crmDb().from("accounts").select("*, tax_id, industry, full_address, zip_code, credit_days, account_type, contacts(id, name, phone, is_primary)").order("name"),
       crmDb().from("leads").select("id,account_id"),
     ]);
     if (accRes.error) return toast.error("โหลดบริษัทไม่สำเร็จ", { description: accRes.error.message });
@@ -200,7 +200,7 @@ function AccountsPage() {
         </div>
         <div className="flex gap-2">
           {isAdmin && (
-            <Button variant="outline" size="sm" onClick={handleExport} disabled={!filtered?.length}>
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={!filtered?.length} title="เฉพาะ Admin เท่านั้น">
               <Download className="mr-1.5 h-4 w-4" /> Export CSV
             </Button>
           )}
@@ -265,91 +265,123 @@ function AccountsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                  <th className="px-3 py-2.5 w-8"><Checkbox checked={!!filtered?.length && selected.size === filtered.length} onCheckedChange={(v) => v ? selectAll() : clearAll()} /></th>
+                <tr className="border-b bg-muted/40 text-[11px] text-muted-foreground uppercase tracking-wide">
+                  <th className="px-3 py-2.5 w-8">
+                    <Checkbox checked={!!filtered?.length && selected.size === filtered.length} onCheckedChange={(v) => v ? selectAll() : clearAll()} />
+                  </th>
                   <th className="px-4 py-2.5 text-left font-medium">ชื่อบริษัท</th>
                   <th className="px-4 py-2.5 text-left font-medium">อุตสาหกรรม</th>
-                  <th className="px-4 py-2.5 text-left font-medium">เลขประจำตัวผู้เสียภาษี</th>
-                  <th className="px-4 py-2.5 text-left font-medium">เครดิต</th>
-                  <th className="px-4 py-2.5 text-left font-medium">ที่อยู่</th>
+                  <th className="px-4 py-2.5 text-left font-medium">ดีล</th>
+                  <th className="px-4 py-2.5 text-left font-medium">ผู้ติดต่อหลัก</th>
                   <th className="px-4 py-2.5 text-left font-medium">เว็บไซต์</th>
-                  <th className="px-4 py-2.5 text-left font-medium">ผู้ติดต่อ</th>
                   <th className="px-4 py-2.5 text-left font-medium">โทรศัพท์</th>
-                  <th className="px-4 py-2.5 text-center font-medium">ดีล</th>
-                  <th className="px-4 py-2.5 text-left font-medium">สร้างเมื่อ</th>
+                  <th className="px-4 py-2.5 text-left font-medium">อัปเดต</th>
                   <th className="px-2 py-2.5 w-8" />
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {pageItems.map((a) => (
-                  <tr key={a.id} className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected.has(a.id) ? "bg-primary/5" : ""}`} onClick={() => navigate({ to: "/accounts/$accountId", params: { accountId: a.id } })}>
-                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}><Checkbox checked={selected.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} /></td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-primary">{a.name}</span>
-                        {a.is_key_account && (
-                          <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-                            <Crown className="h-2.5 w-2.5" /> Key Account
-                          </span>
+                {pageItems.map((a) => {
+                  const contacts = (a as any).contacts as { id: string; name: string; phone: string | null; is_primary: boolean | null }[] | undefined;
+                  const primaryContact = contacts?.find((c) => c.is_primary) ?? contacts?.[0] ?? null;
+                  const initials = primaryContact
+                    ? primaryContact.name.split(" ").map((s: string) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase()
+                    : null;
+                  const dealCount = leadsCount.get(a.id) ?? 0;
+
+                  return (
+                    <tr
+                      key={a.id}
+                      className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected.has(a.id) ? "bg-primary/5" : ""}`}
+                      onClick={() => navigate({ to: "/accounts/$accountId", params: { accountId: a.id } })}
+                    >
+                      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox checked={selected.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} />
+                      </td>
+
+                      {/* ชื่อบริษัท */}
+                      <td className="px-4 py-3 max-w-[220px]">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-medium text-primary truncate">{a.name}</span>
+                          {a.is_key_account && (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 shrink-0">
+                              <Crown className="h-2.5 w-2.5" /> Key
+                            </span>
+                          )}
+                        </div>
+                        {a.account_type && (
+                          <div className="text-[10px] text-muted-foreground mt-0.5 capitalize">{a.account_type}</div>
                         )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {a.industry ? (
-                        <Badge className={`text-[11px] ${INDUSTRY_COLOR[a.industry] ?? "bg-muted text-muted-foreground"}`}>
-                          {a.industry}
-                        </Badge>
-                      ) : <span className="text-xs text-muted-foreground">—</span>}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                      {a.tax_id ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {a.credit_days != null ? `${a.credit_days} วัน` : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      <span className="truncate block max-w-[200px]" title={a.full_address ?? undefined}>
-                        {a.full_address ?? "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs" onClick={(e) => e.stopPropagation()}>
-                      {a.website ? (
-                        <a
-                          href={a.website.startsWith("http") ? a.website : `https://${a.website}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-primary hover:underline max-w-[140px]"
-                        >
-                          <ExternalLink className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{a.website.replace(/^https?:\/\//, "")}</span>
-                        </a>
-                      ) : <span className="text-muted-foreground">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      <span className="text-muted-foreground/50">—</span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {a.phone ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {(leadsCount.get(a.id) ?? 0) > 0 ? (
-                        <Badge variant="secondary" className="text-[11px]">
-                          {leadsCount.get(a.id)}
-                        </Badge>
-                      ) : <span className="text-xs text-muted-foreground">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {formatThaiDate(a.created_at)}
-                    </td>
-                    <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
-                      <RowActions actions={[
-                        stdOpen(() => window.location.assign(`/accounts/${a.id}`)),
-                        stdDupe(() => duplicateAccount(a)),
-                        stdDelete(() => deleteAccount(a.id)),
-                      ]} />
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+
+                      {/* อุตสาหกรรม */}
+                      <td className="px-4 py-3">
+                        {a.industry ? (
+                          <Badge className={`text-[11px] font-medium ${INDUSTRY_COLOR[a.industry] ?? "bg-muted text-muted-foreground"}`}>
+                            {a.industry}
+                          </Badge>
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
+                      </td>
+
+                      {/* ดีล */}
+                      <td className="px-4 py-3">
+                        {dealCount > 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
+                            <Building2 className="h-2.5 w-2.5" />
+                            {dealCount}
+                          </span>
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
+                      </td>
+
+                      {/* ผู้ติดต่อหลัก */}
+                      <td className="px-4 py-3">
+                        {primaryContact ? (
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-semibold text-primary">
+                              {initials}
+                            </div>
+                            <span className="truncate text-xs text-muted-foreground max-w-[120px]">
+                              {primaryContact.name}
+                            </span>
+                          </div>
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
+                      </td>
+
+                      {/* เว็บไซต์ */}
+                      <td className="px-4 py-3 text-xs" onClick={(e) => e.stopPropagation()}>
+                        {a.website ? (
+                          <a
+                            href={a.website.startsWith("http") ? a.website : `https://${a.website}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-primary hover:underline max-w-[140px]"
+                          >
+                            <ExternalLink className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{a.website.replace(/^https?:\/\//, "")}</span>
+                          </a>
+                        ) : <span className="text-muted-foreground">—</span>}
+                      </td>
+
+                      {/* โทรศัพท์ */}
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {a.phone ?? "—"}
+                      </td>
+
+                      {/* อัปเดต */}
+                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                        {formatThaiDate(a.updated_at)}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                        <RowActions actions={[
+                          stdOpen(() => navigate({ to: "/accounts/$accountId", params: { accountId: a.id } })),
+                          stdDupe(() => duplicateAccount(a)),
+                          stdDelete(() => deleteAccount(a.id)),
+                        ]} />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
