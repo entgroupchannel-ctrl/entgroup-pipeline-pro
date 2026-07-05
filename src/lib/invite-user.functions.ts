@@ -6,18 +6,18 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const CRM_ROLES = ["sales", "manager", "admin"] as const;
 const SUPER_ADMIN_EMAILS = ["therdpoom@entgroup.co.th"];
 
-async function assertAdmin(userId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+async function assertAdmin(supabase: any, userId: string) {
   // super admin bypass
   try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u } = await supabaseAdmin.auth.admin.getUserById(userId);
     const email = (u?.user?.email ?? "").toLowerCase();
     if (SUPER_ADMIN_EMAILS.includes(email)) return;
   } catch { /* fall through */ }
-  // check crm.user_profiles role
-  const { data, error } = await supabaseAdmin
-    .schema("crm" as any)
-    .from("user_profiles" as any)
+  // check crm.user_profiles role (authenticated user client, RLS applies)
+  const { data, error } = await (supabase as any)
+    .schema("crm")
+    .from("user_profiles")
     .select("role")
     .eq("id", userId)
     .maybeSingle();

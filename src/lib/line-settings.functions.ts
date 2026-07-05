@@ -3,11 +3,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-async function assertAdmin(userId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await (supabaseAdmin as any)
+async function assertAdmin(supabase: any, userId: string) {
+  const { data, error } = await (supabase as any)
     .schema("crm").from("user_profiles")
     .select("role").eq("id", userId).maybeSingle();
+  if (error) throw new Error(`ตรวจสอบสิทธิ์ไม่สำเร็จ: ${error.message}`);
   if ((data as any)?.role !== "admin") throw new Error("Forbidden: admin only");
 }
 
