@@ -70,6 +70,11 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
     );
   });
 
+  useEffect(() => { setPage(0); }, [search]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageItems = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+
   const doClaimRequest = async (req: B2BQuoteRequest) => {
     setClaiming(req.id);
     try {
