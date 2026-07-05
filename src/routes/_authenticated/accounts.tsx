@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { formatThaiDate } from "@/lib/format";
@@ -23,6 +25,12 @@ interface Account {
   id: string;
   name: string;
   industry: string | null;
+  industry_group: string | null;
+  full_address: string | null;
+  zip_code: string | null;
+  credit_days: number | null;
+  account_type: string | null;
+  tax_id: string | null;
   website: string | null;
   phone: string | null;
   address: string | null;
@@ -35,6 +43,43 @@ interface Account {
   updated_at: string;
 }
 
+const INDUSTRIES = [
+  "ทั้งหมด",
+  "เทคโนโลยี/IT",
+  "อุตสาหกรรม/โรงงาน",
+  "การศึกษา",
+  "สุขภาพ/การแพทย์",
+  "ภาครัฐ",
+  "พลังงาน/สาธารณูปโภค",
+  "การค้า/นำเข้า-ส่งออก",
+  "ขนส่ง/โลจิสติกส์",
+  "ก่อสร้าง/อสังหาริมทรัพย์",
+  "อาหาร/เกษตร",
+  "โรงแรม/ท่องเที่ยว",
+  "ค้าปลีก/ค้าส่ง",
+  "สื่อ/โฆษณา",
+  "การเงิน/ธนาคาร",
+  "อื่นๆ",
+] as const;
+
+const INDUSTRY_COLOR: Record<string, string> = {
+  "เทคโนโลยี/IT": "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+  "อุตสาหกรรม/โรงงาน": "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  "การศึกษา": "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+  "สุขภาพ/การแพทย์": "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+  "ภาครัฐ": "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300",
+  "พลังงาน/สาธารณูปโภค": "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+  "การค้า/นำเข้า-ส่งออก": "bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300",
+  "ขนส่ง/โลจิสติกส์": "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
+  "ก่อสร้าง/อสังหาริมทรัพย์": "bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300",
+  "อาหาร/เกษตร": "bg-lime-100 text-lime-700 dark:bg-lime-950/40 dark:text-lime-300",
+  "โรงแรม/ท่องเที่ยว": "bg-pink-100 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300",
+  "ค้าปลีก/ค้าส่ง": "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300",
+  "สื่อ/โฆษณา": "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
+  "การเงิน/ธนาคาร": "bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300",
+  "อื่นๆ": "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+};
+
 function AccountsPage() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
@@ -44,12 +89,13 @@ function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [leadsCount, setLeadsCount] = useState<Map<string, number>>(new Map());
   const [q, setQ] = useState("");
+  const [industryFilter, setIndustryFilter] = useState("ทั้งหมด");
   const [newOpen, setNewOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = async () => {
     const [accRes, leadsRes] = await Promise.all([
-      crmDb().from("accounts").select("*").order("name"),
+      crmDb().from("accounts").select("*, tax_id, industry, full_address, zip_code, credit_days, account_type").order("name"),
       crmDb().from("leads").select("id,account_id"),
     ]);
     if (accRes.error) return toast.error("โหลดบริษัทไม่สำเร็จ", { description: accRes.error.message });
@@ -71,8 +117,18 @@ function AccountsPage() {
 
   const duplicateAccount = async (a: Account) => {
     const { error } = await crmDb().from("accounts").insert({
-      name: `${a.name} (สำเนา)`, industry: a.industry, website: a.website,
-      phone: a.phone, address: a.address, owner_id: user?.id, created_by: user?.id,
+      name: `${a.name} (สำเนา)`,
+      industry: a.industry,
+      tax_id: a.tax_id,
+      full_address: a.full_address,
+      zip_code: a.zip_code,
+      credit_days: a.credit_days,
+      account_type: a.account_type,
+      website: a.website,
+      phone: a.phone,
+      address: a.address,
+      owner_id: user?.id,
+      created_by: user?.id,
     });
     if (error) { toast.error("สร้างซ้ำไม่สำเร็จ"); return; }
     toast.success("สร้างซ้ำแล้ว"); load();
@@ -98,12 +154,16 @@ function AccountsPage() {
   const filtered = useMemo(() => {
     if (!accounts) return null;
     const needle = q.trim().toLowerCase();
-    if (!needle) return accounts;
-    return accounts.filter((a) =>
-      a.name.toLowerCase().includes(needle) ||
-      (a.industry ?? "").toLowerCase().includes(needle)
-    );
-  }, [accounts, q]);
+    return accounts.filter((a) => {
+      if (industryFilter !== "ทั้งหมด" && a.industry !== industryFilter) return false;
+      if (!needle) return true;
+      return (
+        a.name.toLowerCase().includes(needle) ||
+        (a.industry ?? "").toLowerCase().includes(needle) ||
+        (a.tax_id ?? "").toLowerCase().includes(needle)
+      );
+    });
+  }, [accounts, q, industryFilter]);
 
   const handleExport = () => {
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
@@ -148,6 +208,25 @@ function AccountsPage() {
         </div>
       </div>
 
+      {/* Industry filter */}
+      <div className="mb-4 -mx-6 px-6">
+        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
+          {INDUSTRIES.map((ind) => (
+            <button
+              key={ind}
+              onClick={() => setIndustryFilter(ind)}
+              className={`shrink-0 rounded-full border px-3 py-1 text-xs transition-colors ${
+                industryFilter === ind
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "bg-background hover:bg-muted"
+              }`}
+            >
+              {ind}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* List */}
       <BulkActionBar
         count={selected.size}
@@ -175,6 +254,9 @@ function AccountsPage() {
                   <th className="px-3 py-2.5 w-8"><Checkbox checked={!!filtered?.length && selected.size === filtered.length} onCheckedChange={(v) => v ? selectAll() : clearAll()} /></th>
                   <th className="px-4 py-2.5 text-left font-medium">ชื่อบริษัท</th>
                   <th className="px-4 py-2.5 text-left font-medium">อุตสาหกรรม</th>
+                  <th className="px-4 py-2.5 text-left font-medium">เลขประจำตัวผู้เสียภาษี</th>
+                  <th className="px-4 py-2.5 text-left font-medium">เครดิต</th>
+                  <th className="px-4 py-2.5 text-left font-medium">ที่อยู่</th>
                   <th className="px-4 py-2.5 text-left font-medium">เว็บไซต์</th>
                   <th className="px-4 py-2.5 text-left font-medium">โทรศัพท์</th>
                   <th className="px-4 py-2.5 text-center font-medium">ดีล</th>
@@ -196,8 +278,23 @@ function AccountsPage() {
                         )}
                       </div>
                     </td>
+                    <td className="px-4 py-3">
+                      {a.industry ? (
+                        <Badge className={`text-[11px] ${INDUSTRY_COLOR[a.industry] ?? "bg-muted text-muted-foreground"}`}>
+                          {a.industry}
+                        </Badge>
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {a.tax_id ?? "—"}
+                    </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {a.industry ?? "—"}
+                      {a.credit_days != null ? `${a.credit_days} วัน` : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      <span className="truncate block max-w-[200px]" title={a.full_address ?? undefined}>
+                        {a.full_address ?? "—"}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-xs" onClick={(e) => e.stopPropagation()}>
                       {a.website ? (
@@ -256,11 +353,11 @@ export function NewAccountDialog({
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    name: "", industry: "", website: "", phone: "", address: "",
+    name: "", industry: "", account_type: "", tax_id: "", website: "", phone: "", full_address: "", zip_code: "", credit_days: "", address: "",
   });
 
   useEffect(() => {
-    if (open) setForm({ name: "", industry: "", website: "", phone: "", address: "" });
+    if (open) setForm({ name: "", industry: "", account_type: "", tax_id: "", website: "", phone: "", full_address: "", zip_code: "", credit_days: "", address: "" });
   }, [open]);
 
   const submit = async () => {
@@ -268,9 +365,14 @@ export function NewAccountDialog({
     setSaving(true);
     const { error } = await crmDb().from("accounts").insert({
       name: form.name.trim(),
-      industry: form.industry.trim() || null,
+      industry: form.industry || null,
+      account_type: form.account_type || null,
+      tax_id: form.tax_id.trim() || null,
       website: form.website.trim() || null,
       phone: form.phone.trim() || null,
+      full_address: form.full_address.trim() || null,
+      zip_code: form.zip_code.trim() || null,
+      credit_days: form.credit_days ? parseInt(form.credit_days, 10) : null,
       address: form.address.trim() || null,
       owner_id: user?.id,
       created_by: user?.id,
@@ -293,8 +395,34 @@ export function NewAccountDialog({
             <Input placeholder="บริษัท ABC จำกัด" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
           <div>
+            <Label className="text-xs">เลขประจำตัวผู้เสียภาษี</Label>
+            <Input placeholder="1234567890123" value={form.tax_id} onChange={(e) => setForm({ ...form, tax_id: e.target.value })} />
+          </div>
+          <div>
             <Label className="text-xs">อุตสาหกรรม</Label>
-            <Input placeholder="เช่น อาหาร, IT, ก่อสร้าง" value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
+            <Select value={form.industry} onValueChange={(v) => setForm({ ...form, industry: v })}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="เลือกอุตสาหกรรม" />
+              </SelectTrigger>
+              <SelectContent>
+                {INDUSTRIES.filter((i) => i !== "ทั้งหมด").map((ind) => (
+                  <SelectItem key={ind} value={ind}>{ind}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">ประเภทบัญชี</Label>
+            <Select value={form.account_type} onValueChange={(v) => setForm({ ...form, account_type: v })}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="เลือกประเภทบัญชี" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="customer">ลูกค้า</SelectItem>
+                <SelectItem value="vendor">ผู้จำหน่าย</SelectItem>
+                <SelectItem value="both">ลูกค้า + ผู้จำหน่าย</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -307,7 +435,21 @@ export function NewAccountDialog({
             </div>
           </div>
           <div>
-            <Label className="text-xs">ที่อยู่</Label>
+            <Label className="text-xs">ที่อยู่เต็ม</Label>
+            <Textarea placeholder="ที่อยู่บริษัท" value={form.full_address} onChange={(e) => setForm({ ...form, full_address: e.target.value })} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">รหัสไปรษณีย์</Label>
+              <Input placeholder="10110" value={form.zip_code} onChange={(e) => setForm({ ...form, zip_code: e.target.value })} />
+            </div>
+            <div>
+              <Label className="text-xs">เครดิต (วัน)</Label>
+              <Input type="number" placeholder="30" value={form.credit_days} onChange={(e) => setForm({ ...form, credit_days: e.target.value })} />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">ที่อยู่ (ย่อ)</Label>
             <Input placeholder="ที่อยู่บริษัท" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
