@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ActivityLogDialog } from "@/components/activities/ActivityLogDialog";
 
 // @ts-ignore — route registered at build time
-export const Route = createFileRoute("/_authenticated/events" as any)({
+export const Route = createFileRoute("/_authenticated/events")({
   component: EventsPage,
 });
 

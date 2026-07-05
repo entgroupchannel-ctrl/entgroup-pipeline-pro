@@ -17,6 +17,7 @@ import { Route as AuthenticatedQuotationsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedPipelineRouteImport } from './routes/_authenticated/pipeline'
 import { Route as AuthenticatedKpiRouteImport } from './routes/_authenticated/kpi'
 import { Route as AuthenticatedKeyAccountsRouteImport } from './routes/_authenticated/key-accounts'
+import { Route as AuthenticatedEventsRouteImport } from './routes/_authenticated/events'
 import { Route as AuthenticatedEmailsRouteImport } from './routes/_authenticated/emails'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedActivitiesRouteImport } from './routes/_authenticated/activities'
@@ -65,6 +66,11 @@ const AuthenticatedKeyAccountsRoute =
     path: '/key-accounts',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedEventsRoute = AuthenticatedEventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedEmailsRoute = AuthenticatedEmailsRouteImport.update({
   id: '/emails',
   path: '/emails',
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/activities': typeof AuthenticatedActivitiesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/emails': typeof AuthenticatedEmailsRoute
+  '/events': typeof AuthenticatedEventsRoute
   '/key-accounts': typeof AuthenticatedKeyAccountsRoute
   '/kpi': typeof AuthenticatedKpiRoute
   '/pipeline': typeof AuthenticatedPipelineRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/activities': typeof AuthenticatedActivitiesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/emails': typeof AuthenticatedEmailsRoute
+  '/events': typeof AuthenticatedEventsRoute
   '/key-accounts': typeof AuthenticatedKeyAccountsRoute
   '/kpi': typeof AuthenticatedKpiRoute
   '/pipeline': typeof AuthenticatedPipelineRoute
@@ -144,6 +152,7 @@ export interface FileRoutesById {
   '/_authenticated/activities': typeof AuthenticatedActivitiesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/emails': typeof AuthenticatedEmailsRoute
+  '/_authenticated/events': typeof AuthenticatedEventsRoute
   '/_authenticated/key-accounts': typeof AuthenticatedKeyAccountsRoute
   '/_authenticated/kpi': typeof AuthenticatedKpiRoute
   '/_authenticated/pipeline': typeof AuthenticatedPipelineRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/activities'
     | '/dashboard'
     | '/emails'
+    | '/events'
     | '/key-accounts'
     | '/kpi'
     | '/pipeline'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/activities'
     | '/dashboard'
     | '/emails'
+    | '/events'
     | '/key-accounts'
     | '/kpi'
     | '/pipeline'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/_authenticated/activities'
     | '/_authenticated/dashboard'
     | '/_authenticated/emails'
+    | '/_authenticated/events'
     | '/_authenticated/key-accounts'
     | '/_authenticated/kpi'
     | '/_authenticated/pipeline'
@@ -269,6 +281,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedKeyAccountsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/events': {
+      id: '/_authenticated/events'
+      path: '/events'
+      fullPath: '/events'
+      preLoaderRoute: typeof AuthenticatedEventsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/emails': {
       id: '/_authenticated/emails'
       path: '/emails'
@@ -339,6 +358,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedActivitiesRoute: typeof AuthenticatedActivitiesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEmailsRoute: typeof AuthenticatedEmailsRoute
+  AuthenticatedEventsRoute: typeof AuthenticatedEventsRoute
   AuthenticatedKeyAccountsRoute: typeof AuthenticatedKeyAccountsRoute
   AuthenticatedKpiRoute: typeof AuthenticatedKpiRoute
   AuthenticatedPipelineRoute: typeof AuthenticatedPipelineRoute
@@ -353,6 +373,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedActivitiesRoute: AuthenticatedActivitiesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEmailsRoute: AuthenticatedEmailsRoute,
+  AuthenticatedEventsRoute: AuthenticatedEventsRoute,
   AuthenticatedKeyAccountsRoute: AuthenticatedKeyAccountsRoute,
   AuthenticatedKpiRoute: AuthenticatedKpiRoute,
   AuthenticatedPipelineRoute: AuthenticatedPipelineRoute,
