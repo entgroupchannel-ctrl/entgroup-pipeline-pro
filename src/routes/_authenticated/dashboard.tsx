@@ -132,22 +132,53 @@ function Dashboard() {
       </div>
 
       <div className="rounded-xl border bg-card p-5">
-        <h2 className="mb-4 text-sm font-semibold">Pipeline by Stage</h2>
-        <div style={{ width: "100%", height: 280 }}>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold">Pipeline by Stage</h2>
+          <div className="inline-flex rounded-lg border bg-muted/40 p-0.5">
+            <ChartModeBtn active={chartMode === "horizontal"} onClick={() => setChartMode("horizontal")} icon={<BarChartHorizontal className="h-3.5 w-3.5" />} label="แนวนอน" />
+            <ChartModeBtn active={chartMode === "vertical"} onClick={() => setChartMode("vertical")} icon={<BarChart3 className="h-3.5 w-3.5" />} label="แนวตั้ง" />
+            <ChartModeBtn active={chartMode === "pie"} onClick={() => setChartMode("pie")} icon={<PieChartIcon className="h-3.5 w-3.5" />} label="วงกลม" />
+          </div>
+        </div>
+        <div style={{ width: "100%", height: 320 }}>
           <ResponsiveContainer>
-            <BarChart data={stageData} layout="vertical" margin={{ left: 20, right: 20 }}>
-              <XAxis type="number" tickFormatter={(v) => new Intl.NumberFormat("th-TH", { notation: "compact" }).format(v)} className="text-xs" />
-              <YAxis dataKey="stage" type="category" width={90} className="text-xs" />
-              <Tooltip formatter={(v: any) => formatBaht(Number(v))} cursor={{ fill: "hsl(var(--muted))" }} />
-              <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                {stageData.map((d) => (
-                  <Cell key={d.key} className={`stage-fill-${d.key}`} />
-                ))}
-              </Bar>
-            </BarChart>
+            {chartMode === "pie" ? (
+              <PieChart>
+                <Tooltip formatter={(v: any) => formatBaht(Number(v))} />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                <Pie data={stageData.filter((d) => d.value > 0)} dataKey="value" nameKey="stage" cx="50%" cy="45%" innerRadius={55} outerRadius={100} paddingAngle={2} stroke="var(--card)" strokeWidth={2}>
+                  {stageData.filter((d) => d.value > 0).map((d) => (
+                    <Cell key={d.key} fill={STAGE_COLORS[d.key as LeadStage]} />
+                  ))}
+                </Pie>
+              </PieChart>
+            ) : chartMode === "vertical" ? (
+              <BarChart data={stageData} margin={{ left: 10, right: 20, top: 10, bottom: 10 }}>
+                <XAxis dataKey="stage" className="text-xs" tick={{ fontSize: 11 }} />
+                <YAxis tickFormatter={(v) => new Intl.NumberFormat("th-TH", { notation: "compact" }).format(v)} className="text-xs" />
+                <Tooltip formatter={(v: any) => formatBaht(Number(v))} cursor={{ fill: "color-mix(in oklab, var(--muted) 60%, transparent)" }} />
+                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                  {stageData.map((d) => (
+                    <Cell key={d.key} fill={STAGE_COLORS[d.key as LeadStage]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            ) : (
+              <BarChart data={stageData} layout="vertical" margin={{ left: 20, right: 20 }}>
+                <XAxis type="number" tickFormatter={(v) => new Intl.NumberFormat("th-TH", { notation: "compact" }).format(v)} className="text-xs" />
+                <YAxis dataKey="stage" type="category" width={90} className="text-xs" />
+                <Tooltip formatter={(v: any) => formatBaht(Number(v))} cursor={{ fill: "color-mix(in oklab, var(--muted) 60%, transparent)" }} />
+                <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                  {stageData.map((d) => (
+                    <Cell key={d.key} fill={STAGE_COLORS[d.key as LeadStage]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            )}
           </ResponsiveContainer>
         </div>
       </div>
+
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="rounded-xl border bg-card p-5 xl:col-span-2">
