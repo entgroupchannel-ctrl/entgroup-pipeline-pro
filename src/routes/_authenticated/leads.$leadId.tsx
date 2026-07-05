@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, Phone, MessageCircle, Save, ExternalLink, Loader2, Check, Plus, Send, Mail, Trophy, XCircle,
+  ArrowLeft, Phone, MessageCircle, Save, ExternalLink, Loader2, Check, Plus, Send, Mail, Trophy, XCircle, Crown, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import { fetchFADocument, type FADocument } from "@/lib/flowaccount-client";
 import { FAImportModal } from "@/components/flowaccount/FAImportModal";
 import { LeadQuotationsSection } from "@/components/pipeline/LeadQuotationsSection";
 import { LeadEmailComposer } from "@/components/pipeline/LeadEmailComposer";
-import { X as XIcon, FileDown } from "lucide-react";
+import { FileDown } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/leads/$leadId")({
   component: LeadDetailPage,
@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_authenticated/leads/$leadId")({
 
 const PIPELINE_STAGES: LeadStage[] = ACTIVE_STAGES;
 
-interface UP { id: string; full_name: string | null; role: string; email?: string | null }
+interface UP { id: string; full_name: string | null; role: string; email?: string | null; is_active?: boolean | null }
 
 function LeadDetailPage() {
   const { leadId } = Route.useParams();
@@ -60,6 +60,13 @@ function LeadDetailPage() {
   const [wonConfirmOpen, setWonConfirmOpen] = useState(false);
   const [lostConfirmOpen, setLostConfirmOpen] = useState(false);
   const [lostReason, setLostReason] = useState("");
+
+  const [keyOwners, setKeyOwners] = useState<any[]>([]);
+  const [keyOwnerOpen, setKeyOwnerOpen] = useState(false);
+  const [keyOwnerUser, setKeyOwnerUser] = useState("");
+  const [keyOwnerContact, setKeyOwnerContact] = useState("");
+  const [keyOwnerNote, setKeyOwnerNote] = useState("");
+  const [contacts, setContacts] = useState<any[]>([]);
 
   const [form, setForm] = useState({
     title: "",
@@ -116,6 +123,19 @@ function LeadDetailPage() {
     } else {
       setFaDoc(null);
     }
+
+    // โหลด key account owners (ถ้า account เป็น key account)
+    if (leadData.account_id) {
+      const [ownersRes, contactsRes] = await Promise.all([
+        crmDb().from("key_account_owners")
+          .select("id, user_id, contact_id, note, created_at, user:user_id(full_name), contact:contact_id(name, phone, line_id)")
+          .eq("account_id", leadData.account_id),
+        crmDb().from("contacts").select("id, name, phone, line_id, position").eq("account_id", leadData.account_id),
+      ]);
+      setKeyOwners(ownersRes.data ?? []);
+      setContacts(contactsRes.data ?? []);
+    }
+
     setLoading(false);
   };
 
@@ -241,6 +261,40 @@ function LeadDetailPage() {
     });
     if (error) return toast.error("บันทึกไม่สำเร็จ", { description: error.message });
     setChatterText("");
+    load();
+  };
+
+  const toggleKeyAccount = async () => {
+    if (!account) return;
+    const newVal = !account.is_key_account;
+    const { error } = await crmDb().from("accounts").update({ is_key_account: newVal }).eq("id", account.id);
+    if (error) { toast.error("อัปเดตไม่สำเร็จ"); return; }
+    setAccount({ ...account, is_key_account: newVal });
+    toast.success(newVal ? "เพิ่มเป็น Key Account แล้ว" : "ยกเลิก Key Account แล้ว");
+  };
+
+  const addKeyOwner = async () => {
+    if (!keyOwnerUser || !account) return;
+    const { error } = await crmDb().from("key_account_owners").insert({
+      account_id: account.id,
+      user_id: keyOwnerUser,
+      contact_id: keyOwnerContact || null,
+      note: keyOwnerNote || null,
+    });
+    if (error) {
+      if (error.code === "23505") { toast.error("Sales คนนี้ดูแล Account นี้อยู่แล้ว"); }
+      else { toast.error("เพิ่มไม่สำเร็จ"); }
+      return;
+    }
+    toast.success("เพิ่ม Sales ดูแล Key Account แล้ว");
+    setKeyOwnerOpen(false);
+    setKeyOwnerUser(""); setKeyOwnerContact(""); setKeyOwnerNote("");
+    load();
+  };
+
+  const removeKeyOwner = async (id: string) => {
+    await crmDb().from("key_account_owners").delete().eq("id", id);
+    toast.success("ลบออกแล้ว");
     load();
   };
 
@@ -425,7 +479,7 @@ function LeadDetailPage() {
                     ดูใน FlowAccount <ExternalLink className="h-3 w-3" />
                   </a>
                   <Button variant="ghost" size="sm" onClick={unlinkFA}>
-                    <XIcon className="mr-1 h-3 w-3" /> ยกเลิก link
+                    <X className="mr-1 h-3 w-3" /> ยกเลิก link
                   </Button>
                 </div>
               </div>
@@ -548,6 +602,77 @@ function LeadDetailPage() {
 
         {/* RIGHT */}
         <aside className="w-full shrink-0 space-y-4 lg:w-[340px]">
+          {account && (
+            <div className="rounded-xl border bg-card p-4 space-y-3">
+              {/* Header row */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Crown className="h-4 w-4 text-amber-600" />
+                  Key Account
+                </div>
+                <button
+                  onClick={toggleKeyAccount}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                    account.is_key_account ? "bg-amber-500" : "bg-muted"
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    account.is_key_account ? "translate-x-4" : "translate-x-0.5"
+                  }`} />
+                </button>
+              </div>
+              {account.is_key_account && (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    Sales ที่ดูแล {account.name}
+                  </p>
+                  {/* รายชื่อ Sales ที่ดูแล */}
+                  <div className="space-y-2">
+                    {keyOwners.map((ko) => (
+                      <div key={ko.id} className="flex items-start gap-2 rounded-lg bg-muted/40 px-3 py-2">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-semibold text-amber-700">
+                          {(ko.user?.full_name ?? "?").slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium">{ko.user?.full_name ?? "—"}</div>
+                          {ko.contact?.name && (
+                            <div className="text-[10px] text-muted-foreground">
+                              Contact: {ko.contact.name}
+                              {ko.contact.phone && ` · ${ko.contact.phone}`}
+                            </div>
+                          )}
+                          {ko.note && <div className="text-[10px] text-muted-foreground mt-0.5">{ko.note}</div>}
+                        </div>
+                        {(role === "admin" || role === "manager") && (
+                          <button
+                            onClick={() => removeKeyOwner(ko.id)}
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {keyOwners.length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        ยังไม่มี Sales ดูแล Account นี้
+                      </p>
+                    )}
+                  </div>
+                  {/* ปุ่มเพิ่ม Sales */}
+                  {(role === "admin" || role === "manager") && (
+                    <button
+                      onClick={() => setKeyOwnerOpen(true)}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-amber-300 py-2 text-xs text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> เพิ่ม Sales ดูแล
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           <div className="rounded-xl border bg-card">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <div className="flex items-center gap-2 text-sm font-semibold">
@@ -758,6 +883,63 @@ function LeadDetailPage() {
             >
               <XCircle className="mr-1.5 h-4 w-4" /> ยืนยัน แพ้
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={keyOwnerOpen} onOpenChange={setKeyOwnerOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Crown className="h-4 w-4 text-amber-600" /> เพิ่ม Sales ดูแล Key Account
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Sales ที่รับผิดชอบ <span className="text-red-500">*</span></Label>
+              <Select value={keyOwnerUser || "none"} onValueChange={(v) => setKeyOwnerUser(v === "none" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="เลือก Sales..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— เลือก Sales —</SelectItem>
+                  {profiles.filter(p => p.is_active).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.id.slice(0, 8)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Contact ที่ดูแล (optional)</Label>
+              <Select value={keyOwnerContact || "none"} onValueChange={(v) => setKeyOwnerContact(v === "none" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="เลือก Contact..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— ไม่ระบุ —</SelectItem>
+                  {contacts.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}{c.position ? ` (${c.position})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Contact คนละคนสำหรับ Sales แต่ละคนในองค์กรใหญ่
+              </p>
+            </div>
+            <div>
+              <Label className="text-xs">หมายเหตุ</Label>
+              <Textarea
+                rows={2}
+                placeholder="เช่น ดูแลฝ่าย IT, ติดต่อด้านจัดซื้อ..."
+                value={keyOwnerNote}
+                onChange={(e) => setKeyOwnerNote(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" onClick={() => setKeyOwnerOpen(false)}>ยกเลิก</Button>
+              <Button onClick={addKeyOwner} disabled={!keyOwnerUser}
+                className="bg-amber-600 hover:bg-amber-700 text-white">
+                เพิ่ม Sales
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
