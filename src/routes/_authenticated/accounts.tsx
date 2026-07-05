@@ -365,9 +365,14 @@ export function NewAccountDialog({
     setSaving(true);
     const { error } = await crmDb().from("accounts").insert({
       name: form.name.trim(),
-      industry: form.industry.trim() || null,
+      industry: form.industry || null,
+      account_type: form.account_type || null,
+      tax_id: form.tax_id.trim() || null,
       website: form.website.trim() || null,
       phone: form.phone.trim() || null,
+      full_address: form.full_address.trim() || null,
+      zip_code: form.zip_code.trim() || null,
+      credit_days: form.credit_days ? parseInt(form.credit_days, 10) : null,
       address: form.address.trim() || null,
       owner_id: user?.id,
       created_by: user?.id,
