@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { crmDb, STAGE_LABEL_TH, type LeadStage } from "@/lib/crm";
+import { usePermissions } from "@/lib/permissions";
 import { formatThaiDate } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 
@@ -56,6 +57,9 @@ function ApprovalsPage() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
   const isManager = role === "manager" || role === "admin";
+
+  const { can } = usePermissions();
+  const canReview = can("stage_request.review");
 
   const [requests, setRequests] = useState<StageRequest[]>([]);
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
@@ -282,7 +286,7 @@ function ApprovalsPage() {
                   </div>
 
                   {/* Action buttons — pending only */}
-                  {req.status === "pending" && (
+                  {req.status === "pending" && canReview && (
                     <div className="flex shrink-0 gap-1.5 ml-2">
                       <Button
                         size="sm"
@@ -300,6 +304,9 @@ function ApprovalsPage() {
                         <X className="mr-1 h-3.5 w-3.5" /> ปฏิเสธ
                       </Button>
                     </div>
+                  )}
+                  {req.status === "pending" && !canReview && (
+                    <span className="ml-2 text-[11px] text-muted-foreground shrink-0">ไม่มีสิทธิ์</span>
                   )}
                 </div>
               </li>

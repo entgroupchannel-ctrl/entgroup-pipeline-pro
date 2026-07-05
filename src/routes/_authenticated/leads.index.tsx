@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/auth-context";
 import { NewLeadDialog } from "@/components/pipeline/NewLeadDialog";
 import { RowActions, BulkActionBar, stdOpen, stdDupe, stdDelete } from "@/components/ui/row-actions";
 import { exportToCsv, leadsToRows } from "@/lib/export-csv";
+import { usePermissions } from "@/lib/permissions";
 import { ListPagination, usePagination } from "@/components/list-pagination";
 
 // ── Types & constants ─────────────────────────────────────────────────────────
@@ -86,6 +87,10 @@ function LeadsPage() {
   const { user, role } = useAuth();
   const confirm = useConfirm();
   const isManager = role === "manager" || role === "admin";
+  const { can } = usePermissions();
+  const canCreate  = can("lead.create");
+  const canDelete  = can("lead.delete");
+  const canBulkDel = can("lead.delete");
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
 
@@ -261,9 +266,11 @@ function LeadsPage() {
           <Button variant="outline" size="sm" onClick={handleExport} disabled={!filtered?.length}>
             <Download className="mr-1.5 h-4 w-4" /> Export CSV
           </Button>
-          <Button size="sm" onClick={() => setNewOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" /> ดีลใหม่
-          </Button>
+          {canCreate && (
+            <Button size="sm" onClick={() => setNewOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" /> ดีลใหม่
+            </Button>
+          )}
         </div>
       </div>
 
@@ -391,7 +398,7 @@ function LeadsPage() {
         total={filtered?.length ?? 0}
         onSelectAll={selectAll}
         onClearAll={clearAll}
-        actions={isManager ? [{ label: "ลบที่เลือก", icon: <Trash2 className="h-3.5 w-3.5" />, onClick: bulkDelete, variant: "danger" }] : []}
+        actions={canBulkDel ? [{ label: "ลบที่เลือก", icon: <Trash2 className="h-3.5 w-3.5" />, onClick: bulkDelete, variant: "danger" }] : []}
       />
 
       {/* ── Table ── */}
@@ -478,7 +485,7 @@ function LeadsPage() {
                         <RowActions actions={[
                           stdOpen(() => navigate({ to: "/leads/$leadId", params: { leadId: l.id } })),
                           stdDupe(() => duplicateLead(l)),
-                          ...(isManager ? [stdDelete(() => deleteLead(l.id))] : []),
+                          ...(canDelete ? [stdDelete(() => deleteLead(l.id))] : []),
                         ]} />
                       </td>
                     </tr>

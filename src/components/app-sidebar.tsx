@@ -27,6 +27,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/lib/auth-context";
+import { usePermissions } from "@/lib/permissions";
 import { crmDb } from "@/lib/crm";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -67,10 +68,12 @@ export function AppSidebar() {
   const isActive = (url: string) => pathname === url || pathname.startsWith(url + "/");
   const isAdmin = role === "admin";
   const isManager = role === "manager" || role === "admin";
+  const { can } = usePermissions();
+  const canReview = can("stage_request.review");
 
   const [pendingCount, setPendingCount] = useState(0);
   useEffect(() => {
-    if (!isManager) return;
+    if (!canReview) { setPendingCount(0); return; }
     const load = async () => {
       const { count } = await crmDb()
         .from("stage_change_requests")
@@ -79,9 +82,9 @@ export function AppSidebar() {
       setPendingCount(count ?? 0);
     };
     load();
-    const interval = setInterval(load, 30000); // poll every 30s
+    const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
-  }, [isManager]);
+  }, [canReview]);
 
   const group1 = [...salesItems];
   const group2 = [...docItems];
@@ -134,8 +137,8 @@ export function AppSidebar() {
                 </div>
               ))}
 
-              {/* Approvals — manager/admin only */}
-              {isManager && (
+              {/* Approvals — only when user has stage_request.review permission */}
+              {canReview && (
                 <div className="border-t pt-2 mt-2">
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={isActive("/approvals")} tooltip="คำขออนุมัติ">

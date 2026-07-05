@@ -3,6 +3,7 @@ import { Shield, Loader2, Save, RotateCcw, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { crmDb } from "@/lib/crm";
+import { invalidatePermissionCache } from "@/lib/permissions";
 import { useAuth } from "@/lib/auth-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -196,6 +197,7 @@ export function PermissionsTab() {
     }
     setSaving(false);
     if (failed > 0) { toast.error(`บันทึกไม่สำเร็จ ${failed} รายการ`); return; }
+    invalidatePermissionCache();
     toast.success(`บันทึก ${changed.length} รายการแล้ว`);
     load();
   };
