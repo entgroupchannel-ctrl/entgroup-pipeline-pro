@@ -33,7 +33,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+// ActivityLogDialog handles its own imports
 import { fetchFADocuments, type FADocument } from "@/lib/flowaccount-client";
+import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
 
 
 
@@ -126,8 +128,8 @@ function KeyAccountsPage() {
   const [selected, setSelected] = useState<KeyAccount | null>(null);
   const [tab, setTab] = useState("กิจกรรมเดือนนี้");
   const [logOpen, setLogOpen] = useState(false);
-  const [logType, setLogType] = useState("meeting");
-  const [logNote, setLogNote] = useState("");
+  const [logKind, setLogKind] = useState<ActivityKind>("call");
+  const [logLeadId, setLogLeadId] = useState<string | null>(null);
   const [addDealOpen, setAddDealOpen] = useState(false);
   const [accPage, setAccPage] = useState(1);
   const ACC_PAGE_SIZE = 20;
@@ -232,8 +234,9 @@ function KeyAccountsPage() {
   const selectedTarget = selected?.target?.[0] ?? DEFAULT_TARGET;
   const selectedHealth = selected ? calcHealth(selectedTarget, selectedActs) : 0;
 
-  const handleLog = async () => {
+  const openLog = async (kind: ActivityKind) => {
     if (!selected) return;
+    // resolve latest lead for this account
     const { data: lead } = await crmDb()
       .from("leads")
       .select("id")
@@ -242,26 +245,12 @@ function KeyAccountsPage() {
       .limit(1)
       .maybeSingle();
     if (!lead) {
-      toast.error("ไม่พบ Lead ของบริษัทนี้");
+      toast.error("ไม่พบ Lead ของบริษัทนี้ กรุณาสร้างดีลก่อน");
       return;
     }
-    const { error } = await crmDb().from("activities").insert({
-      lead_id: lead.id,
-      type: logType,
-      subject: `Key Account: ${logType}`,
-      body: logNote || null,
-      done: true,
-      done_at: new Date().toISOString(),
-      owner_id: user?.id,
-    });
-    if (error) {
-      toast.error("บันทึกไม่สำเร็จ");
-      return;
-    }
-    toast.success("บันทึกกิจกรรมแล้ว");
-    setLogOpen(false);
-    setLogNote("");
-    load();
+    setLogLeadId(lead.id);
+    setLogKind(kind);
+    setLogOpen(true);
   };
 
   return (
@@ -490,7 +479,7 @@ function KeyAccountsPage() {
                   {selected.industry ?? "—"} · {selected.owner_id ? profileMap.get(selected.owner_id) ?? "—" : "—"}
                 </div>
               </div>
-              <Button size="sm" onClick={() => setLogOpen(true)}>
+              <Button size="sm" onClick={() => openLog("call")}>
                 <Plus className="mr-1 h-4 w-4" /> บันทึกกิจกรรม
               </Button>
             </div>
@@ -525,10 +514,7 @@ function KeyAccountsPage() {
                 target={selectedTarget}
                 acts={selectedActs}
                 health={selectedHealth}
-                onLog={(t) => {
-                  setLogType(t);
-                  setLogOpen(true);
-                }}
+                onLog={(t) => openLog(t as ActivityKind)}
               />
             )}
             {tab === "ประวัติกิจกรรม" && (
@@ -563,51 +549,14 @@ function KeyAccountsPage() {
         </div>
       )}
 
-      <Dialog open={logOpen} onOpenChange={setLogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>บันทึกกิจกรรม</DialogTitle>
-          </DialogHeader>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div>
-              <Label>ประเภท</Label>
-              <select
-                value={logType}
-                onChange={(e) => setLogType(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "8px 10px",
-                  border: "0.5px solid var(--border)",
-                  borderRadius: "var(--radius)",
-                  fontSize: 13,
-                  background: "var(--surface)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                {ACTIVITY_TYPES.map((a) => (
-                  <option key={a.type} value={a.type}>
-                    {a.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>บันทึก</Label>
-              <Textarea
-                value={logNote}
-                onChange={(e) => setLogNote(e.target.value)}
-                placeholder="สรุปกิจกรรม..."
-              />
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <Button variant="ghost" onClick={() => setLogOpen(false)}>
-                ยกเลิก
-              </Button>
-              <Button onClick={handleLog}>บันทึก</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ActivityLogDialog
+        open={logOpen}
+        onOpenChange={setLogOpen}
+        leadId={logLeadId}
+        defaultKind={logKind}
+        title={selected ? `บันทึกกิจกรรม — ${selected.name}` : undefined}
+        onSaved={() => { setLogOpen(false); load(); }}
+      />
 
       {selected && (
         <AddDealDialog
