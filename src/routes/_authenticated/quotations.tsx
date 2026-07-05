@@ -588,146 +588,172 @@ export function QuotationFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? "แก้ไขใบเสนอราคา" : "สร้างใบเสนอราคาใหม่"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 pt-1">
 
-          {/* ── 1. Lead (เลือกก่อน — context หลัก) ── */}
-          <div>
-            <Label className="text-xs">ดีล (Lead)</Label>
-            <Select value={form.lead_id || "none"} onValueChange={handleLeadChange}>
-              <SelectTrigger><SelectValue placeholder="— ไม่ระบุ —" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">— ไม่ระบุ —</SelectItem>
-                {leads.map((l) => <SelectItem key={l.id} value={l.id}>{l.title}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {/* Info card ที่ pull มาจาก lead — แทน field บริษัทซ้ำ */}
-            {resolvedAccount && (
-              <div className="mt-1.5 flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-                  {resolvedAccount.name.slice(0, 1)}
-                </div>
-                <span className="text-xs font-medium">{resolvedAccount.name}</span>
-                <span className="ml-auto text-[10px] text-muted-foreground">บริษัท (auto)</span>
-              </div>
-            )}
-          </div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3 pt-1">
 
-          {/* บริษัท standalone — แสดงเฉพาะเมื่อไม่ได้เลือก Lead */}
-          {showStandaloneAccount && (
+          {/* ── คอลัมน์ซ้าย: ข้อมูลหลัก ── */}
+          <div className="space-y-3">
+
+            {/* 1. Lead */}
             <div>
-              <Label className="text-xs">บริษัท <span className="text-muted-foreground">(ถ้าไม่มีดีล)</span></Label>
-              <Select value={form.account_id || "none"} onValueChange={(v) => setForm({ ...form, account_id: v === "none" ? "" : v })}>
+              <Label className="text-xs">ดีล (Lead)</Label>
+              <Select value={form.lead_id || "none"} onValueChange={handleLeadChange}>
                 <SelectTrigger><SelectValue placeholder="— ไม่ระบุ —" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">— ไม่ระบุ —</SelectItem>
-                  {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  {leads.map((l) => <SelectItem key={l.id} value={l.id}>{l.title}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {resolvedAccount && (
+                <div className="mt-1.5 flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-1.5">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                    {resolvedAccount.name.slice(0, 1)}
+                  </div>
+                  <span className="text-xs font-medium truncate">{resolvedAccount.name}</span>
+                  <span className="ml-auto text-[10px] text-muted-foreground shrink-0">auto</span>
+                </div>
+              )}
             </div>
-          )}
 
-          {/* ── 2. เลขที่ QT + สถานะ ── */}
-          <div className="grid grid-cols-2 gap-3">
+            {/* บริษัท standalone */}
+            {showStandaloneAccount && (
+              <div>
+                <Label className="text-xs">บริษัท <span className="text-muted-foreground">(ถ้าไม่มีดีล)</span></Label>
+                <Select value={form.account_id || "none"} onValueChange={(v) => setForm({ ...form, account_id: v === "none" ? "" : v })}>
+                  <SelectTrigger><SelectValue placeholder="— ไม่ระบุ —" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— ไม่ระบุ —</SelectItem>
+                    {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* 2. ชื่อ/รายละเอียด */}
             <div>
-              <Label className="text-xs">เลขที่ QT</Label>
+              <Label className="text-xs">ชื่อ / รายละเอียด <span className="text-red-500">*</span></Label>
               <Input
-                placeholder="QT-2026-001"
-                value={form.quotation_no}
-                onChange={(e) => setForm({ ...form, quotation_no: e.target.value })}
+                placeholder="เช่น โปรเจกต์ AI สำหรับฝ่ายโลจิสติกส์"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
               />
             </div>
+
+            {/* 3. เลขที่ QT + สถานะ */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">เลขที่ QT</Label>
+                <Input
+                  placeholder="QT-2026-001"
+                  value={form.quotation_no}
+                  onChange={(e) => setForm({ ...form, quotation_no: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">สถานะ</Label>
+                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as QuotationStatus })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(STATUS_LABEL) as QuotationStatus[]).map((s) => (
+                      <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* 4. มอบหมาย */}
             <div>
-              <Label className="text-xs">สถานะ</Label>
-              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as QuotationStatus })}>
+              <Label className="text-xs">มอบหมาย</Label>
+              <Select value={form.owner_id || "none"} onValueChange={(v) => setForm({ ...form, owner_id: v === "none" ? "" : v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(STATUS_LABEL) as QuotationStatus[]).map((s) => (
-                    <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
-                  ))}
+                  <SelectItem value="none">— ไม่ระบุ —</SelectItem>
+                  {profiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.id.slice(0, 8)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          {/* ── 3. ชื่อ/รายละเอียด ── */}
-          <div>
-            <Label className="text-xs">ชื่อ / รายละเอียด <span className="text-red-500">*</span></Label>
-            <Input
-              placeholder="เช่น โปรเจกต์ AI สำหรับฝ่ายโลจิสติกส์"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-            />
-          </div>
-
-          {/* ── 4. ราคา ── */}
-          <div className="grid grid-cols-3 gap-3">
+            {/* 5. หมายเหตุ */}
             <div>
-              <Label className="text-xs">ราคาก่อน VAT</Label>
-              <Input type="number" value={form.subtotal}   onChange={(e) => setForm(recalc({ subtotal: e.target.value }))}   placeholder="0" />
-            </div>
-            <div>
-              <Label className="text-xs">ส่วนลด</Label>
-              <Input type="number" value={form.discount}   onChange={(e) => setForm(recalc({ discount: e.target.value }))}   placeholder="0" />
-            </div>
-            <div>
-              <Label className="text-xs">VAT</Label>
-              <Input type="number" value={form.vat_amount} onChange={(e) => setForm(recalc({ vat_amount: e.target.value }))} placeholder="0" />
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs">ยอดรวมสุทธิ (บาท)</Label>
-            <Input
-              type="number"
-              value={form.grand_total}
-              onChange={(e) => setForm({ ...form, grand_total: e.target.value })}
-              placeholder="คำนวณอัตโนมัติ หรือกรอกเอง"
-            />
-            {form.grand_total && (
-              <div className="mt-1 text-base font-semibold">{formatBaht(parseFloat(form.grand_total))}</div>
-            )}
-          </div>
-
-          {/* ── 5. วันที่ ── */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">วันที่ออก</Label>
-              <Input type="date" value={form.issued_date}  onChange={(e) => setForm({ ...form, issued_date:  e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-xs">ใช้ได้ถึง</Label>
-              <Input type="date" value={form.valid_until}  onChange={(e) => setForm({ ...form, valid_until:  e.target.value })} />
+              <Label className="text-xs">หมายเหตุ</Label>
+              <Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="รายละเอียดเพิ่มเติม" />
             </div>
           </div>
 
-          {/* ── 6. มอบหมาย ── */}
-          <div>
-            <Label className="text-xs">มอบหมาย</Label>
-            <Select value={form.owner_id || "none"} onValueChange={(v) => setForm({ ...form, owner_id: v === "none" ? "" : v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">— ไม่ระบุ —</SelectItem>
-                {profiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.id.slice(0, 8)}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* ── คอลัมน์ขวา: ราคา + วันที่ ── */}
+          <div className="space-y-3">
 
-          {/* ── 7. หมายเหตุ ── */}
-          <div>
-            <Label className="text-xs">หมายเหตุ</Label>
-            <Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="รายละเอียดเพิ่มเติม" />
-          </div>
+            {/* ยอดรวม — แสดงเด่นขึ้น */}
+            <div className="rounded-xl border bg-muted/20 p-4">
+              <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">ราคา</div>
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-xs">ราคาก่อน VAT</Label>
+                  <Input type="number" value={form.subtotal}
+                    onChange={(e) => setForm(recalc({ subtotal: e.target.value }))}
+                    placeholder="0" className="bg-background" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">ส่วนลด</Label>
+                    <Input type="number" value={form.discount}
+                      onChange={(e) => setForm(recalc({ discount: e.target.value }))}
+                      placeholder="0" className="bg-background" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">VAT</Label>
+                    <Input type="number" value={form.vat_amount}
+                      onChange={(e) => setForm(recalc({ vat_amount: e.target.value }))}
+                      placeholder="0" className="bg-background" />
+                  </div>
+                </div>
+                <div className="border-t pt-2">
+                  <Label className="text-xs">ยอดรวมสุทธิ (บาท)</Label>
+                  <Input type="number" value={form.grand_total}
+                    onChange={(e) => setForm({ ...form, grand_total: e.target.value })}
+                    placeholder="คำนวณอัตโนมัติ" className="bg-background" />
+                  {form.grand_total && (
+                    <div className="mt-1.5 text-xl font-bold text-primary">
+                      {formatBaht(parseFloat(form.grand_total))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
-            <Button onClick={submit} disabled={saving}>
-              {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-              {isEdit ? "บันทึก" : "สร้าง"}
-            </Button>
+            {/* วันที่ */}
+            <div className="rounded-xl border bg-muted/20 p-4">
+              <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">วันที่</div>
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-xs">วันที่ออก</Label>
+                  <Input type="date" value={form.issued_date}
+                    onChange={(e) => setForm({ ...form, issued_date: e.target.value })}
+                    className="bg-background" />
+                </div>
+                <div>
+                  <Label className="text-xs">ใช้ได้ถึง</Label>
+                  <Input type="date" value={form.valid_until}
+                    onChange={(e) => setForm({ ...form, valid_until: e.target.value })}
+                    className="bg-background" />
+                </div>
+              </div>
+            </div>
           </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-2 border-t pt-4 mt-1">
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
+          <Button onClick={submit} disabled={saving}>
+            {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+            {isEdit ? "บันทึก" : "สร้าง"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
