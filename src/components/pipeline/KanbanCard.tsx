@@ -208,11 +208,13 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
 
       {/* Bottom row: stars + indicators + avatar */}
       <div className="mt-1.5 flex items-center justify-between gap-2">
-        <PriorityStars
-          priority={localPriority}
-          leadId={lead.id}
-          onChange={savePriority}
-        />
+        <div onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
+          <PriorityStars
+            priority={localPriority}
+            leadId={lead.id}
+            onChange={savePriority}
+          />
+        </div>
 
         <div className="flex items-center gap-1.5">
           {/* FA quotation tag */}
