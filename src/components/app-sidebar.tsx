@@ -30,6 +30,7 @@ import logoAsset from "@/assets/LOGO_ENTGroup.png.asset.json";
 
 const navItems = [
   { title: "Pipeline", url: "/pipeline", icon: KanbanSquare },
+  { title: "Key Accounts", url: "/key-accounts", icon: Crown },
   { title: "รายการดีล", url: "/leads", icon: List },
   { title: "บริษัท", url: "/accounts", icon: Building2 },
   { title: "ใบเสนอราคา", url: "/quotations", icon: FileText },
