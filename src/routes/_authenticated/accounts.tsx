@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { formatThaiDate } from "@/lib/format";
+import { ListPagination, usePagination } from "@/components/list-pagination";
 
 export const Route = createFileRoute("/_authenticated/accounts")({
   component: AccountsPage,
@@ -166,6 +167,16 @@ function AccountsPage() {
     });
   }, [accounts, q, industryFilter]);
 
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalPages,
+    total: pagedTotal,
+    paged: pageItems,
+  } = usePagination(filtered ?? [], 25);
+
   const handleExport = () => {
     if (!isAdmin) { toast.error("ไม่มีสิทธิ์ Export — เฉพาะ Admin เท่านั้น"); return; }
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
@@ -269,7 +280,7 @@ function AccountsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtered.map((a) => (
+                {pageItems.map((a) => (
                   <tr key={a.id} className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected.has(a.id) ? "bg-primary/5" : ""}`} onClick={() => navigate({ to: "/accounts/$accountId", params: { accountId: a.id } })}>
                     <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}><Checkbox checked={selected.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} /></td>
                     <td className="px-4 py-3">
@@ -337,6 +348,14 @@ function AccountsPage() {
               </tbody>
             </table>
           </div>
+          <ListPagination
+            page={page}
+            pageSize={pageSize}
+            total={pagedTotal}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 

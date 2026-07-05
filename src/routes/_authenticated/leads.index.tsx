@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/auth-context";
 import { NewLeadDialog } from "@/components/pipeline/NewLeadDialog";
 import { RowActions, BulkActionBar, stdOpen, stdDupe, stdDelete } from "@/components/ui/row-actions";
 import { exportToCsv, leadsToRows } from "@/lib/export-csv";
+import { ListPagination, usePagination } from "@/components/list-pagination";
 
 // ── Types & constants ─────────────────────────────────────────────────────────
 
@@ -183,6 +184,11 @@ function LeadsPage() {
       );
     });
   }, [periodLeads, stageFilter, ownerFilter, qFilter, accountsMap]);
+
+  const {
+    page, setPage, pageSize, setPageSize, totalPages,
+    total: pagedTotal, paged: pageItems,
+  } = usePagination(filtered ?? [], 25);
 
   // ── period KPIs ─────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
@@ -422,7 +428,7 @@ function LeadsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtered.map((l) => {
+                {pageItems.map((l) => {
                   const owner       = l.owner_id    ? profilesMap.get(l.owner_id)   : null;
                   const accountName = l.account_id  ? accountsMap.get(l.account_id) : null;
                   const overdue = l.expected_close_date && ACTIVE_STAGES.includes(l.stage) &&
@@ -481,6 +487,14 @@ function LeadsPage() {
               </tbody>
             </table>
           </div>
+          <ListPagination
+            page={page}
+            pageSize={pageSize}
+            total={pagedTotal}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 

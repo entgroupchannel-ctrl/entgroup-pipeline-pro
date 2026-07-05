@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { activityIcon, formatThaiDate, ACTIVITY_TYPE_LABEL, type Activity, type ActivityType } from "@/lib/activities";
+import { ListPagination, usePagination } from "@/components/list-pagination";
 
 const searchSchema = z.object({
   filter: z.enum(["all", "overdue", "today", "pending", "done"]).optional(),
@@ -90,6 +91,11 @@ function ActivitiesPage() {
     }
   }, [rows, filter]);
 
+  const {
+    page, setPage, pageSize, setPageSize, totalPages,
+    total: pagedTotal, paged: pageItems,
+  } = usePagination(filtered ?? [], 25);
+
   return (
     <div className="p-6 page-fade-in">
       <div className="mb-4">
@@ -119,7 +125,7 @@ function ActivitiesPage() {
         </div>
       ) : (
         <ul className="divide-y rounded-xl border bg-card">
-          {filtered.map((a) => {
+          {pageItems.map((a) => {
             const Icon = activityIcon(a.type);
             const overdue = !a.done && !!a.due_at && new Date(a.due_at).getTime() < Date.now();
             const lead = a.lead_id ? leadsMap.get(a.lead_id) : null;
@@ -158,6 +164,20 @@ function ActivitiesPage() {
             );
           })}
         </ul>
+      )}
+
+      {filtered && filtered.length > 0 && (
+        <div className="mt-3 rounded-xl border bg-card overflow-hidden">
+          <ListPagination
+            page={page}
+            pageSize={pageSize}
+            total={pagedTotal}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            className="border-t-0"
+          />
+        </div>
       )}
 
       

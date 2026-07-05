@@ -19,6 +19,7 @@ import { fetchFADocuments, type FADocument } from "@/lib/flowaccount-client";
 import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete } from "@/components/ui/row-actions";
 import { exportToCsv, quotationsToRows } from "@/lib/export-csv";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ListPagination, usePagination } from "@/components/list-pagination";
 
 export const Route = createFileRoute("/_authenticated/quotations")({
   component: QuotationsPage,
@@ -161,6 +162,11 @@ function QuotationsPage() {
     });
   }, [rows, q, statusFilter, accountsMap]);
 
+  const {
+    page, setPage, pageSize, setPageSize, totalPages,
+    total: pagedTotal, paged: pageItems,
+  } = usePagination(filtered ?? [], 25);
+
   const updateStatus = async (id: string, status: QuotationStatus) => {
     const { error } = await crmDb().from("quotations").update({ status }).eq("id", id);
     if (error) return toast.error("อัปเดตสถานะไม่สำเร็จ", { description: error.message });
@@ -269,7 +275,7 @@ function QuotationsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtered.map((r) => (
+                {pageItems.map((r) => (
                   <QuotationRow
                     key={r.id}
                     row={r}
@@ -287,6 +293,14 @@ function QuotationsPage() {
               </tbody>
             </table>
           </div>
+          <ListPagination
+            page={page}
+            pageSize={pageSize}
+            total={pagedTotal}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 
