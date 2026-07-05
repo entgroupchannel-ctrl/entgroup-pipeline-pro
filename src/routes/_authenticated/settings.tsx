@@ -18,6 +18,7 @@ import { InviteUserModal } from "@/components/InviteUserModal";
 import { FlowAccountTab } from "@/components/settings/FlowAccountTab";
 import { EmailConfigTab } from "@/components/settings/EmailConfigTab";
 import { LineOATab } from "@/components/settings/LineOATab";
+import { AISettingsTab } from "@/components/settings/AISettingsTab";
 import { deactivateCrmUser } from "@/lib/invite-user.functions";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
@@ -45,6 +46,7 @@ function SettingsPage() {
           {isAdmin && <TabsTrigger value="flowaccount">FlowAccount</TabsTrigger>}
           {isAdmin && <TabsTrigger value="email">อีเมล</TabsTrigger>}
           {isAdmin && <TabsTrigger value="line">LINE OA</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="ai">AI ✦</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="mt-6 max-w-lg">
@@ -76,6 +78,11 @@ function SettingsPage() {
         {isAdmin && (
           <TabsContent value="line" className="mt-6">
             <LineOATab />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="ai" className="mt-6">
+            <AISettingsTab />
           </TabsContent>
         )}
       </Tabs>
