@@ -57,6 +57,31 @@ export function AddContactDialog({ open, onOpenChange, accountId, accountName, i
   const currentYear = new Date().getFullYear();
   const [saving, setSaving] = useState(false);
 
+  // Duplicate detection state
+  const [duplicates, setDuplicates] = useState<any[]>([]);
+  const [checking, setChecking] = useState(false);
+  const [ignoreDup, setIgnoreDup] = useState(false);
+
+  // Check for similar contacts in this account when name/phone/email changes
+  const checkDuplicates = async (name: string, phone: string, email: string) => {
+    if (!name.trim() && !phone.trim() && !email.trim()) { setDuplicates([]); return; }
+    setChecking(true);
+    const orParts: string[] = [];
+    if (name.trim().length >= 2) orParts.push(`name.ilike.%${name.trim()}%`);
+    if (phone.trim().length >= 6) orParts.push(`phone.ilike.%${phone.trim().replace(/[\-\s]/g,"")}%`);
+    if (email.trim().includes("@")) orParts.push(`email.ilike.%${email.trim()}%`);
+    if (!orParts.length) { setDuplicates([]); setChecking(false); return; }
+    const { data } = await crmDb()
+      .from("contacts")
+      .select("id, name, position, email, phone, account_id")
+      .eq("account_id", accountId)
+      .or(orParts.join(","))
+      .limit(5);
+    // Exclude self when editing
+    setDuplicates((data ?? []).filter((c: any) => c.id !== initial?.id));
+    setChecking(false);
+  };
+
   const [form, setForm] = useState({
     name:           initial?.name           ?? "",
     nickname:       initial?.nickname        ?? "",
@@ -70,10 +95,23 @@ export function AddContactDialog({ open, onOpenChange, accountId, accountName, i
     personal_notes: initial?.personal_notes  ?? "",
   });
 
-  const set = (patch: Partial<typeof form>) => setForm(prev => ({ ...prev, ...patch }));
+  const set = (patch: Partial<typeof form>) => {
+    const next = { ...form, ...patch };
+    setForm(next);
+    setIgnoreDup(false);
+    // Debounce duplicate check
+    if ("name" in patch || "phone" in patch || "email" in patch) {
+      clearTimeout((set as any)._t);
+      (set as any)._t = setTimeout(() => checkDuplicates(next.name, next.phone, next.email), 500);
+    }
+  };
 
   const submit = async () => {
     if (!form.name.trim()) { toast.error("กรุณาระบุชื่อผู้ติดต่อ"); return; }
+    if (duplicates.length > 0 && !ignoreDup) {
+      toast.error("พบรายชื่อที่คล้ายกัน — กรุณาตรวจสอบก่อน หรือกด 'เพิ่มถึงกัน' เพื่อยืนยัน");
+      return;
+    }
     setSaving(true);
     const payload = {
       account_id:     accountId,
@@ -198,6 +236,42 @@ export function AddContactDialog({ open, onOpenChange, accountId, accountName, i
           </div>
         </div>
 
+        {/* Duplicate warning */}
+        {duplicates.length > 0 && !ignoreDup && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20 p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">⚠ พบรายชื่อที่คล้ายกัน {duplicates.length} รายการ</span>
+              {checking && <span className="text-xs text-muted-foreground">กำลังตรวจสอบ...</span>}
+            </div>
+            <div className="space-y-1.5">
+              {duplicates.map((d) => (
+                <div key={d.id} className="flex items-center justify-between rounded-lg border bg-card px-3 py-2 text-sm">
+                  <div>
+                    <span className="font-medium">{d.name}</span>
+                    {d.position && <span className="text-muted-foreground ml-1.5">· {d.position}</span>}
+                    {d.email && <span className="text-muted-foreground ml-1.5">· {d.email}</span>}
+                    {d.phone && <span className="text-muted-foreground ml-1.5">· {d.phone}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Button size="sm" variant="outline" className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                onClick={() => setIgnoreDup(true)}>
+                เพิ่มถึงกัน (ไม่ใช่คนเดิม)
+              </Button>
+              <span className="text-xs text-muted-foreground">หรือแก้ไขข้อมูลให้ต่างออกไป</span>
+            </div>
+          </div>
+        )}
+
+        {checking && duplicates.length === 0 && (
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 animate-spin rounded-full border border-muted-foreground border-t-transparent" />
+            กำลังตรวจสอบรายชื่อซ้ำ...
+          </p>
+        )}
+
         <DialogFooter className="flex items-center justify-between gap-2 mt-2">
           <div>
             {isEdit && (
@@ -210,7 +284,7 @@ export function AddContactDialog({ open, onOpenChange, accountId, accountName, i
             <Button variant="outline" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
             <Button onClick={submit} disabled={saving}>
               {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-              {isEdit ? "บันทึกการแก้ไข" : "เพิ่มผู้ติดต่อ"}
+              {isEdit ? "บันทึกการแก้ไข" : ignoreDup ? "ยืนยันเพิ่มถึงกัน" : "เพิ่มผู้ติดต่อ"}
             </Button>
           </div>
         </DialogFooter>
