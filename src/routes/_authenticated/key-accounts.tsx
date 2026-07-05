@@ -472,7 +472,7 @@ function KeyAccountsPage() {
             {tab === "ดีลที่เกี่ยวข้อง" && (
               <DealsTab
                 leads={getAccLeads(selected)}
-                onAddDeal={() => setTab("บันทึกกิจกรรม")}
+                onAddDeal={() => setAddDealOpen(true)}
               />
             )}
 
