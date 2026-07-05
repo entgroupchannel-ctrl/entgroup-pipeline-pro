@@ -36,6 +36,13 @@ function SettingsPage() {
   const isManager = role === "manager" || role === "admin";
   const [active, setActive] = useState("profile");
 
+  // Sales role can only access "profile" tab — block all others
+  // (sidebar already hides the link, but guard direct URL access too)
+  if (role === "sales" && active !== "profile") {
+    // If someone manually changes tab via URL hack, reset to profile
+    setTimeout(() => setActive("profile"), 0);
+  }
+
   // Menu groups definition
   type MenuItem = { key: string; label: string; adminOnly?: boolean; managerOnly?: boolean };
   type MenuGroup = { group: string; items: MenuItem[] };
@@ -75,14 +82,20 @@ function SettingsPage() {
   ];
 
   // Filter items by role
+  const isSales = role === "sales";
+
   const visibleGroups = menuGroups.map((g) => ({
     ...g,
     items: g.items.filter((item) => {
       if (item.adminOnly && !isAdmin) return false;
       if (item.managerOnly && !isManager) return false;
+      if (isSales && (item as any).key !== "profile") return false; // sales: profile only
       return true;
     }),
   })).filter((g) => g.items.length > 0);
+
+  // If sales tries to access non-profile tab (e.g. via URL manipulation)
+  const effectiveActive = isSales ? "profile" : active;
 
   const CONTENT: Record<string, React.ReactNode> = {
     profile:         <ProfileTab />,
@@ -98,7 +111,7 @@ function SettingsPage() {
     ai:              isAdmin ? <AISettingsTab /> : null,
   };
 
-  const activeLabel = visibleGroups.flatMap((g) => g.items).find((i) => i.key === active)?.label ?? "";
+  const activeLabel = visibleGroups.flatMap((g) => g.items).find((i) => i.key === effectiveActive)?.label ?? "";
 
   return (
     <div className="flex h-full page-fade-in">
@@ -119,13 +132,13 @@ function SettingsPage() {
                   key={item.key}
                   onClick={() => setActive(item.key)}
                   className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
-                    active === item.key
+                    effectiveActive === item.key
                       ? "bg-primary/10 text-primary font-medium"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
                   <span>{item.label}</span>
-                  {active === item.key && <ChevronRight className="h-3.5 w-3.5 opacity-60" />}
+                  {effectiveActive === item.key && <ChevronRight className="h-3.5 w-3.5 opacity-60" />}
                 </button>
               ))}
             </div>
@@ -139,7 +152,9 @@ function SettingsPage() {
           <h2 className="text-lg font-semibold">{activeLabel}</h2>
         </div>
         <div className="max-w-3xl">
-          {CONTENT[active] ?? null}
+          {CONTENT[effectiveActive] ?? (
+            isSales ? <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-6 text-sm text-amber-700 dark:text-amber-400">ไม่มีสิทธิ์เข้าถึงส่วนนี้</div> : null
+          )}
         </div>
       </div>
     </div>
