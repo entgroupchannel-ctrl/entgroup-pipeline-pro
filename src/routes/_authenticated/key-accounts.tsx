@@ -55,8 +55,9 @@ interface KeyAccount {
       title: string | null;
       grand_total: number | null;
       status: string | null;
-      flowaccount_quotation_url: string | null;
+      flowaccount_url: string | null;
     }[];
+
   }[];
   target?: KeyAccountTarget[];
 }
@@ -127,7 +128,7 @@ function KeyAccountsPage() {
           `id, name, industry, owner_id, is_key_account,
            leads (
              id, title, stage, expected_value, created_at,
-             quotations ( id, quotation_no, title, grand_total, status, flowaccount_quotation_url )
+             quotations ( id, quotation_no, title, grand_total, status, flowaccount_url )
            ),
            target:key_account_targets ( visit_target, call_target, line_target, email_target, quote_target )`,
         )
@@ -881,13 +882,13 @@ function DealsTab({
                               >
                                 {STATUS_LABEL[q.status] ?? q.status}
                               </span>
-                              {q.flowaccount_quotation_url && (
-                                <a
-                                  href={q.flowaccount_quotation_url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-[11px] text-primary hover:underline shrink-0"
-                                >
+                            {q.flowaccount_url && (
+                              <a
+                                href={q.flowaccount_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[11px] text-primary hover:underline shrink-0"
+                              >
                                   ดู
                                 </a>
                               )}
