@@ -36,6 +36,7 @@ import {
 // ActivityLogDialog handles its own imports
 import { fetchFADocuments, type FADocument } from "@/lib/flowaccount-client";
 import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
+import { AccountEmailDialog } from "@/components/accounts/AccountEmailDialog";
 
 
 
@@ -131,6 +132,7 @@ function KeyAccountsPage() {
   const [logKind, setLogKind] = useState<ActivityKind>("call");
   const [logLeadId, setLogLeadId] = useState<string | null>(null);
   const [addDealOpen, setAddDealOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
   const [accPage, setAccPage] = useState(1);
   const ACC_PAGE_SIZE = 20;
 
@@ -466,52 +468,84 @@ function KeyAccountsPage() {
       {/* RIGHT PANEL */}
       {selected ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <div style={{ borderBottom: "0.5px solid var(--border)", background: "var(--surface-1)" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "space-between",
-                padding: "16px 20px 8px",
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 600, color: "var(--text-primary)" }}>
-                  {selected.name}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                  {selected.industry ?? "—"} · {selected.owner_id ? profileMap.get(selected.owner_id) ?? "—" : "—"}
-                </div>
-              </div>
-              <Button size="sm" onClick={() => openLog("call")}>
-                <Plus className="mr-1 h-4 w-4" /> บันทึกกิจกรรม
-              </Button>
-            </div>
 
-            <div style={{ display: "flex", gap: 4, padding: "0 20px", overflowX: "auto" }}>
-              {["กิจกรรมเดือนนี้", "ประวัติกิจกรรม", "ดีลที่เกี่ยวข้อง", "บันทึก"].map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  style={{
-                    fontSize: 12,
-                    padding: "8px 16px",
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    borderBottom:
-                      tab === t ? "2px solid #185FA5" : "2px solid transparent",
-                    color: tab === t ? "#185FA5" : "var(--text-muted)",
-                    fontWeight: tab === t ? 500 : 400,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {t}
-                </button>
-              ))}
+          {/* ── Header: ชื่อบริษัท + สถานะ ── */}
+          <div className="border-b bg-card px-5 py-3.5 shrink-0">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold text-foreground truncate">{selected.name}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {selected.industry ?? "—"} · {selected.owner_id ? profileMap.get(selected.owner_id) ?? "—" : "—"}
+                </p>
+              </div>
+              <span className={`shrink-0 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                selectedHealth >= 80 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" :
+                selectedHealth >= 50 ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" :
+                "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+              }`}>
+                {selectedHealth >= 80 ? "✓ สุขภาพดี" : selectedHealth >= 50 ? "⚠ ต้องระวัง" : "⚡ ใกล้สูญเสีย"}
+                {" "}{selectedHealth}%
+              </span>
             </div>
           </div>
 
+          {/* ── Quick Action Bar ── */}
+          <div className="flex items-center gap-2 border-b bg-muted/10 px-5 py-2 shrink-0 overflow-x-auto">
+            <button
+              onClick={() => openLog("call")}
+              className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors shrink-0"
+            >
+              <Phone className="h-3.5 w-3.5 text-emerald-600" /> โทร
+            </button>
+            <button
+              onClick={() => openLog("line")}
+              className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors shrink-0"
+            >
+              <MessageCircle className="h-3.5 w-3.5 text-green-600" /> Line
+            </button>
+            <button
+              onClick={() => setEmailOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors shrink-0"
+            >
+              <Mail className="h-3.5 w-3.5 text-blue-600" /> ส่งอีเมล
+            </button>
+            <button
+              onClick={() => openLog("meeting")}
+              className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors shrink-0"
+            >
+              <Users className="h-3.5 w-3.5 text-violet-600" /> นัดประชุม
+            </button>
+            <button
+              onClick={() => setAddDealOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors shrink-0"
+            >
+              <FileText className="h-3.5 w-3.5 text-amber-600" /> สร้างดีล
+            </button>
+            <div className="ml-auto shrink-0">
+              <Button size="sm" onClick={() => openLog("call")}>
+                <Plus className="mr-1 h-3.5 w-3.5" /> บันทึกกิจกรรม
+              </Button>
+            </div>
+          </div>
+
+          {/* ── Tabs ── */}
+          <div className="flex border-b bg-card shrink-0 overflow-x-auto">
+            {["กิจกรรมเดือนนี้", "ประวัติกิจกรรม", "ดีลที่เกี่ยวข้อง", "ผู้ติดต่อ", "อีเมล", "บันทึก"].map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  tab === t
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Tab content ── */}
           <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
             {tab === "กิจกรรมเดือนนี้" && (
               <ActivityTab
@@ -522,9 +556,7 @@ function KeyAccountsPage() {
               />
             )}
             {tab === "ประวัติกิจกรรม" && (
-              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                ประวัติกิจกรรมทั้งหมดจะแสดงที่นี่
-              </div>
+              <ActivityHistoryTab accountId={selected.id} />
             )}
             {tab === "ดีลที่เกี่ยวข้อง" && (
               <DealsTab
@@ -532,9 +564,14 @@ function KeyAccountsPage() {
                 onAddDeal={() => setAddDealOpen(true)}
               />
             )}
-
+            {tab === "ผู้ติดต่อ" && (
+              <ContactsTab accountId={selected.id} accountName={selected.name} onEmail={() => setEmailOpen(true)} />
+            )}
+            {tab === "อีเมล" && (
+              <EmailLogTab accountId={selected.id} />
+            )}
             {tab === "บันทึก" && (
-              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>ยังไม่มีบันทึก</div>
+              <div className="text-sm text-muted-foreground">ยังไม่มีบันทึก</div>
             )}
           </div>
         </div>
@@ -573,6 +610,15 @@ function KeyAccountsPage() {
           ownerId={user?.id ?? null}
           profiles={profiles}
           onCreated={() => { setAddDealOpen(false); load(); }}
+        />
+      )}
+
+      {selected && emailOpen && (
+        <AccountEmailDialog
+          open={emailOpen}
+          onOpenChange={setEmailOpen}
+          accountId={selected.id}
+          accountName={selected.name}
         />
       )}
     </div>
@@ -1365,6 +1411,173 @@ function SummaryCard({
       >
         {value}
       </div>
+    </div>
+  );
+}
+
+// ── ActivityHistoryTab ────────────────────────────────────────────────────────
+function ActivityHistoryTab({ accountId }: { accountId: string }) {
+  const [acts, setActs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      // Get all lead ids for this account
+      const { data: leads } = await crmDb().from("leads").select("id").eq("account_id", accountId);
+      const ids = (leads ?? []).map((l: any) => l.id);
+      if (!ids.length) { setActs([]); setLoading(false); return; }
+      const { data } = await crmDb()
+        .from("activities")
+        .select("id, type, subject, done, done_at, created_at, lead_id")
+        .in("lead_id", ids)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      setActs(data ?? []);
+      setLoading(false);
+    })();
+  }, [accountId]);
+
+  const TYPE_ICON: Record<string, string> = { call:"📞", meeting:"👥", line:"💬", email:"✉️", note:"📝" };
+  const MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  const fmtDate = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${String(d.getFullYear()+543).slice(-2)}`;
+  };
+
+  if (loading) return <div className="flex justify-center py-10"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
+  if (!acts.length) return <p className="text-sm text-muted-foreground text-center py-10">ยังไม่มีประวัติกิจกรรม</p>;
+
+  return (
+    <div className="space-y-1">
+      {acts.map((a) => (
+        <div key={a.id} className="flex items-start gap-3 rounded-xl border bg-card px-4 py-3 hover:bg-muted/20 transition-colors">
+          <span className="text-base shrink-0 mt-0.5">{TYPE_ICON[a.type] ?? "📋"}</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{a.subject || "—"}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{fmtDate(a.created_at)}</p>
+          </div>
+          <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+            a.done ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                   : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+          }`}>
+            {a.done ? "✓ เสร็จ" : "รอ"}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── ContactsTab ───────────────────────────────────────────────────────────────
+function ContactsTab({ accountId, accountName, onEmail }: { accountId: string; accountName: string; onEmail: () => void }) {
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data } = await crmDb()
+        .from("contacts")
+        .select("id, name, position, email, phone, line_id")
+        .eq("account_id", accountId)
+        .order("name");
+      setContacts(data ?? []);
+      setLoading(false);
+    })();
+  }, [accountId]);
+
+  if (loading) return <div className="flex justify-center py-10"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
+  if (!contacts.length) return <p className="text-sm text-muted-foreground text-center py-10">ยังไม่มีผู้ติดต่อ</p>;
+
+  return (
+    <div className="space-y-2">
+      {contacts.map((c) => (
+        <div key={c.id} className="rounded-xl border bg-card px-4 py-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold truncate">{c.name}</p>
+              {c.position && <p className="text-xs text-muted-foreground">{c.position}</p>}
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {c.phone && (
+                <a href={`tel:${c.phone}`} className="rounded-lg border p-1.5 text-muted-foreground hover:text-primary hover:border-primary transition-colors" title={c.phone}>
+                  <Phone className="h-3.5 w-3.5" />
+                </a>
+              )}
+              {c.line_id && (
+                <a href={`https://line.me/ti/p/~${c.line_id}`} target="_blank" rel="noreferrer" className="rounded-lg border p-1.5 text-muted-foreground hover:text-green-600 hover:border-green-400 transition-colors" title={`Line: ${c.line_id}`}>
+                  <MessageCircle className="h-3.5 w-3.5" />
+                </a>
+              )}
+              {c.email && (
+                <button onClick={onEmail} className="rounded-lg border p-1.5 text-muted-foreground hover:text-blue-600 hover:border-blue-400 transition-colors" title={c.email}>
+                  <Mail className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+            {c.email && <span className="truncate max-w-[200px]">{c.email}</span>}
+            {c.phone && <span>{c.phone}</span>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── EmailLogTab ───────────────────────────────────────────────────────────────
+function EmailLogTab({ accountId }: { accountId: string }) {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data } = await crmDb()
+        .from("email_send_log")
+        .select("*")
+        .or(`related_id.eq.${accountId},metadata->>account_id.eq.${accountId}`)
+        .order("created_at", { ascending: false })
+        .limit(30);
+      setLogs(data ?? []);
+      setLoading(false);
+    })();
+  }, [accountId]);
+
+  const MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  const fmtDate = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getDate()} ${MONTHS[d.getMonth()]} · ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  };
+
+  if (loading) return <div className="flex justify-center py-10"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
+  if (!logs.length) return <p className="text-sm text-muted-foreground text-center py-10">ยังไม่มีประวัติการส่งอีเมล</p>;
+
+  return (
+    <div className="space-y-1.5">
+      {logs.map((log) => (
+        <div key={log.id} className="rounded-xl border bg-card px-4 py-3 hover:bg-muted/20 transition-colors">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium truncate flex-1">{log.subject || "—"}</p>
+            <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+              log.status === "sent"
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                : "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+            }`}>
+              {log.status === "sent" ? "✓ ส่งแล้ว" : "✗ ล้มเหลว"}
+            </span>
+          </div>
+          <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="truncate">{log.recipient_name ? `${log.recipient_name} · ` : ""}{log.recipient_email}</span>
+            <span className="shrink-0">{fmtDate(log.created_at)}</span>
+          </div>
+          {log.error_message && (
+            <p className="mt-1.5 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 rounded px-2 py-1">{log.error_message}</p>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
