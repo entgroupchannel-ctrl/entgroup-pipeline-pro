@@ -288,18 +288,35 @@ function ActivityDetailModal({ a, leadsMap, profilesMap, onClose, onToggle, onNa
   );
 }
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
+// ── Stat card (matches leads/quotations PeriodKpiCard style) ─────────────────
 
-function StatCard({ value, label, color, bg, border }: { value:number; label:string; color:string; bg:string; border:string }) {
+function StatCard({ icon, value, label, tone }: {
+  icon: React.ReactNode;
+  value: number;
+  label: string;
+  tone: "red" | "amber" | "blue" | "emerald" | "muted";
+}) {
+  const toneClass = {
+    red:      "text-red-600 dark:text-red-400",
+    amber:    "text-amber-700 dark:text-amber-400",
+    blue:     "text-blue-700 dark:text-blue-400",
+    emerald:  "text-emerald-700 dark:text-emerald-400",
+    muted:    "text-muted-foreground",
+  }[tone];
   return (
-    <div className={`rounded-xl border px-3 py-2 text-center ${bg} ${border}`}>
-      <div className={`text-xl font-bold leading-none ${value>0 ? color : "text-muted-foreground"}`}>{value}</div>
-      <div className="mt-0.5 text-[10px] text-muted-foreground">{label}</div>
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <span className={value > 0 ? toneClass : "text-muted-foreground"}>{icon}</span>
+        {label}
+      </div>
+      <div className={`mt-1.5 text-lg font-bold tabular-nums ${value > 0 ? "text-foreground" : "text-muted-foreground"}`}>
+        {value}
+      </div>
     </div>
   );
 }
 
-// ── Compact task row (half-width column) ──────────────────────────────────────
+// ── Compact task row ─────────────────────────────────────────────────────────
 
 function TaskRow({ a, group, leadsMap, profilesMap, onToggle, onClick }: {
   a: Activity;
@@ -318,33 +335,32 @@ function TaskRow({ a, group, leadsMap, profilesMap, onToggle, onClick }: {
 
   return (
     <li
-      className={`flex items-center gap-2 px-3 py-2 border-b last:border-0 cursor-pointer transition-colors
-        hover:bg-muted/40 border-l-2
-        ${isOverdue ? "border-l-red-500 bg-red-50/20 dark:bg-red-950/10" : isToday ? "border-l-amber-400" : "border-l-transparent"}
-        ${isDone ? "opacity-50" : ""}`}
+      className={`flex items-center gap-2.5 px-4 py-2.5 border-b last:border-0 cursor-pointer transition-colors hover:bg-muted/40 ${
+        isDone ? "opacity-60" : ""
+      }`}
       onClick={() => onClick(a)}
     >
-      {/* Checkbox */}
       <div onClick={(e) => { e.stopPropagation(); onToggle(a, !isDone); }} className="shrink-0">
         <Checkbox checked={isDone} />
       </div>
 
-      {/* Type icon only (compact) */}
-      <span className={`inline-flex shrink-0 items-center justify-center h-6 w-6 rounded-full text-[10px] ${typeCfg.bg} ${typeCfg.text}`}>
+      <span className={`inline-flex shrink-0 items-center justify-center h-6 w-6 rounded-full ${typeCfg.bg} ${typeCfg.text}`}>
         <Icon className="h-3 w-3" />
       </span>
 
-      {/* Text */}
       <div className="min-w-0 flex-1">
-        <p className={`text-xs font-medium leading-tight truncate ${isDone ? "line-through text-muted-foreground" : ""}`}>
+        <p className={`text-sm font-medium leading-tight truncate ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>
           {a.subject ?? ACTIVITY_TYPE_LABEL[a.type as ActivityType]}
         </p>
-        {leadTitle && <p className="text-[10px] text-primary/70 truncate mt-0.5">{leadTitle}</p>}
+        {leadTitle && <p className="text-[11px] text-muted-foreground truncate mt-0.5">{leadTitle}</p>}
       </div>
 
-      {/* Due */}
       {a.due_at && !isDone && (
-        <span className={`shrink-0 text-[10px] font-medium ${isOverdue ? "text-red-600 dark:text-red-400" : isToday ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+        <span className={`shrink-0 text-xs tabular-nums whitespace-nowrap ${
+          isOverdue ? "text-red-600 dark:text-red-400 font-medium" :
+          isToday   ? "text-amber-700 dark:text-amber-400 font-medium" :
+                      "text-muted-foreground"
+        }`}>
           {formatDue(a.due_at, true)}
         </span>
       )}
@@ -364,37 +380,35 @@ function Column({ groups, leadsMap, profilesMap, onToggle, onClick, doneOpen, se
   setDoneOpen: (v:boolean)=>void;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {groups.map((group) => {
         const isCollapsible = group.collapsible;
         const isOpen = isCollapsible ? doneOpen : true;
-        const SHOW = isCollapsible ? 3 : 5;
+        const SHOW = isCollapsible ? 3 : 6;
         const [showAll, setShowAll] = useState(false);
         const visible = showAll ? group.items : group.items.slice(0, SHOW);
         const hidden = group.items.length - visible.length;
 
         return (
-          <div key={group.key} className="rounded-xl border bg-card overflow-hidden">
-            {/* Section header */}
+          <div key={group.key} className="rounded-xl border border-border bg-card overflow-hidden">
             <button
-              className="flex w-full items-center gap-1.5 px-3 py-2 text-left hover:bg-muted/20 transition-colors"
+              className="flex w-full items-center gap-2 border-b bg-muted/30 px-4 py-2.5 text-left hover:bg-muted/50 transition-colors"
               onClick={() => isCollapsible && setDoneOpen(!isOpen)}
             >
-              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: group.color }} />
-              {group.icon && <group.icon className="h-3 w-3 shrink-0" style={{ color: group.color }} />}
-              <span className="text-[11px] font-semibold" style={{ color: group.color }}>{group.label}</span>
-              <span className="text-[10px] text-muted-foreground">({group.items.length})</span>
+              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: group.color }} />
+              {group.icon && <group.icon className="h-3.5 w-3.5 shrink-0" style={{ color: group.color }} />}
+              <span className="text-xs font-semibold" style={{ color: group.color }}>{group.label}</span>
+              <span className="text-[11px] text-muted-foreground">({group.items.length})</span>
               {isCollapsible && (
                 <span className="ml-auto">
-                  {isOpen ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                  {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                 </span>
               )}
             </button>
 
-            {/* Rows */}
             {isOpen && (
               <>
-                <ul className="border-t">
+                <ul>
                   {visible.map((a) => (
                     <TaskRow key={a.id} a={a} group={group} leadsMap={leadsMap} profilesMap={profilesMap} onToggle={onToggle} onClick={onClick} />
                   ))}
@@ -402,10 +416,9 @@ function Column({ groups, leadsMap, profilesMap, onToggle, onClick, doneOpen, se
                 {hidden > 0 && (
                   <button
                     onClick={() => setShowAll(true)}
-                    className="flex w-full items-center justify-center gap-1 border-t py-1.5 text-[10px] text-muted-foreground hover:bg-muted/20 transition-colors"
-                    style={{ color: group.color }}
+                    className="flex w-full items-center justify-center gap-1 border-t bg-muted/20 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/40 transition-colors"
                   >
-                    <ChevronDown className="h-3 w-3" /> อีก {hidden} รายการ
+                    <ChevronDown className="h-3.5 w-3.5" /> อีก {hidden} รายการ
                   </button>
                 )}
               </>
@@ -416,6 +429,7 @@ function Column({ groups, leadsMap, profilesMap, onToggle, onClick, doneOpen, se
     </div>
   );
 }
+
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
