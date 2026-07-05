@@ -10,11 +10,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Sparkles, Send, Loader2, Mail, RotateCcw, ChevronDown, ChevronUp,
+  CalendarClock, MessageCircleHeart, HandHeart, FileText, UserPlus, BellRing, Tag, Wand2,
 } from "lucide-react";
 import { draftLeadEmail, sendLeadEmail } from "@/lib/lead-email.functions";
 import { useAuth } from "@/lib/auth-context";
 import { STAGE_LABEL_TH, type LeadStage } from "@/lib/crm";
+
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -33,15 +38,35 @@ interface Props {
   onSent?: () => void;
 }
 
-// ── AI template suggestions ───────────────────────────────────────────────────
+// ── AI templates, tones, lengths ─────────────────────────────────────────────
 
-const QUICK_BRIEFS = [
-  { label: "ติดตามหลังนำเสนอ",    text: "ติดตามผลหลังจากนำเสนอสินค้า/บริการ ถามว่ามีคำถามหรือต้องการข้อมูลเพิ่มเติมไหม" },
-  { label: "ส่งใบเสนอราคา",       text: "แจ้งว่าได้ส่งใบเสนอราคาให้แล้ว ขอให้ตรวจสอบและแจ้งผล" },
-  { label: "ติดตาม Follow Up",     text: "ติดตามสถานะการพิจารณา ถามว่ามีข้อสงสัยหรือต้องการนัดคุยเพิ่มเติมไหม" },
-  { label: "ขอบคุณหลังประชุม",    text: "ขอบคุณสำหรับเวลาในการประชุม สรุปประเด็นสำคัญและ next step" },
-  { label: "แจ้งโปรโมชัน",        text: "แจ้งโปรโมชันพิเศษที่น่าสนใจสำหรับลูกค้า ไม่กดดัน เปิดให้ถาม" },
+const TEMPLATES: {
+  id: string; label: string; icon: any; brief: string;
+}[] = [
+  { id: "meeting",      label: "นัดประชุม",      icon: CalendarClock,     brief: "อยากนัดประชุมกับลูกค้าเพื่อคุยรายละเอียดเพิ่มเติม เสนอ 2-3 ช่วงเวลาที่สะดวก" },
+  { id: "followup",     label: "ติดตามผล",       icon: BellRing,          brief: "ติดตามผลหลังจากคุยครั้งล่าสุด สอบถามความคืบหน้าและมีอะไรให้ช่วยเพิ่มไหม" },
+  { id: "thanks",       label: "ขอบคุณ",         icon: HandHeart,         brief: "ขอบคุณลูกค้าสำหรับเวลาในการประชุม/สั่งซื้อ สรุปประเด็นและ next step" },
+  { id: "quotation",    label: "ส่งใบเสนอราคา",  icon: FileText,          brief: "แจ้งว่าได้ส่งใบเสนอราคาให้แล้ว ขอให้ตรวจสอบและแจ้งผลกลับ" },
+  { id: "introduction", label: "แนะนำตัว",       icon: UserPlus,          brief: "แนะนำตัวและบริษัท ENTGROUP พร้อมเสนอโอกาสความร่วมมือกับลูกค้า" },
+  { id: "reminder",     label: "เตือนอย่างสุภาพ", icon: MessageCircleHeart, brief: "เตือนลูกค้าอย่างสุภาพเรื่องที่ยังค้างอยู่ เช่น เอกสารหรือการตัดสินใจ" },
+  { id: "promotion",    label: "แจ้งโปรโมชัน",   icon: Tag,               brief: "แจ้งโปรโมชันพิเศษที่น่าสนใจสำหรับลูกค้า ไม่กดดัน เปิดให้สอบถาม" },
+  { id: "custom",       label: "กำหนดเอง",       icon: Wand2,             brief: "" },
 ];
+
+const TONE_OPTIONS = [
+  { value: "formal",     label: "สุภาพทางการ" },
+  { value: "friendly",   label: "สุภาพเป็นกันเอง" },
+  { value: "concise",    label: "กระชับตรงประเด็น" },
+  { value: "warm",       label: "อบอุ่นเป็นมิตร" },
+  { value: "persuasive", label: "โน้มน้าวมืออาชีพ" },
+];
+
+const LENGTH_OPTIONS = [
+  { value: "short",  label: "สั้น (2-3 ประโยค)" },
+  { value: "medium", label: "ปานกลาง (4-6 ประโยค)" },
+  { value: "long",   label: "ยาว (7-10 ประโยค)" },
+];
+
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -64,6 +89,9 @@ export function LeadEmailComposer({
   const [drafting, setDrafting]   = useState(false);
   const [sending,  setSending]    = useState(false);
   const [showCtx,  setShowCtx]    = useState(false);
+  const [template, setTemplate]   = useState<string>("followup");
+  const [tone,     setTone]       = useState<string>("friendly");
+  const [length,   setLength]     = useState<string>("medium");
 
   const stageLabel = stage ? (STAGE_LABEL_TH[stage as LeadStage] ?? stage) : undefined;
 
@@ -71,11 +99,18 @@ export function LeadEmailComposer({
     setBrief(""); setSubject(""); setBody("");
     setToEmail(contactEmail ?? ""); setToName(contactName ?? "");
     setStep("compose"); setShowCtx(false);
+    setTemplate("followup"); setTone("friendly"); setLength("medium");
   };
 
   const handleOpenChange = (o: boolean) => {
     if (!o) reset();
     onOpenChange(o);
+  };
+
+  const pickTemplate = (id: string) => {
+    setTemplate(id);
+    const t = TEMPLATES.find((x) => x.id === id);
+    if (t && t.brief && !brief.trim()) setBrief(t.brief);
   };
 
   const handleDraft = async () => {
@@ -90,6 +125,9 @@ export function LeadEmailComposer({
           company_name: companyName,
           stage:        stageLabel,
           sender_name:  profile?.full_name || user?.email,
+          tone,
+          length,
+          template,
         },
       }) as { subject: string; body: string };
       setSubject(result.subject);
@@ -101,6 +139,7 @@ export function LeadEmailComposer({
       setDrafting(false);
     }
   };
+
 
   const handleSend = async () => {
     if (!toEmail.trim()) { toast.error("กรุณาระบุอีเมลผู้รับ"); return; }
@@ -184,25 +223,57 @@ export function LeadEmailComposer({
         {/* ── Step: Compose (Brief) ── */}
         {step === "compose" && (
           <div className="space-y-4">
-            {/* Quick briefs */}
+            {/* Template picker */}
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">เริ่มด้วย template</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {QUICK_BRIEFS.map((q) => (
-                  <button
-                    key={q.label}
-                    onClick={() => setBrief(q.text)}
-                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                      brief === q.text
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted"
-                    }`}
-                  >
-                    {q.label}
-                  </button>
-                ))}
+              <Label className="text-xs text-muted-foreground">เลือกเทมเพลตอีเมล</Label>
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                {TEMPLATES.map((t) => {
+                  const Icon = t.icon;
+                  const active = template === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => pickTemplate(t.id)}
+                      className={`flex flex-col items-center justify-center gap-1 rounded-md border px-2 py-2 text-xs transition-colors ${
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "bg-background hover:bg-muted"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="text-[11px] leading-tight">{t.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
+
+            {/* Tone + Length */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">โทนภาษา</Label>
+                <Select value={tone} onValueChange={setTone}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TONE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">ความยาว</Label>
+                <Select value={length} onValueChange={setLength}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {LENGTH_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
 
             {/* Brief input */}
             <div className="space-y-1.5">
