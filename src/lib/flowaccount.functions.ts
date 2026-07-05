@@ -98,27 +98,37 @@ export const loadFASettings = createServerFn({ method: "GET" })
       .eq("id", "flowaccount")
       .maybeSingle();
 
-    if (error) throw new Error(`โหลด settings ไม่สำเร็จ: ${error.message}`);
-
     const blank = {
       client_id: "", client_secret_masked: "", base_url: "",
       token_url: "", is_active: false, last_synced_at: null, sync_error: null,
     };
+
+    // Graceful fallback: treat any load error as "not configured yet"
+    if (error) {
+      console.warn("[loadFASettings] load error, returning blank:", error.message);
+      return blank;
+    }
     if (!data) return blank;
 
-    const secret: string = (data as any).client_secret ?? "";
+    const cfg = data as any;
+    // If FlowAccount credentials aren't set yet, return blank instead of throwing
+    if (!cfg.client_id || !cfg.client_secret) {
+      return blank;
+    }
+
+    const secret: string = cfg.client_secret ?? "";
     const masked = secret.length > 4
       ? "••••••••" + secret.slice(-4)
       : secret ? "••••" : "";
 
     return {
-      client_id:          (data as any).client_id ?? "",
+      client_id:          cfg.client_id ?? "",
       client_secret_masked: masked,
-      base_url:           (data as any).base_url ?? "https://openapi.flowaccount.com/v1",
-      token_url:          (data as any).token_url ?? "https://openapi.flowaccount.com/token",
-      is_active:          (data as any).is_active ?? false,
-      last_synced_at:     (data as any).last_synced_at ?? null,
-      sync_error:         (data as any).sync_error ?? null,
+      base_url:           cfg.base_url ?? "https://openapi.flowaccount.com/v1",
+      token_url:          cfg.token_url ?? "https://openapi.flowaccount.com/token",
+      is_active:          cfg.is_active ?? false,
+      last_synced_at:     cfg.last_synced_at ?? null,
+      sync_error:         cfg.sync_error ?? null,
     };
   });
 
