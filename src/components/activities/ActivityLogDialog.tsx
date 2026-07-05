@@ -411,175 +411,221 @@ export function ActivityLogDialog({
 
   const KindIcon = KIND_ICONS[log.kind];
 
+  // Activity type quick-select buttons
+  const KIND_ENTRIES = Object.entries(KIND_LABELS) as [ActivityKind, string][];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent style={{ maxWidth: 560, maxHeight: "90vh", overflowY: "auto" }}>
-        <DialogHeader>
-          <DialogTitle style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <KindIcon size={18} />
+      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden" style={{ maxHeight: "92vh" }}>
+
+        {/* Header */}
+        <DialogHeader className="px-5 py-3.5 border-b shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <KindIcon size={16} />
             {title ?? `บันทึก${KIND_LABELS[log.kind]}`}
           </DialogTitle>
         </DialogHeader>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingBottom: 4 }}>
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
 
-          {/* ── ประเภท + วันเวลา ── */}
-          <SectionTitle>ข้อมูลพื้นฐาน</SectionTitle>
-
-          <Row>
-            <Field label="ประเภทกิจกรรม">
-              <Select
-                value={log.kind}
-                onValueChange={(v) => setLog(defaultLog(v as ActivityKind))}
-              >
-                <SelectTrigger>
-                  <SelectValue>
-                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      {(() => { const Ic = KIND_ICONS[log.kind]; return <Ic size={13} />; })()}
-                      {KIND_LABELS[log.kind]}
-                    </span>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(KIND_LABELS) as ActivityKind[]).map((k) => {
-                    const Ic = KIND_ICONS[k];
-                    return (
-                      <SelectItem key={k} value={k}>
-                        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <Ic size={13} />
-                          {KIND_LABELS[k]}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="ระยะเวลา (นาที)">
-              <Input
-                type="number"
-                min={0}
-                placeholder="เช่น 30"
-                value={log.duration_min}
-                onChange={e => patch({ duration_min: e.target.value })}
-              />
-            </Field>
-          </Row>
-
-          <Row>
-            <Field label="วันที่">
-              <Input type="date" value={log.date} onChange={e => patch({ date: e.target.value })} />
-            </Field>
-            <Field label="เวลา">
-              <Input type="time" value={log.time} onChange={e => patch({ time: e.target.value })} />
-            </Field>
-          </Row>
-
-          {/* ── Kind-specific fields ── */}
-          {log.kind === "call" && <CallFields log={log as CallLog} set={p => patch<CallLog>(p)} />}
-          {log.kind === "meeting" && <MeetingFields log={log as MeetingLog} set={p => patch<MeetingLog>(p)} />}
-          {log.kind === "line" && <LineFields log={log as LineLog} set={p => patch<LineLog>(p)} />}
-          {log.kind === "email" && <EmailFields log={log as EmailLog} set={p => patch<EmailLog>(p)} />}
-          {log.kind === "note" && <NoteFields log={log as NoteLog} set={p => patch<NoteLog>(p)} />}
-
-          {/* ── เนื้อหาหลัก ── */}
-          <SectionTitle>เนื้อหาการสนทนา</SectionTitle>
-
-          <Field label="เรื่องที่คุย / หัวข้อหลัก *">
-            <Input
-              value={log.topic}
-              onChange={e => patch({ topic: e.target.value })}
-              placeholder={
-                log.kind === "call" ? "เช่น ติดตามใบเสนอราคา QT-2026-0012" :
-                log.kind === "meeting" ? "เช่น นำเสนอโซลูชัน AI สำหรับคลังสินค้า" :
-                log.kind === "line" ? "เช่น ส่งไฟล์ใบเสนอราคาและรอคำตอบ" :
-                log.kind === "email" ? "เช่น ติดตามผลการอนุมัติงบประมาณ" :
-                "หัวข้อบันทึก"
-              }
-            />
-          </Field>
-
-          <Field label="ประเด็นสำคัญที่พูดถึง">
-            <Textarea
-              rows={2}
-              value={log.issues}
-              onChange={e => patch({ issues: e.target.value })}
-              placeholder="เช่น ลูกค้าสนใจ Package B แต่ยังกังวลเรื่องราคา, ขอเปรียบเทียบกับคู่แข่งอีกราย"
-            />
-          </Field>
-
-          {/* ── ขั้นตอนต่อไป ── */}
-          <SectionTitle>ขั้นตอนต่อไป (Next Steps)</SectionTitle>
-
-          <Field label="สิ่งที่ต้องทำต่อ">
-            <Textarea
-              rows={2}
-              value={log.next_action}
-              onChange={e => patch({ next_action: e.target.value })}
-              placeholder="เช่น ส่งใบเสนอราคาฉบับแก้ไขภายใน 7 ก.ค., โทรติดตามผลอีกครั้ง 10 ก.ค."
-            />
-          </Field>
-
-          <Field label="วันนัดครั้งต่อไป">
-            <Input type="date" value={log.next_date} onChange={e => patch({ next_date: e.target.value })} />
-          </Field>
-
-          {/* ── ประเมินผล ── */}
-          <SectionTitle>ประเมินผลการสนทนา</SectionTitle>
-
-          <Field label="ผลลัพธ์โดยรวม">
-            <ResultPicker value={log.result} onChange={v => patch({ result: v })} />
-          </Field>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <Label style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                ท่าทีของลูกค้า / ความพร้อม
-              </Label>
-              <span style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: sentimentColor(log.sentiment),
-              }}>
-                {sentimentLabel(log.sentiment)}
-              </span>
+          {/* ── Row 1: Type quick select + Date + Time + Duration ── */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Left: type buttons */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">ประเภทกิจกรรม</Label>
+              <div className="grid grid-cols-5 gap-1">
+                {KIND_ENTRIES.map(([k, label]) => {
+                  const Ic = KIND_ICONS[k];
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => setLog(defaultLog(k))}
+                      className={`flex flex-col items-center gap-0.5 rounded-lg border py-2 text-[10px] font-medium transition-colors ${
+                        log.kind === k
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      <Ic size={14} />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <Slider
-              min={1}
-              max={5}
-              step={1}
-              value={[log.sentiment]}
-              onValueChange={([v]) => patch({ sentiment: v })}
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--text-muted)" }}>
-              <span>เย็นชา</span>
-              <span>ระมัดระวัง</span>
-              <span>เป็นกลาง</span>
-              <span>สนใจ</span>
-              <span>พร้อมซื้อ</span>
+
+            {/* Right: date/time/duration */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2 space-y-1.5">
+                <Label className="text-xs text-muted-foreground">วันที่</Label>
+                <Input type="date" value={log.date} onChange={e => patch({ date: e.target.value })} className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">เวลา</Label>
+                <Input type="time" value={log.time} onChange={e => patch({ time: e.target.value })} className="h-8 text-sm" />
+              </div>
+              {/* Duration + kind-specific compact fields */}
+              {log.kind === "call" && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">นาที</Label>
+                    <Input type="number" min={0} placeholder="30" value={log.duration_min} onChange={e => patch({ duration_min: e.target.value })} className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">เบอร์โทร</Label>
+                    <Input placeholder="0xx-xxx-xxxx" value={(log as CallLog).call_number} onChange={e => patch<CallLog>({ call_number: e.target.value })} className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">สถานะ</Label>
+                    <Select value={(log as CallLog).answered} onValueChange={v => patch<CallLog>({ answered: v as CallLog["answered"] })}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">รับสาย</SelectItem>
+                        <SelectItem value="no">ไม่รับ</SelectItem>
+                        <SelectItem value="voicemail">Voicemail</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
+              {log.kind === "meeting" && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">นาที</Label>
+                    <Input type="number" min={0} placeholder="60" value={log.duration_min} onChange={e => patch({ duration_min: e.target.value })} className="h-8 text-sm" />
+                  </div>
+                  <div className="col-span-2 space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">สถานที่</Label>
+                    <Input placeholder="สำนักงานลูกค้า, Zoom..." value={(log as MeetingLog).location} onChange={e => patch<MeetingLog>({ location: e.target.value })} className="h-8 text-sm" />
+                  </div>
+                </>
+              )}
+              {(log.kind === "line" || log.kind === "email" || log.kind === "note") && (
+                <div className="col-span-3 space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    {log.kind === "line" ? "สถานะการอ่าน" : log.kind === "email" ? "สถานะอีเมล" : "หมวดหมู่"}
+                  </Label>
+                  {log.kind === "line" && (
+                    <Select value={(log as LineLog).read_status} onValueChange={v => patch<LineLog>({ read_status: v as LineLog["read_status"] })}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="read">อ่านแล้ว</SelectItem>
+                        <SelectItem value="replied">ตอบกลับแล้ว</SelectItem>
+                        <SelectItem value="unread">ยังไม่อ่าน</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {log.kind === "email" && (
+                    <Select value={(log as EmailLog).opened} onValueChange={v => patch<EmailLog>({ opened: v as EmailLog["opened"] })}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">เปิดอ่านแล้ว</SelectItem>
+                        <SelectItem value="no">ยังไม่เปิด</SelectItem>
+                        <SelectItem value="unknown">ไม่ทราบ</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {log.kind === "note" && (
+                    <Select value={(log as NoteLog).note_category} onValueChange={v => patch<NoteLog>({ note_category: v as NoteLog["note_category"] })}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="internal">บันทึกภายใน</SelectItem>
+                        <SelectItem value="reminder">Reminder</SelectItem>
+                        <SelectItem value="risk">ความเสี่ยง</SelectItem>
+                        <SelectItem value="opportunity">โอกาส</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* ── หมายเหตุเพิ่มเติม ── */}
-          <Field label="หมายเหตุ / รายละเอียดอื่น ๆ">
-            <Textarea
-              rows={2}
-              value={log.notes}
-              onChange={e => patch({ notes: e.target.value })}
-              placeholder="ข้อมูลเพิ่มเติมที่ควรจำ..."
-            />
-          </Field>
+          {/* ── Row 2: Topic + Issues (2 col) ── */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">เรื่องที่คุย / หัวข้อหลัก *</Label>
+              <Input
+                value={log.topic}
+                onChange={e => patch({ topic: e.target.value })}
+                placeholder={
+                  log.kind === "call" ? "เช่น ติดตามใบเสนอราคา QT-2026-0012" :
+                  log.kind === "meeting" ? "เช่น นำเสนอโซลูชัน AI" :
+                  log.kind === "line" ? "เช่น ส่งไฟล์ใบเสนอราคา" :
+                  log.kind === "email" ? "เช่น ติดตามผลการอนุมัติ" : "หัวข้อบันทึก"
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">ประเด็นสำคัญที่พูดถึง</Label>
+              <Input
+                value={log.issues}
+                onChange={e => patch({ issues: e.target.value })}
+                placeholder="เช่น กังวลเรื่องราคา, ขอเปรียบเทียบคู่แข่ง"
+              />
+            </div>
+          </div>
+
+          {/* ── Row 3: Next action + Next date (2 col) ── */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">สิ่งที่ต้องทำต่อ (Next Action)</Label>
+              <Input
+                value={log.next_action}
+                onChange={e => patch({ next_action: e.target.value })}
+                placeholder="เช่น ส่งใบเสนอราคาฉบับแก้ไข 7 ก.ค."
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">วันนัดครั้งต่อไป</Label>
+              <Input type="date" value={log.next_date} onChange={e => patch({ next_date: e.target.value })} className="h-9" />
+            </div>
+          </div>
+
+          {/* ── Row 4: Result + Sentiment (2 col) ── */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">ผลลัพธ์โดยรวม</Label>
+              <ResultPicker value={log.result} onChange={v => patch({ result: v })} />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">ท่าทีของลูกค้า</Label>
+                <span className="text-xs font-semibold" style={{ color: sentimentColor(log.sentiment) }}>
+                  {sentimentLabel(log.sentiment)}
+                </span>
+              </div>
+              <Slider min={1} max={5} step={1} value={[log.sentiment]} onValueChange={([v]) => patch({ sentiment: v })} />
+              <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
+                <span>เย็นชา</span><span>เป็นกลาง</span><span>พร้อมซื้อ</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Notes (full width, compact) ── */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">หมายเหตุ / รายละเอียดเพิ่มเติม</Label>
+            <Textarea rows={2} value={log.notes} onChange={e => patch({ notes: e.target.value })}
+              placeholder="ข้อมูลอื่นที่ควรจำ..." className="resize-none text-sm" />
+          </div>
 
         </div>
 
-        {/* Actions */}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, paddingTop: 8, borderTop: "0.5px solid var(--border)" }}>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-            บันทึกกิจกรรม
-          </Button>
+        {/* Footer actions */}
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-t bg-muted/5 shrink-0">
+          <p className="text-xs text-muted-foreground">
+            {log.topic.trim() ? `"${log.topic.slice(0,40)}${log.topic.length>40?"…":""}"` : "กรอกหัวข้อเพื่อบันทึก"}
+          </p>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
+            <Button size="sm" onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              บันทึกกิจกรรม
+            </Button>
+          </div>
         </div>
+
       </DialogContent>
     </Dialog>
   );
