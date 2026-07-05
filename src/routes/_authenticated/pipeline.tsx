@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { KanbanBoard } from "@/components/pipeline/KanbanBoard";
+import { MyDayPanel } from "@/components/pipeline/MyDayPanel";
+import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
 import { crmDb } from "@/lib/crm";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -11,6 +13,12 @@ export const Route = createFileRoute("/_authenticated/pipeline")({
 function PipelinePage() {
   const [tab, setTab] = useState<"all" | "line">("all");
   const [unassignedLine, setUnassignedLine] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Quick-log dialog state — triggered from KanbanCard buttons
+  const [logOpen, setLogOpen] = useState(false);
+  const [logLeadId, setLogLeadId] = useState<string | null>(null);
+  const [logKind, setLogKind] = useState<ActivityKind>("call");
 
   const loadCount = async () => {
     const { count } = await crmDb()
@@ -30,8 +38,20 @@ function PipelinePage() {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
+  const handleQuickLog = (leadId: string, type: ActivityKind) => {
+    setLogLeadId(leadId);
+    setLogKind(type);
+    setLogOpen(true);
+  };
+
   return (
     <div className="flex h-full flex-col">
+      {/* My Day panel — collapsible inbox at the top */}
+      <MyDayPanel
+        onRefresh={() => setRefreshKey((k) => k + 1)}
+      />
+
+      {/* Tabs */}
       <div className="flex items-center gap-2 border-b bg-background px-6 pt-3">
         <button
           onClick={() => setTab("all")}
@@ -59,7 +79,24 @@ function PipelinePage() {
           )}
         </button>
       </div>
-      <KanbanBoard sourceFilter={tab} showClaimButton={tab === "line"} />
+
+      {/* Kanban board */}
+      <KanbanBoard
+        key={refreshKey}
+        sourceFilter={tab}
+        showClaimButton={tab === "line"}
+        onQuickLog={handleQuickLog}
+      />
+
+      {/* Quick-log dialog (triggered from card buttons) */}
+      <ActivityLogDialog
+        open={logOpen}
+        onOpenChange={setLogOpen}
+        leadId={logLeadId}
+        defaultKind={logKind}
+        title="บันทึกกิจกรรมด่วน"
+        onSaved={() => { setLogOpen(false); setRefreshKey((k) => k + 1); }}
+      />
     </div>
   );
 }

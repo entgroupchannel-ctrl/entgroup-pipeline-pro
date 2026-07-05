@@ -25,6 +25,7 @@ interface Props {
   currentUserId?: string;
   onClaim?: () => void;
   linePreview?: string;
+  onQuickLog?: (leadId: string, type: "call" | "line" | "meeting" | "email") => void;
 }
 
 
@@ -65,7 +66,7 @@ function PriorityStars({ priority, leadId, onChange }: {
   );
 }
 
-export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDuplicate, lineUnread = 0, onLineBadgeClear, showClaimButton = false, currentUserId, onClaim, linePreview }: Props) {
+export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDuplicate, lineUnread = 0, onLineBadgeClear, showClaimButton = false, currentUserId, onClaim, linePreview, onQuickLog }: Props) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id, disabled: !draggable });
   const downRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -183,8 +184,30 @@ export function KanbanCard({ lead, onClick, draggable = false, onDelete, onDupli
         )}
       </div>
 
+      {/* Quick-log action buttons */}
+      <div
+        className="mt-2 flex items-center gap-1"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerUp={(e) => e.stopPropagation()}
+      >
+        {(["call","line","meeting","email"] as const).map((type) => {
+          const ICON: Record<string, string> = { call:"📞", line:"💬", meeting:"👥", email:"✉️" };
+          return (
+            <button
+              key={type}
+              title={`บันทึก ${type}`}
+              onClick={() => onQuickLog?.(lead.id, type)}
+              className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              {ICON[type]}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Bottom row: stars + indicators + avatar */}
-      <div className="mt-2.5 flex items-center justify-between gap-2">
+      <div className="mt-1.5 flex items-center justify-between gap-2">
         <PriorityStars
           priority={localPriority}
           leadId={lead.id}
