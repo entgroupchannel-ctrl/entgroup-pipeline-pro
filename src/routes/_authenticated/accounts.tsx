@@ -117,8 +117,18 @@ function AccountsPage() {
 
   const duplicateAccount = async (a: Account) => {
     const { error } = await crmDb().from("accounts").insert({
-      name: `${a.name} (สำเนา)`, industry: a.industry, website: a.website,
-      phone: a.phone, address: a.address, owner_id: user?.id, created_by: user?.id,
+      name: `${a.name} (สำเนา)`,
+      industry: a.industry,
+      tax_id: a.tax_id,
+      full_address: a.full_address,
+      zip_code: a.zip_code,
+      credit_days: a.credit_days,
+      account_type: a.account_type,
+      website: a.website,
+      phone: a.phone,
+      address: a.address,
+      owner_id: user?.id,
+      created_by: user?.id,
     });
     if (error) { toast.error("สร้างซ้ำไม่สำเร็จ"); return; }
     toast.success("สร้างซ้ำแล้ว"); load();
