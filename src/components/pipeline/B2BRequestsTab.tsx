@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import {
   Loader2, RefreshCw, Building2, Phone, Mail, ShoppingCart,
-  ChevronDown, ChevronUp, Plus, AlertTriangle, Clock,
+  ChevronDown, ChevronUp, Plus, AlertTriangle, Clock, Package,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -162,7 +162,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
       {/* Header */}
       <div className="flex items-center justify-between border-b px-6 py-3">
         <div>
-          <h2 className="text-sm font-semibold flex items-center gap-2">
+          <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground">
             🛒 B2B Requests
             {requests.length > 0 && (
               <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
@@ -178,7 +178,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-auto p-4">
         {requests.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <ShoppingCart className="h-10 w-10 mb-3 opacity-20" />
@@ -186,116 +186,152 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
             <p className="text-xs mt-1 opacity-60">ทุก request ถูกรับงานแล้ว</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {requests.map((req) => {
-              const isExp = expanded.has(req.id);
-              const urgent = isSlaUrgent(req.sla_po_review_due);
-              return (
-                <div
-                  key={req.id}
-                  className={`rounded-xl border bg-card overflow-hidden transition-colors ${
-                    urgent ? "border-red-300 dark:border-red-700" : ""
-                  }`}
-                >
-                  {/* Summary row */}
-                  <div className="flex items-start gap-3 p-4">
-                    {/* Company avatar */}
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
-                      {(req.customer_company || req.customer_name || "?").slice(0, 2).toUpperCase()}
-                    </div>
+          <div className="rounded-xl border border-border bg-card overflow-hidden min-w-[1100px]">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
+                  <th className="px-4 py-3 text-left font-medium w-32">เลขที่ QT</th>
+                  <th className="px-4 py-3 text-left font-medium w-28">สถานะ</th>
+                  <th className="px-4 py-3 text-left font-medium">บริษัท</th>
+                  <th className="px-4 py-3 text-left font-medium">ผู้ติดต่อ</th>
+                  <th className="px-4 py-3 text-left font-medium">โทรศัพท์</th>
+                  <th className="px-4 py-3 text-left font-medium">อีเมล</th>
+                  <th className="px-4 py-3 text-right font-medium w-28">มูลค่า</th>
+                  <th className="px-4 py-3 text-left font-medium w-28">วันที่</th>
+                  <th className="px-4 py-3 text-center font-medium w-20">รายการ</th>
+                  <th className="px-3 py-3 text-right w-28" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {requests.map((req) => {
+                  const isExp = expanded.has(req.id);
+                  const urgent = isSlaUrgent(req.sla_po_review_due);
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold">{req.quote_number}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_COLOR[req.status] ?? "bg-muted text-muted-foreground"}`}>
-                          {STATUS_LABEL[req.status] ?? req.status}
-                        </span>
-                        {urgent && (
-                          <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-950/40 dark:text-red-300">
-                            <AlertTriangle className="h-2.5 w-2.5" /> SLA ด่วน
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-1.5 text-xs font-medium">
-                        <Building2 className="h-3 w-3 text-muted-foreground" />
-                        {req.customer_company}
-                      </div>
-                      <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
-                        <span>{req.customer_name}</span>
-                        {req.customer_phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{req.customer_phone}</span>}
-                        {req.customer_email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{req.customer_email}</span>}
-                      </div>
-                      <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="font-semibold text-foreground">{formatBaht(req.grand_total)}</span>
-                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{fmtDate(req.created_at)}</span>
-                        {req.items && <span>{req.items.length} รายการ</span>}
-                      </div>
-                    </div>
-
-                    <div className="flex shrink-0 flex-col gap-1.5 items-end">
-                      <Button
-                        size="sm"
-                        onClick={() => claimRequest(req)}
-                        disabled={claiming === req.id}
-                        className="h-7 px-3 text-xs"
-                      >
-                        {claiming === req.id
-                          ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                          : <Plus className="mr-1 h-3 w-3" />}
-                        รับงาน
-                      </Button>
-                      <button
+                  return (
+                    <>
+                      <tr
+                        key={req.id}
+                        className="group hover:bg-muted/40 transition-colors cursor-pointer"
                         onClick={() => toggleExpand(req.id)}
-                        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
                       >
-                        {isExp ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        {isExp ? "ย่อ" : "รายละเอียด"}
-                      </button>
-                    </div>
-                  </div>
+                        <td className="px-4 py-3.5">
+                          <span className="font-mono text-sm font-medium text-foreground">{req.quote_number}</span>
+                          {urgent && (
+                            <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-950/30 dark:text-red-300">
+                              <AlertTriangle className="h-2.5 w-2.5" /> SLA
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${STATUS_COLOR[req.status] ?? "bg-muted text-muted-foreground"}`}>
+                            {STATUS_LABEL[req.status] ?? req.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-sm text-foreground">
+                          <div className="flex items-center gap-1.5">
+                            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="truncate max-w-[180px]">{req.customer_company}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-sm text-foreground">
+                          {req.customer_name || <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-4 py-3.5 text-xs text-muted-foreground">
+                          {req.customer_phone ? (
+                            <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{req.customer_phone}</span>
+                          ) : <span>—</span>}
+                        </td>
+                        <td className="px-4 py-3.5 text-xs text-muted-foreground">
+                          {req.customer_email ? (
+                            <span className="flex items-center gap-1 truncate max-w-[160px]"><Mail className="h-3 w-3 shrink-0" />{req.customer_email}</span>
+                          ) : <span>—</span>}
+                        </td>
+                        <td className="px-4 py-3.5 text-right text-sm font-medium tabular-nums whitespace-nowrap text-foreground">
+                          {formatBaht(req.grand_total)}
+                        </td>
+                        <td className="px-4 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
+                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{fmtDate(req.created_at)}</span>
+                        </td>
+                        <td className="px-4 py-3.5 text-center text-xs text-foreground">
+                          {req.items && req.items.length > 0 ? (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                              <Package className="h-3 w-3" /> {req.items.length}
+                            </span>
+                          ) : <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-3 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            size="sm"
+                            onClick={() => claimRequest(req)}
+                            disabled={claiming === req.id}
+                            className="h-7 px-3 text-xs"
+                          >
+                            {claiming === req.id
+                              ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                              : <Plus className="mr-1 h-3 w-3" />}
+                            รับงาน
+                          </Button>
+                        </td>
+                      </tr>
 
-                  {/* Expanded: product items */}
-                  {isExp && req.items && req.items.length > 0 && (
-                    <div className="border-t bg-muted/20 px-4 py-3">
-                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">รายการสินค้า</p>
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b text-muted-foreground">
-                            <th className="pb-1 text-left font-medium">สินค้า</th>
-                            <th className="pb-1 text-right font-medium">จำนวน</th>
-                            <th className="pb-1 text-right font-medium">ราคาต่อหน่วย</th>
-                            <th className="pb-1 text-right font-medium">รวม</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {req.items.map((item, i) => (
-                            <tr key={item.id ?? i} className="text-xs">
-                              <td className="py-1.5">
-                                <div className="font-medium">{item.product_name}</div>
-                                {item.description && <div className="text-muted-foreground">{item.description}</div>}
-                              </td>
-                              <td className="py-1.5 text-right">{item.quantity}</td>
-                              <td className="py-1.5 text-right">{formatBaht(item.unit_price)}</td>
-                              <td className="py-1.5 text-right font-medium">{formatBaht(item.total_price)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr className="border-t">
-                            <td colSpan={3} className="pt-2 text-right font-semibold">รวมทั้งสิ้น</td>
-                            <td className="pt-2 text-right font-bold text-primary">{formatBaht(req.grand_total)}</td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                      {/* Expanded: product items + SLA */}
+                      {isExp && req.items && req.items.length > 0 && (
+                        <tr className="bg-muted/30">
+                          <td colSpan={10} className="px-4 py-3">
+                            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              รายการสินค้า
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b border-border text-muted-foreground">
+                                    <th className="pb-1.5 text-left font-medium">สินค้า</th>
+                                    <th className="pb-1.5 text-right font-medium w-20">จำนวน</th>
+                                    <th className="pb-1.5 text-right font-medium w-28">ราคาต่อหน่วย</th>
+                                    <th className="pb-1.5 text-right font-medium w-28">รวม</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                  {req.items.map((item, i) => (
+                                    <tr key={item.id ?? i}>
+                                      <td className="py-1.5">
+                                        <div className="font-medium text-foreground">{item.product_name}</div>
+                                        {item.description && <div className="text-muted-foreground">{item.description}</div>}
+                                      </td>
+                                      <td className="py-1.5 text-right tabular-nums">{item.quantity}</td>
+                                      <td className="py-1.5 text-right tabular-nums">{formatBaht(item.unit_price)}</td>
+                                      <td className="py-1.5 text-right font-medium tabular-nums text-foreground">{formatBaht(item.total_price)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot>
+                                  <tr className="border-t border-border">
+                                    <td colSpan={3} className="pt-2 text-right font-semibold text-foreground">รวมทั้งสิ้น</td>
+                                    <td className="pt-2 text-right font-bold text-foreground">{formatBaht(req.grand_total)}</td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                            {req.sla_po_review_due && (
+                              <div className="mt-2 text-[11px] text-muted-foreground">
+                                SLA รีวิว PO: {fmtDate(req.sla_po_review_due)} {urgent && <span className="text-red-600 font-medium">(ใกล้ครบกำหนด)</span>}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
+
+      <p className="px-6 pb-2 text-xs text-muted-foreground text-center">
+        คลิกแถวเพื่อดูรายละเอียดสินค้า
+      </p>
     </div>
   );
 }
