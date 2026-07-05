@@ -455,24 +455,27 @@ export function QuotationFormDialog({
   const isEdit = !!initial;
 
   const [saving, setSaving] = useState(false);
-  const [leads, setLeads] = useState<{ id: string; title: string }[]>([]);
+  const [leads, setLeads] = useState<{ id: string; title: string; account_id: string | null; owner_id: string | null }[]>([]);
   const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
   const [profiles, setProfiles] = useState<{ id: string; full_name: string | null }[]>([]);
 
+  // Resolved account/owner from selected lead
+  const [resolvedAccount, setResolvedAccount] = useState<{ id: string; name: string } | null>(null);
+
   const blank = {
-    lead_id: prefillLeadId ?? "",
-    account_id: "",
+    lead_id:      prefillLeadId ?? "",
+    account_id:   "",
     quotation_no: "",
-    title: "",
-    subtotal: "",
-    discount: "0",
-    vat_amount: "0",
-    grand_total: "",
-    status: "draft" as QuotationStatus,
-    issued_date: new Date().toISOString().slice(0, 10),
-    valid_until: "",
-    owner_id: user?.id ?? "",
-    notes: "",
+    title:        "",
+    subtotal:     "",
+    discount:     "0",
+    vat_amount:   "0",
+    grand_total:  "",
+    status:       "draft" as QuotationStatus,
+    issued_date:  new Date().toISOString().slice(0, 10),
+    valid_until:  "",
+    owner_id:     user?.id ?? "",
+    notes:        "",
   };
 
   const [form, setForm] = useState(blank);
@@ -481,26 +484,26 @@ export function QuotationFormDialog({
     if (!open) return;
     if (initial) {
       setForm({
-        lead_id: initial.lead_id ?? "",
-        account_id: initial.account_id ?? "",
+        lead_id:      initial.lead_id ?? "",
+        account_id:   initial.account_id ?? "",
         quotation_no: initial.quotation_no ?? "",
-        title: initial.title,
-        subtotal: initial.subtotal != null ? String(initial.subtotal) : "",
-        discount: initial.discount != null ? String(initial.discount) : "0",
-        vat_amount: initial.vat_amount != null ? String(initial.vat_amount) : "0",
-        grand_total: initial.grand_total != null ? String(initial.grand_total) : "",
-        status: initial.status,
-        issued_date: initial.issued_date ?? new Date().toISOString().slice(0, 10),
-        valid_until: initial.valid_until ?? "",
-        owner_id: initial.owner_id ?? user?.id ?? "",
-        notes: initial.notes ?? "",
+        title:        initial.title,
+        subtotal:     initial.subtotal != null ? String(initial.subtotal) : "",
+        discount:     initial.discount != null ? String(initial.discount) : "0",
+        vat_amount:   initial.vat_amount != null ? String(initial.vat_amount) : "0",
+        grand_total:  initial.grand_total != null ? String(initial.grand_total) : "",
+        status:       initial.status,
+        issued_date:  initial.issued_date ?? new Date().toISOString().slice(0, 10),
+        valid_until:  initial.valid_until ?? "",
+        owner_id:     initial.owner_id ?? user?.id ?? "",
+        notes:        initial.notes ?? "",
       });
     } else {
       setForm({ ...blank, lead_id: prefillLeadId ?? "" });
     }
     (async () => {
       const [lRes, aRes, pRes] = await Promise.all([
-        crmDb().from("leads").select("id,title").order("title"),
+        crmDb().from("leads").select("id,title,account_id,owner_id").order("title"),
         crmDb().from("accounts").select("id,name").order("name"),
         crmDb().from("user_profiles").select("id,full_name").eq("is_active", true),
       ]);
@@ -511,12 +514,40 @@ export function QuotationFormDialog({
   // eslint-disable-next-line
   }, [open]);
 
+  // When lead changes → auto-fill account_id and owner_id
+  const handleLeadChange = (leadId: string) => {
+    if (leadId === "none" || !leadId) {
+      setForm((f) => ({ ...f, lead_id: "", account_id: "" }));
+      setResolvedAccount(null);
+      return;
+    }
+    const lead = leads.find((l) => l.id === leadId);
+    const accId = lead?.account_id ?? "";
+    const acc = accounts.find((a) => a.id === accId) ?? null;
+    setResolvedAccount(acc);
+    setForm((f) => ({
+      ...f,
+      lead_id:    leadId,
+      account_id: accId,
+      // Auto-fill owner only if not already set
+      owner_id:   f.owner_id || lead?.owner_id || f.owner_id,
+    }));
+  };
+
+  // Sync resolvedAccount when editing existing quotation (after accounts load)
+  useEffect(() => {
+    if (form.account_id && accounts.length > 0 && !resolvedAccount) {
+      const acc = accounts.find((a) => a.id === form.account_id);
+      if (acc) setResolvedAccount(acc);
+    }
+  }, [accounts, form.account_id]);
+
   const recalc = (patch: Partial<typeof form>) => {
     const merged = { ...form, ...patch };
-    const sub = parseFloat(merged.subtotal) || 0;
-    const disc = parseFloat(merged.discount) || 0;
-    const vat = parseFloat(merged.vat_amount) || 0;
-    const gt = sub - disc + vat;
+    const sub  = parseFloat(merged.subtotal)   || 0;
+    const disc = parseFloat(merged.discount)   || 0;
+    const vat  = parseFloat(merged.vat_amount) || 0;
+    const gt   = sub - disc + vat;
     return { ...merged, grand_total: (sub || disc || vat) ? String(Math.round(gt * 100) / 100) : merged.grand_total };
   };
 
@@ -524,20 +555,20 @@ export function QuotationFormDialog({
     if (!form.title.trim()) return toast.error("กรุณาระบุชื่อใบเสนอราคา");
     setSaving(true);
     const payload: any = {
-      lead_id: form.lead_id || null,
-      account_id: form.account_id || null,
-      quotation_no: form.quotation_no.trim() || null,
-      title: form.title.trim(),
-      source: "crm",
-      subtotal: form.subtotal ? parseFloat(form.subtotal) : null,
-      discount: form.discount ? parseFloat(form.discount) : 0,
-      vat_amount: form.vat_amount ? parseFloat(form.vat_amount) : 0,
-      grand_total: form.grand_total ? parseFloat(form.grand_total) : null,
-      status: form.status,
-      issued_date: form.issued_date || null,
-      valid_until: form.valid_until || null,
-      owner_id: form.owner_id || user?.id || null,
-      notes: form.notes.trim() || null,
+      lead_id:       form.lead_id || null,
+      account_id:    form.account_id || null,
+      quotation_no:  form.quotation_no.trim() || null,
+      title:         form.title.trim(),
+      source:        "crm",
+      subtotal:      form.subtotal    ? parseFloat(form.subtotal)    : null,
+      discount:      form.discount    ? parseFloat(form.discount)    : 0,
+      vat_amount:    form.vat_amount  ? parseFloat(form.vat_amount)  : 0,
+      grand_total:   form.grand_total ? parseFloat(form.grand_total) : null,
+      status:        form.status,
+      issued_date:   form.issued_date  || null,
+      valid_until:   form.valid_until  || null,
+      owner_id:      form.owner_id || user?.id || null,
+      notes:         form.notes.trim() || null,
     };
     let error;
     if (isEdit && initial) {
@@ -552,6 +583,9 @@ export function QuotationFormDialog({
     onSaved();
   };
 
+  // Leads that have no lead selected = show standalone account picker
+  const showStandaloneAccount = !form.lead_id;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
@@ -559,6 +593,44 @@ export function QuotationFormDialog({
           <DialogTitle>{isEdit ? "แก้ไขใบเสนอราคา" : "สร้างใบเสนอราคาใหม่"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 pt-1">
+
+          {/* ── 1. Lead (เลือกก่อน — context หลัก) ── */}
+          <div>
+            <Label className="text-xs">ดีล (Lead)</Label>
+            <Select value={form.lead_id || "none"} onValueChange={handleLeadChange}>
+              <SelectTrigger><SelectValue placeholder="— ไม่ระบุ —" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— ไม่ระบุ —</SelectItem>
+                {leads.map((l) => <SelectItem key={l.id} value={l.id}>{l.title}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {/* Info card ที่ pull มาจาก lead — แทน field บริษัทซ้ำ */}
+            {resolvedAccount && (
+              <div className="mt-1.5 flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                  {resolvedAccount.name.slice(0, 1)}
+                </div>
+                <span className="text-xs font-medium">{resolvedAccount.name}</span>
+                <span className="ml-auto text-[10px] text-muted-foreground">บริษัท (auto)</span>
+              </div>
+            )}
+          </div>
+
+          {/* บริษัท standalone — แสดงเฉพาะเมื่อไม่ได้เลือก Lead */}
+          {showStandaloneAccount && (
+            <div>
+              <Label className="text-xs">บริษัท <span className="text-muted-foreground">(ถ้าไม่มีดีล)</span></Label>
+              <Select value={form.account_id || "none"} onValueChange={(v) => setForm({ ...form, account_id: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="— ไม่ระบุ —" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— ไม่ระบุ —</SelectItem>
+                  {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* ── 2. เลขที่ QT + สถานะ ── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">เลขที่ QT</Label>
@@ -580,44 +652,26 @@ export function QuotationFormDialog({
               </Select>
             </div>
           </div>
+
+          {/* ── 3. ชื่อ/รายละเอียด ── */}
           <div>
-            <Label className="text-xs">ชื่อ/รายละเอียด <span className="text-red-500">*</span></Label>
+            <Label className="text-xs">ชื่อ / รายละเอียด <span className="text-red-500">*</span></Label>
             <Input
-              placeholder="ใบเสนอราคา — บริษัท XYZ"
+              placeholder="เช่น โปรเจกต์ AI สำหรับฝ่ายโลจิสติกส์"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">ดีล (Lead)</Label>
-              <Select value={form.lead_id || "none"} onValueChange={(v) => setForm({ ...form, lead_id: v === "none" ? "" : v })}>
-                <SelectTrigger><SelectValue placeholder="ไม่ระบุ" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— ไม่ระบุ —</SelectItem>
-                  {leads.map((l) => <SelectItem key={l.id} value={l.id}>{l.title}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">บริษัท</Label>
-              <Select value={form.account_id || "none"} onValueChange={(v) => setForm({ ...form, account_id: v === "none" ? "" : v })}>
-                <SelectTrigger><SelectValue placeholder="ไม่ระบุ" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— ไม่ระบุ —</SelectItem>
-                  {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+
+          {/* ── 4. ราคา ── */}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label className="text-xs">ราคาก่อน VAT</Label>
-              <Input type="number" value={form.subtotal} onChange={(e) => setForm(recalc({ subtotal: e.target.value }))} placeholder="0" />
+              <Input type="number" value={form.subtotal}   onChange={(e) => setForm(recalc({ subtotal: e.target.value }))}   placeholder="0" />
             </div>
             <div>
               <Label className="text-xs">ส่วนลด</Label>
-              <Input type="number" value={form.discount} onChange={(e) => setForm(recalc({ discount: e.target.value }))} placeholder="0" />
+              <Input type="number" value={form.discount}   onChange={(e) => setForm(recalc({ discount: e.target.value }))}   placeholder="0" />
             </div>
             <div>
               <Label className="text-xs">VAT</Label>
@@ -636,16 +690,20 @@ export function QuotationFormDialog({
               <div className="mt-1 text-base font-semibold">{formatBaht(parseFloat(form.grand_total))}</div>
             )}
           </div>
+
+          {/* ── 5. วันที่ ── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">วันที่ออก</Label>
-              <Input type="date" value={form.issued_date} onChange={(e) => setForm({ ...form, issued_date: e.target.value })} />
+              <Input type="date" value={form.issued_date}  onChange={(e) => setForm({ ...form, issued_date:  e.target.value })} />
             </div>
             <div>
               <Label className="text-xs">ใช้ได้ถึง</Label>
-              <Input type="date" value={form.valid_until} onChange={(e) => setForm({ ...form, valid_until: e.target.value })} />
+              <Input type="date" value={form.valid_until}  onChange={(e) => setForm({ ...form, valid_until:  e.target.value })} />
             </div>
           </div>
+
+          {/* ── 6. มอบหมาย ── */}
           <div>
             <Label className="text-xs">มอบหมาย</Label>
             <Select value={form.owner_id || "none"} onValueChange={(v) => setForm({ ...form, owner_id: v === "none" ? "" : v })}>
@@ -656,10 +714,13 @@ export function QuotationFormDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {/* ── 7. หมายเหตุ ── */}
           <div>
             <Label className="text-xs">หมายเหตุ</Label>
             <Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="รายละเอียดเพิ่มเติม" />
           </div>
+
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
             <Button onClick={submit} disabled={saving}>
@@ -687,20 +748,23 @@ export function FAImportToQuotationDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [docs, setDocs] = useState<FADocument[]>([]);
-  const [leads, setLeads] = useState<{ id: string; title: string }[]>([]);
+  const [leads, setLeads] = useState<{ id: string; title: string; account_id: string | null }[]>([]);
   const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
   const [selected, setSelected] = useState<FADocument | null>(null);
   const [q, setQ] = useState("");
 
   const [form, setForm] = useState({
-    lead_id: prefillLeadId ?? "",
-    account_id: "",
-    title: "",
+    lead_id:      prefillLeadId ?? "",
+    account_id:   "",
+    title:        "",
     quotation_no: "",
-    grand_total: "",
-    issued_date: "",
-    valid_until: "",
+    grand_total:  "",
+    issued_date:  "",
+    valid_until:  "",
   });
+
+  // Resolved account from lead
+  const [resolvedAccount, setResolvedAccount] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -711,7 +775,7 @@ export function FAImportToQuotationDialog({
       try {
         const [docsData, lRes, aRes] = await Promise.all([
           fetchFADocuments(),
-          crmDb().from("leads").select("id,title").order("title"),
+          crmDb().from("leads").select("id,title,account_id").order("title"),
           crmDb().from("accounts").select("id,name").order("name"),
         ]);
         setDocs(docsData.filter((d) => d.document_type === "quotation"));
@@ -731,49 +795,69 @@ export function FAImportToQuotationDialog({
     if (!needle) return docs;
     return docs.filter((d) =>
       (d.document_serial ?? "").toLowerCase().includes(needle) ||
-      (d.contact_name ?? "").toLowerCase().includes(needle)
+      (d.contact_name    ?? "").toLowerCase().includes(needle)
     );
   }, [docs, q]);
 
+  // When lead changes → auto-fill account
+  const handleLeadChange = (leadId: string) => {
+    if (leadId === "none" || !leadId) {
+      setForm((f) => ({ ...f, lead_id: "", account_id: "" }));
+      setResolvedAccount(null);
+      return;
+    }
+    const lead = leads.find((l) => l.id === leadId);
+    const accId = lead?.account_id ?? "";
+    const acc = accounts.find((a) => a.id === accId) ?? null;
+    setResolvedAccount(acc);
+    setForm((f) => ({ ...f, lead_id: leadId, account_id: accId }));
+  };
+
   const pickDoc = (d: FADocument) => {
     setSelected(d);
-    const matchAcc = accounts.find(
-      (a) => a.name.trim().toLowerCase() === (d.contact_name ?? "").trim().toLowerCase()
-    );
-    setForm({
-      lead_id: prefillLeadId ?? "",
-      account_id: matchAcc?.id ?? "",
-      title: `${d.contact_name ?? "ลูกค้า"} — ${d.document_serial}`,
+    // Try to match account from FA contact name if no lead selected
+    const matchAcc = !form.lead_id
+      ? accounts.find((a) => a.name.trim().toLowerCase() === (d.contact_name ?? "").trim().toLowerCase())
+      : null;
+    if (matchAcc && !form.lead_id) {
+      setResolvedAccount(matchAcc);
+    }
+    setForm((f) => ({
+      ...f,
+      account_id:   f.lead_id ? f.account_id : (matchAcc?.id ?? ""),
+      title:        `${d.contact_name ?? "ลูกค้า"} — ${d.document_serial}`,
       quotation_no: d.document_serial,
-      grand_total: d.grand_total != null ? String(d.grand_total) : "",
-      issued_date: d.published_on ? d.published_on.slice(0, 10) : "",
-      valid_until: "",
-    });
+      grand_total:  d.grand_total != null ? String(d.grand_total) : "",
+      issued_date:  d.published_on ? d.published_on.slice(0, 10) : "",
+      valid_until:  "",
+    }));
   };
 
   const submit = async () => {
     if (!selected) return;
     setSaving(true);
     const { error } = await crmDb().from("quotations").insert({
-      lead_id: form.lead_id || null,
-      account_id: form.account_id || null,
-      quotation_no: form.quotation_no || selected.document_serial,
-      title: form.title,
-      source: "flowaccount",
+      lead_id:       form.lead_id      || null,
+      account_id:    form.account_id   || null,
+      quotation_no:  form.quotation_no || selected.document_serial,
+      title:         form.title,
+      source:        "flowaccount",
       fa_inbound_id: selected.id,
-      grand_total: form.grand_total ? parseFloat(form.grand_total) : null,
-      status: "sent",
-      issued_date: form.issued_date || null,
-      valid_until: form.valid_until || null,
-      owner_id: user?.id,
-      created_by: user?.id,
-      fa_raw: selected.raw_data,
+      grand_total:   form.grand_total ? parseFloat(form.grand_total) : null,
+      status:        "sent",
+      issued_date:   form.issued_date  || null,
+      valid_until:   form.valid_until  || null,
+      owner_id:      user?.id,
+      created_by:    user?.id,
+      fa_raw:        selected.raw_data,
     });
     setSaving(false);
     if (error) return toast.error("Import ไม่สำเร็จ", { description: error.message });
     toast.success(`Import ${selected.document_serial} แล้ว`);
     onImported();
   };
+
+  const showStandaloneAccount = !form.lead_id;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -782,6 +866,7 @@ export function FAImportToQuotationDialog({
           <DialogTitle>Import ใบเสนอราคาจาก FlowAccount</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">
+          {/* Left: FA document list */}
           <div className="flex flex-col gap-3">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -826,6 +911,8 @@ export function FAImportToQuotationDialog({
               )}
             </div>
           </div>
+
+          {/* Right: form */}
           <div className="rounded-lg border bg-muted/20 p-4">
             {!selected ? (
               <div className="flex h-full min-h-[300px] items-center justify-center text-center text-sm text-muted-foreground">
@@ -840,49 +927,64 @@ export function FAImportToQuotationDialog({
                   <div className="font-mono text-sm font-semibold">{selected.document_serial}</div>
                   <Badge variant="outline">QT</Badge>
                 </div>
+
+                {/* ── Lead (อันดับแรก) ── */}
                 <div>
-                  <Label className="text-xs">ชื่อ</Label>
-                  <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                  <Label className="text-xs">ดีล (Lead)</Label>
+                  <Select value={form.lead_id || "none"} onValueChange={handleLeadChange}>
+                    <SelectTrigger><SelectValue placeholder="— ไม่ระบุ —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— ไม่ระบุ —</SelectItem>
+                      {leads.map((l) => <SelectItem key={l.id} value={l.id}>{l.title}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {/* Auto-filled account info card */}
+                  {resolvedAccount && (
+                    <div className="mt-1.5 flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                        {resolvedAccount.name.slice(0, 1)}
+                      </div>
+                      <span className="text-xs font-medium">{resolvedAccount.name}</span>
+                      <span className="ml-auto text-[10px] text-muted-foreground">บริษัท (auto)</span>
+                    </div>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+
+                {/* Standalone account — เฉพาะเมื่อไม่เลือก Lead */}
+                {showStandaloneAccount && (
                   <div>
-                    <Label className="text-xs">ดีล (Lead)</Label>
-                    <Select value={form.lead_id || "none"} onValueChange={(v) => setForm({ ...form, lead_id: v === "none" ? "" : v })}>
-                      <SelectTrigger><SelectValue placeholder="ไม่ระบุ" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">— ไม่ระบุ —</SelectItem>
-                        {leads.map((l) => <SelectItem key={l.id} value={l.id}>{l.title}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs">บริษัท</Label>
+                    <Label className="text-xs">บริษัท <span className="text-muted-foreground">(ถ้าไม่มีดีล)</span></Label>
                     <Select value={form.account_id || "none"} onValueChange={(v) => setForm({ ...form, account_id: v === "none" ? "" : v })}>
-                      <SelectTrigger><SelectValue placeholder="ไม่ระบุ" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="— ไม่ระบุ —" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">— ไม่ระบุ —</SelectItem>
                         {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
+                )}
+
+                <div>
+                  <Label className="text-xs">ชื่อ</Label>
+                  <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-xs">ยอดรวม</Label>
-                    <Input type="number" value={form.grand_total} onChange={(e) => setForm({ ...form, grand_total: e.target.value })} />
+                    <Input type="number" value={form.grand_total}  onChange={(e) => setForm({ ...form, grand_total: e.target.value })} />
                   </div>
                   <div>
                     <Label className="text-xs">วันที่ออก</Label>
-                    <Input type="date" value={form.issued_date} onChange={(e) => setForm({ ...form, issued_date: e.target.value })} />
+                    <Input type="date"   value={form.issued_date}  onChange={(e) => setForm({ ...form, issued_date: e.target.value })} />
                   </div>
                 </div>
                 <div>
                   <Label className="text-xs">ใช้ได้ถึง</Label>
                   <Input type="date" value={form.valid_until} onChange={(e) => setForm({ ...form, valid_until: e.target.value })} />
                 </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button variant="ghost" onClick={() => setSelected(null)}>ยกเลิก</Button>
-                  <Button onClick={submit} disabled={saving}>
+                <div className="flex justify-end gap-2 border-t pt-3">
+                  <Button variant="ghost" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
+                  <Button onClick={submit} disabled={saving || !selected}>
                     {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
                     Import
                   </Button>
