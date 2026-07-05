@@ -260,24 +260,24 @@ function RecipientSelector({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Label className="text-sm font-semibold shrink-0">ผู้รับอีเมล</Label>
-        {/* Mode toggle — quick-select style matching ActivityLogDialog */}
-        <div className="grid grid-cols-2 gap-1">
+        {/* Mode toggle — segmented control matching ปฏิทิน/รายการ style */}
+        <div className="inline-flex items-center rounded-xl border border-border bg-muted/40 p-1 shadow-sm">
           <button
             onClick={() => { onModeChange("contact"); onClear(); setQuery(""); setResults([]); }}
-            className={`flex flex-col items-center gap-0.5 rounded-lg border py-2 text-[10px] font-medium transition-colors ${
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
               mode === "contact"
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "bg-primary text-primary-foreground shadow-md"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/60"
             }`}
           >
             <Users className="h-4 w-4" /> รายชื่อผู้ติดต่อ
           </button>
           <button
             onClick={() => { onModeChange("lead"); onClear(); setQuery(""); setResults([]); }}
-            className={`flex flex-col items-center gap-0.5 rounded-lg border py-2 text-[10px] font-medium transition-colors ${
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
               mode === "lead"
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "bg-primary text-primary-foreground shadow-md"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/60"
             }`}
           >
             <Briefcase className="h-4 w-4" /> ดีล / Lead
