@@ -185,6 +185,11 @@ function LeadsPage() {
     });
   }, [periodLeads, stageFilter, ownerFilter, qFilter, accountsMap]);
 
+  const {
+    page, setPage, pageSize, setPageSize, totalPages,
+    total: pagedTotal, paged: pageItems,
+  } = usePagination(filtered ?? [], 25);
+
   // ── period KPIs ─────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
     const src = periodLeads ?? [];
