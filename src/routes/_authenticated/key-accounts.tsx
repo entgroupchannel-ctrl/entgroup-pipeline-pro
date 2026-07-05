@@ -129,6 +129,8 @@ function KeyAccountsPage() {
   const [logType, setLogType] = useState("meeting");
   const [logNote, setLogNote] = useState("");
   const [addDealOpen, setAddDealOpen] = useState(false);
+  const [accPage, setAccPage] = useState(1);
+  const ACC_PAGE_SIZE = 20;
 
 
 
