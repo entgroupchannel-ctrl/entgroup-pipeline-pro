@@ -159,64 +159,66 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                  <th className="px-4 py-3 text-left font-medium w-36">เลขที่ QT</th>
-                  <th className="px-4 py-3 text-left font-medium w-28">สถานะ</th>
-                  <th className="px-4 py-3 text-left font-medium">บริษัท</th>
-                  <th className="px-4 py-3 text-left font-medium">ผู้ติดต่อ</th>
-                  <th className="px-4 py-3 text-right font-medium w-28">มูลค่า</th>
-                  <th className="px-4 py-3 text-left font-medium w-24">วันที่</th>
-                  <th className="px-3 py-3 w-28" />
+                <tr className="border-b bg-muted/30 text-xs text-muted-foreground">
+                  <th className="px-5 py-3 text-left font-normal w-28">วันที่</th>
+                  <th className="px-5 py-3 text-left font-normal w-40">เลขที่ QT</th>
+                  <th className="px-5 py-3 text-left font-normal">บริษัท / รายการ</th>
+                  <th className="px-5 py-3 text-left font-normal w-48">ผู้ติดต่อ</th>
+                  <th className="px-5 py-3 text-right font-normal w-32">มูลค่ารวม</th>
+                  <th className="px-5 py-3 text-left font-normal w-32">สถานะ</th>
+                  <th className="px-4 py-3 w-32" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {filtered.map((req) => {
                   const isExpanded = expandedItems.has(req.id);
-                  const urgent = req.sla_po_review_due &&
-                    new Date(req.sla_po_review_due).getTime() - Date.now() < 12*3600*1000;
+                  const firstItem = req.items?.[0];
+                  const moreCount = (req.items?.length ?? 0) - 1;
                   return (
                     <>
-                      <tr
-                        key={req.id}
-                        className={`hover:bg-muted/30 transition-colors ${urgent ? "bg-red-50/30 dark:bg-red-950/10" : ""}`}
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            {urgent && <AlertTriangle className="h-3 w-3 text-red-500 shrink-0" />}
-                            <span className="font-mono text-xs font-semibold">{req.quote_number}</span>
+                      <tr key={req.id} className="hover:bg-muted/20 transition-colors">
+                        <td className="px-5 py-4 text-muted-foreground whitespace-nowrap">
+                          {fmtDate(req.created_at)}
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                            <span className="font-mono text-[13px]">{req.quote_number}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium ${STATUS_COLOR[req.status] ?? "bg-muted text-muted-foreground"}`}>
+                        <td className="px-5 py-4">
+                          <div className="font-medium truncate max-w-[280px]">{req.customer_company}</div>
+                          {firstItem && (
+                            <div className="text-xs text-muted-foreground truncate max-w-[280px] mt-0.5">
+                              {firstItem.product_name}
+                              {moreCount > 0 && <span className="ml-1">+{moreCount} รายการ</span>}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="text-sm truncate">{req.customer_name}</div>
+                          {req.customer_phone && (
+                            <div className="text-xs text-muted-foreground mt-0.5">{req.customer_phone}</div>
+                          )}
+                        </td>
+                        <td className="px-5 py-4 text-right whitespace-nowrap tabular-nums">
+                          {req.grand_total > 0 ? formatBaht(req.grand_total) : <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className={`inline-flex items-center gap-1.5 text-xs ${STATUS_COLOR[req.status] ?? "text-muted-foreground"}`}>
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
                             {STATUS_LABEL[req.status] ?? req.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium truncate max-w-[200px]">{req.customer_company}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-xs text-muted-foreground space-y-0.5">
-                            <div>{req.customer_name}</div>
-                            {req.customer_phone && (
-                              <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{req.customer_phone}</div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold">
-                          {req.grand_total > 0 ? formatBaht(req.grand_total) : <span className="text-muted-foreground">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground">
-                          {fmtDate(req.created_at)}
-                        </td>
-                        <td className="px-3 py-3">
+                        <td className="px-4 py-4">
                           <div className="flex items-center justify-end gap-1">
                             {req.items && req.items.length > 0 && (
                               <button
                                 onClick={() => toggleItems(req.id)}
-                                className="flex items-center gap-0.5 rounded px-1.5 py-1 text-[10px] text-muted-foreground hover:bg-muted transition-colors"
+                                className="rounded p-1 text-muted-foreground hover:bg-muted transition-colors"
+                                title={isExpanded ? "ซ่อนรายการ" : "ดูรายการทั้งหมด"}
                               >
-                                {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                {req.items.length} รายการ
+                                {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                               </button>
                             )}
                             <Button
@@ -233,29 +235,28 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                         </td>
                       </tr>
 
-                      {/* Expanded items row */}
                       {isExpanded && req.items && req.items.length > 0 && (
-                        <tr key={`${req.id}-items`} className="bg-muted/20">
-                          <td colSpan={7} className="px-6 py-3">
+                        <tr key={`${req.id}-items`} className="bg-muted/10">
+                          <td colSpan={7} className="px-8 py-4">
                             <table className="w-full text-xs">
                               <thead>
                                 <tr className="text-muted-foreground">
-                                  <th className="pb-1.5 text-left font-medium">สินค้า</th>
-                                  <th className="pb-1.5 text-right font-medium w-16">จำนวน</th>
-                                  <th className="pb-1.5 text-right font-medium w-28">ราคา/หน่วย</th>
-                                  <th className="pb-1.5 text-right font-medium w-28">รวม</th>
+                                  <th className="pb-2 text-left font-normal">สินค้า</th>
+                                  <th className="pb-2 text-right font-normal w-20">จำนวน</th>
+                                  <th className="pb-2 text-right font-normal w-32">ราคา/หน่วย</th>
+                                  <th className="pb-2 text-right font-normal w-32">รวม</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-border/50">
                                 {req.items.map((item, i) => (
                                   <tr key={item.id ?? i}>
-                                    <td className="py-1.5">
+                                    <td className="py-2">
                                       <span className="font-medium">{item.product_name}</span>
                                       {item.description && <span className="ml-2 text-muted-foreground">{item.description}</span>}
                                     </td>
-                                    <td className="py-1.5 text-right">{item.quantity}</td>
-                                    <td className="py-1.5 text-right">{formatBaht(item.unit_price)}</td>
-                                    <td className="py-1.5 text-right font-semibold">{formatBaht(item.total_price)}</td>
+                                    <td className="py-2 text-right tabular-nums">{item.quantity}</td>
+                                    <td className="py-2 text-right tabular-nums">{formatBaht(item.unit_price)}</td>
+                                    <td className="py-2 text-right tabular-nums font-medium">{formatBaht(item.total_price)}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -271,6 +272,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
           </div>
         )}
       </div>
+
 
       {/* Confirm claim dialog */}
       <Dialog open={!!confirmReq} onOpenChange={() => setConfirmReq(null)}>
