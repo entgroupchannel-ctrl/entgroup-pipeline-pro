@@ -844,14 +844,29 @@ function DealsTab({ leads, onAddDeal }: { leads: any[]; onAddDeal: () => void })
       {/* Header */}
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-          โอกาสขาย (Opportunities)
+          โอกาสขาย (Opportunities) · เรียงจากใหม่ไปเก่า
         </span>
-        <button
-          onClick={onAddDeal}
-          className="flex items-center gap-1 text-xs border rounded px-2.5 py-1 hover:bg-muted transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" /> เพิ่มดีล
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setExpanded(new Set(pagedLeads.map((l) => l.id)))}
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            กางทั้งหมด
+          </button>
+          <span className="text-muted-foreground/40">·</span>
+          <button
+            onClick={() => setExpanded(new Set())}
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            หุบทั้งหมด
+          </button>
+          <button
+            onClick={onAddDeal}
+            className="ml-2 flex items-center gap-1 text-xs border rounded px-2.5 py-1 hover:bg-muted transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" /> เพิ่มดีล
+          </button>
+        </div>
       </div>
 
       {/* Empty state */}
