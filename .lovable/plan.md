@@ -1,46 +1,31 @@
-## เป้าหมาย
-ตัวอักษรตอนนี้เล็กเกินไป ต้องขยาย + rebalance ทั้งแอป และเพิ่มระบบให้ผู้ใช้ปรับได้เอง (ขนาด + ธีม)
+## สาเหตุ
 
-## สิ่งที่จะทำ
+`assertAdmin` ใน `src/lib/flowaccount.functions.ts` ใช้ `supabaseAdmin` (service_role key) เพื่ออ่าน `crm.user_profiles`:
+- บรรทัด 11 เรียก `.from("crm.user_profiles")` → PostgREST error (ไม่รองรับชื่อ schema ในสตริง)
+- fallback บรรทัด 17-23 ใช้ `.schema("crm")` แต่ Lovable Cloud อาจ inject secret key รูปแบบใหม่ (`sb_secret_*`) ที่ทำให้ Data API/PostgREST reads ล้มเหลว → `d2` เป็น null → throw "Forbidden: admin only"
 
-### 1. ยกฐาน Typography ทั้งระบบ (CSS-first)
-ปรับใน `src/styles.css`:
-- ตั้ง `html { font-size: 16px }` เป็นฐาน (จากเดิมที่หลาย component ใช้ text-xs/text-sm เยอะเกินไป)
-- นิยาม type scale ใหม่ผ่าน CSS variables:
-  - `--text-xs: 0.8125rem` (13px, จากเดิม 12px)
-  - `--text-sm: 0.9375rem` (15px, จากเดิม 14px)
-  - `--text-base: 1.0625rem` (17px)
-  - `--text-lg: 1.25rem`, `--text-xl: 1.5rem`, `--text-2xl: 1.875rem`, `--text-3xl: 2.25rem`
-- ปรับ `line-height` และ `letter-spacing` ให้อ่านง่ายขึ้น (body 1.6, heading 1.2)
-- weight: body 400, heading 600–700 เพื่อความ balance
+ยืนยันจาก DB: user `therdpoom@entgroup.co.th` มี `role='admin'` จริง
 
-### 2. ระบบปรับขนาดตัวอักษร (S / M / L)
-- เพิ่ม `data-font-size` attribute บน `<html>` (`sm` / `md` / `lg`)
-- แต่ละระดับปรับ `html { font-size }` (14 / 16 / 18px) → rem-based utility ของ Tailwind ขยาย/ย่อทั้งแอปอัตโนมัติ
-- สร้าง `FontSizeProvider` (React context) + persist ลง `localStorage`
-- Toggle group 3 ปุ่ม (A- / A / A+) แสดงใน header/topbar
+## แผนแก้ (กระทบเฉพาะ assertAdmin)
 
-### 3. ระบบ Dark / Light Mode
-- ใช้ `next-themes` หรือ context เอง (เลือก context เพื่อไม่เพิ่ม dep — toggle `.dark` class บน `<html>`)
-- persist ลง `localStorage` + respect `prefers-color-scheme` ครั้งแรก
-- ตรวจสอบว่า design tokens ใน `src/styles.css` มีทั้ง `:root` และ `.dark` ครบทุก token
-- ปุ่ม toggle icon (Sun/Moon) วางคู่กับ font-size toggle
+เปลี่ยน `assertAdmin` ให้ใช้ **`context.supabase`** (authenticated user client จาก `requireSupabaseAuth`) แทน `supabaseAdmin`:
 
-### 4. UI Control Panel
-เพิ่มแถบตั้งค่าเล็กๆ (segmented control) วางใน topbar/header ของ layout หลัก:
+```ts
+async function assertAdmin(supabase: any, userId: string) {
+  const { data } = await supabase
+    .schema("crm")
+    .from("user_profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+  if (data?.role !== "admin") throw new Error("Forbidden: admin only");
+}
 ```
-[ A-  A  A+ ]   [ ☀ / 🌙 ]
-```
-- ใช้ shadcn `ToggleGroup` + `Button` (variant ghost)
-- แสดงในทุกหน้า (วางใน layout ที่ครอบ authenticated routes)
 
-## ไฟล์ที่จะแตะ
-- `src/styles.css` — type scale, dark tokens ครบ
-- `src/lib/preferences-context.tsx` (ใหม่) — font size + theme context
-- `src/components/preferences-toggle.tsx` (ใหม่) — UI toggles
-- `src/routes/__root.tsx` — mount provider + apply attribute early (no hydration flash)
-- Layout/topbar component — ใส่ปุ่ม toggle
+ทุก call site (`testFAConnection`, `loadFASettings`, และอื่นๆ ใน flowaccount.functions.ts) เปลี่ยนจาก `assertAdmin(context.userId)` → `assertAdmin(context.supabase, context.userId)`
 
-## ผลลัพธ์
-- ตัวอักษรใหญ่ขึ้นสมดุลขึ้นทันที by default
-- ผู้ใช้ปรับ S/M/L + Dark/Light เองได้ตามชอบ ค่าจะจำไว้
+## ทำไมวิธีนี้ปลอดภัย + ไม่กระทบอื่น
+- RLS + grants บน schema `crm` เปิดให้ `authenticated` แล้ว (จาก migration ล่าสุด)
+- ผู้ใช้อ่านแถวตัวเองได้เสมอ, ตรวจ role='admin' ทำงานถูกต้อง
+- ไม่แตะ `supabaseAdmin` client, ไม่กระทบ server function อื่น
+- แก้ไฟล์เดียว: `src/lib/flowaccount.functions.ts`
