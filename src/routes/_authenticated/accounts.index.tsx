@@ -77,6 +77,7 @@ function AccountsPage() {
 
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [leadsCount, setLeadsCount] = useState<Map<string, number>>(new Map());
+  const [contactEmailMap, setContactEmailMap] = useState<Map<string, string>>(new Map()); // accountId → first email
   const [q, setQ] = useState("");
   const [industryFilter, setIndustryFilter] = useState("ทั้งหมด");
   const [newOpen, setNewOpen] = useState(false);
@@ -121,6 +122,20 @@ function AccountsPage() {
       if (l.account_id) counts.set(l.account_id, (counts.get(l.account_id) ?? 0) + 1);
     });
     setLeadsCount(counts);
+
+    // Load first email per account from contacts
+    const { data: contactsData } = await crmDb()
+      .from("contacts")
+      .select("account_id, email")
+      .not("email", "is", null)
+      .order("created_at", { ascending: true });
+    const emailMap = new Map<string, string>();
+    for (const c of (contactsData ?? []) as any[]) {
+      if (c.account_id && c.email && !emailMap.has(c.account_id)) {
+        emailMap.set(c.account_id, c.email);
+      }
+    }
+    setContactEmailMap(emailMap);
   };
 
   useEffect(() => { load(); }, []);
@@ -256,6 +271,7 @@ function AccountsPage() {
                   <th className="px-4 py-3 text-left font-medium">อุตสาหกรรม</th>
                   <th className="px-4 py-3 text-left font-medium w-24">ดีล</th>
                   <th className="px-4 py-3 text-left font-medium">โทรศัพท์</th>
+                  <th className="px-4 py-3 text-left font-medium">อีเมลผู้ติดต่อ</th>
                   <th className="px-3 py-3 text-right w-16" />
                 </tr>
               </thead>
@@ -297,6 +313,16 @@ function AccountsPage() {
 
                       <td className="px-4 py-3.5 text-sm text-muted-foreground">
                         {a.phone ?? "—"}
+                      </td>
+
+                      <td className="px-4 py-3.5 text-sm">
+                        {contactEmailMap.get(a.id) ? (
+                          <span className="text-primary/80 truncate block max-w-[180px]" title={contactEmailMap.get(a.id)}>
+                            {contactEmailMap.get(a.id)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
 
                       <td className="px-3 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
