@@ -4,7 +4,9 @@ import { KanbanBoard } from "@/components/pipeline/KanbanBoard";
 import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
 import { crmDb } from "@/lib/crm";
 import { B2BRequestsTab } from "@/components/pipeline/B2BRequestsTab";
+import { LineRequestsTab } from "@/components/pipeline/LineRequestsTab";
 import { supabase } from "@/integrations/supabase/client";
+
 
 export const Route = createFileRoute("/_authenticated/pipeline")({
   component: PipelinePage,
@@ -86,17 +88,20 @@ function PipelinePage() {
         </button>
       </div>
 
-      {/* Content — Kanban or B2B tab */}
+      {/* Content — Kanban / LINE / B2B tab */}
       {tab === "b2b" ? (
         <B2BRequestsTab onLeadCreated={() => setRefreshKey((k) => k + 1)} />
+      ) : tab === "line" ? (
+        <LineRequestsTab onLeadCreated={() => setRefreshKey((k) => k + 1)} />
       ) : (
         <KanbanBoard
           key={refreshKey}
           sourceFilter={tab}
-          showClaimButton={tab === "line"}
+          showClaimButton={false}
           onQuickLog={handleQuickLog}
         />
       )}
+
 
       {/* Quick-log dialog (triggered from card buttons) */}
       <ActivityLogDialog

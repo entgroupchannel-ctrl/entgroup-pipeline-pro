@@ -14,6 +14,10 @@ import {
   fetchUnmatchedQuotes, claimQuoteRequest,
   STATUS_LABEL, type B2BQuoteRequest,
 } from "@/lib/b2b-client";
+import { Pagination } from "./LineRequestsTab";
+
+const PAGE_SIZE = 10;
+
 
 const MONTHS_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
 function fmtDate(iso: string) {
@@ -39,6 +43,8 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
   const [confirmReq, setConfirmReq] = useState<B2BQuoteRequest | null>(null);
   const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(0);
+
 
   const load = async () => {
     setLoading(true); setError(null);
@@ -63,6 +69,11 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
       r.customer_name.toLowerCase().includes(q)
     );
   });
+
+  useEffect(() => { setPage(0); }, [search]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageItems = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
 
   const doClaimRequest = async (req: B2BQuoteRequest) => {
     setClaiming(req.id);
@@ -180,7 +191,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filtered.map((req) => {
+                  {pageItems.map((req) => {
                     const isExpanded = expandedItems.has(req.id);
                     const firstItem = req.items?.[0];
                     const moreCount = (req.items?.length ?? 0) - 1;
@@ -288,7 +299,17 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                 </tbody>
               </table>
             </div>
+            {totalPages > 1 && (
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                total={filtered.length}
+                pageSize={PAGE_SIZE}
+                onChange={setPage}
+              />
+            )}
           </div>
+
         )}
       </div>
 
