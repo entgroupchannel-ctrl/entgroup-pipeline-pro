@@ -5,6 +5,7 @@ import {
   Building2,
   FileText,
   CalendarCheck,
+  CalendarHeart,
   LayoutDashboard,
   Settings,
   LogOut,
@@ -39,6 +40,7 @@ const docItems = [
   { title: "ใบเสนอราคา", url: "/quotations", icon: FileText },
   { title: "ส่งอีเมล", url: "/emails", icon: Mail },
   { title: "กิจกรรม", url: "/activities", icon: CalendarCheck },
+  { title: "วันสำคัญ", url: "/events", icon: CalendarHeart },
 ] as const;
 
 const overviewItems = [
