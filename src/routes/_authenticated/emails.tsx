@@ -551,13 +551,12 @@ function EmailsPage() {
   };
 
   const loadLogs = async () => {
-    const { data } = await crmDb()
+    const { data, error } = await crmDb()
       .from("email_send_log")
       .select("*")
-      .eq("template_name", "lead_email_manual")
       .order("created_at", { ascending: false })
       .limit(20);
-    setLogs(data ?? []);
+    if (!error) setLogs(data ?? []);
   };
   useEffect(() => { loadLogs(); }, []);
 
@@ -989,28 +988,38 @@ function EmailsPage() {
           )}
 
           <div className="space-y-3">
-            <h2 className="text-sm font-semibold">ส่งล่าสุด</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold">ประวัติการส่ง</h2>
+              <button onClick={loadLogs} className="text-xs text-muted-foreground hover:text-foreground">
+                รีเฟรช
+              </button>
+            </div>
             {logs.length === 0 ? (
               <p className="text-xs text-muted-foreground">ยังไม่มีประวัติการส่ง</p>
             ) : (
               <div className="space-y-2">
                 {logs.map((log) => (
-                  <div key={log.id} className="rounded-lg border bg-card p-3 space-y-1">
+                  <div key={log.id} className={`rounded-lg border bg-card p-3 space-y-1.5 ${log.status !== "sent" ? "border-red-200 dark:border-red-800" : ""}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <span className="text-xs font-medium line-clamp-1">{log.subject || "—"}</span>
-                      <Badge
-                        variant={log.status === "sent" ? "default" : "destructive"}
-                        className="shrink-0 text-[10px]"
-                      >
-                        {log.status === "sent" ? "ส่งแล้ว" : "ล้มเหลว"}
-                      </Badge>
+                      <span className="text-xs font-medium line-clamp-1 flex-1">{log.subject || "—"}</span>
+                      <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                        log.status === "sent"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                          : "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                      }`}>
+                        {log.status === "sent" ? "✓ ส่งแล้ว" : "✗ ล้มเหลว"}
+                      </span>
                     </div>
-                    <div className="text-xs text-muted-foreground">{log.recipient_email}</div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-muted-foreground truncate">
+                      {log.recipient_name ? `${log.recipient_name} ` : ""}{log.recipient_email}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
                       {new Date(log.created_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}
                     </div>
                     {log.error_message && (
-                      <div className="text-xs text-destructive">{log.error_message}</div>
+                      <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 rounded px-2 py-1">
+                        {log.error_message}
+                      </div>
                     )}
                   </div>
                 ))}
