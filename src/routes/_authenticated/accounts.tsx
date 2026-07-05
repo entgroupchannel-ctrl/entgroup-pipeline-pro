@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { formatThaiDate } from "@/lib/format";
+import { ListPagination, usePagination } from "@/components/list-pagination";
 
 export const Route = createFileRoute("/_authenticated/accounts")({
   component: AccountsPage,
