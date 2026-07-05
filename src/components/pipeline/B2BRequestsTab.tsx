@@ -43,6 +43,8 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
   const [confirmReq, setConfirmReq] = useState<B2BQuoteRequest | null>(null);
   const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(0);
+
 
   const load = async () => {
     setLoading(true); setError(null);
