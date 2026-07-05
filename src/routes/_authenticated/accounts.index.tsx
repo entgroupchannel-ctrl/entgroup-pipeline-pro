@@ -335,6 +335,7 @@ function AccountsPage() {
       <p className="text-xs text-muted-foreground text-center">
         คลิกแถวเพื่อดูรายละเอียดบริษัท
       </p>
+      </div>
 
       {/* Email dialog */}
       {emailTarget && (
