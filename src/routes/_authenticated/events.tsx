@@ -2,11 +2,17 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Loader2, Cake, CalendarDays, Star, Phone, Mail, MessageCircle,
-  ChevronLeft, ChevronRight, LayoutList, Grid3x3,
+  ChevronLeft, ChevronRight, LayoutList, Grid3x3, Plus, Trash2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { crmDb } from "@/lib/crm";
+import { useAuth } from "@/lib/auth-context";
+import { toast } from "sonner";
 
 // @ts-ignore — route registered at build time
 export const Route = createFileRoute("/_authenticated/events")({
@@ -15,9 +21,21 @@ export const Route = createFileRoute("/_authenticated/events")({
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface CustomEvent {
+  id: string;
+  title: string;
+  event_date: string;
+  event_type: "custom" | "reminder" | "holiday" | "meeting";
+  description: string | null;
+  account_id: string | null;
+  is_recurring: boolean;
+  color: string;
+  created_by: string | null;
+}
+
 interface CRMEvent {
   id: string;
-  type: "birthday" | "company_anniv" | "customer_anniv";
+  type: "birthday" | "company_anniv" | "customer_anniv" | "custom_event";
   label: string;
   detail?: string;
   accountId: string | null;
@@ -40,6 +58,7 @@ const EVENT_CONFIG = {
   birthday:       { label: "วันเกิด",        icon: Cake,         color: "#D85A30", bg: "#FAECE7", textColor: "#993C1D", dot: "#D85A30" },
   company_anniv:  { label: "ครบรอบก่อตั้ง",  icon: CalendarDays, color: "#185FA5", bg: "#E6F1FB", textColor: "#0C447C", dot: "#378ADD" },
   customer_anniv: { label: "ครบรอบลูกค้า",   icon: Star,         color: "#BA7517", bg: "#FAEEDA", textColor: "#633806", dot: "#EF9F27" },
+  custom_event: { label: "วันสำคัญ", icon: Star, color: "#185FA5", bg: "#E6F1FB", textColor: "#0C447C", dot: "#185FA5" },
 } as const;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -252,8 +271,10 @@ function EventCard({ ev }: { ev: CRMEvent }) {
 
 function EventsPage() {
   const today = new Date();
+  const { user } = useAuth();
 
   const [events, setEvents]             = useState<CRMEvent[] | null>(null);
+  const [customEvents, setCustomEvents] = useState<CustomEvent[]>([]);
   const [q, setQ]                       = useState("");
   const [typeFilter, setTypeFilter]     = useState<"all" | CRMEvent["type"]>("all");
   const [viewMode, setViewMode]         = useState<"calendar" | "list">("calendar");
@@ -262,6 +283,16 @@ function EventsPage() {
   const [calYear, setCalYear]   = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth()); // 0-indexed
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+
+  // Add event dialog state
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addDate, setAddDate]   = useState("");
+  const [addTitle, setAddTitle] = useState("");
+  const [addType, setAddType]   = useState<CustomEvent["event_type"]>("custom");
+  const [addDesc, setAddDesc]   = useState("");
+  const [addRecurring, setAddRecurring] = useState(false);
+  const [addColor, setAddColor] = useState("#185FA5");
+  const [saving, setSaving]     = useState(false);
 
   // Load ALL events (no window filter — calendar shows the month you're on)
   const load = async () => {
@@ -322,7 +353,47 @@ function EventsPage() {
     setEvents(all);
   };
 
-  useEffect(() => { load(); }, []);
+  const loadCustomEvents = async () => {
+    const { data } = await crmDb().from("custom_events").select("*").order("event_date");
+    setCustomEvents((data ?? []) as CustomEvent[]);
+  };
+
+  const saveCustomEvent = async () => {
+    if (!addTitle.trim()) { toast.error("กรุณาระบุชื่อวันสำคัญ"); return; }
+    if (!addDate)          { toast.error("กรุณาเลือกวันที่");       return; }
+    setSaving(true);
+    const { error } = await crmDb().from("custom_events").insert({
+      title: addTitle.trim(), event_date: addDate, event_type: addType,
+      description: addDesc.trim() || null, is_recurring: addRecurring,
+      color: addColor, created_by: user?.id,
+    });
+    setSaving(false);
+    if (error) { toast.error("บันทึกไม่สำเร็จ", { description: error.message }); return; }
+    toast.success(`เพิ่ม "${addTitle}" แล้ว`);
+    setAddDialogOpen(false);
+    setAddTitle(""); setAddDesc(""); setAddType("custom"); setAddRecurring(false); setAddColor("#185FA5");
+    await loadCustomEvents();
+  };
+
+  const deleteCustomEvent = async (id: string) => {
+    const { error } = await crmDb().from("custom_events").delete().eq("id", id);
+    if (error) { toast.error("ลบไม่สำเร็จ"); return; }
+    toast.success("ลบแล้ว");
+    await loadCustomEvents();
+  };
+
+  const openAddDialog = (day?: number) => {
+    if (day) {
+      const d = new Date(calYear, calMonth, day);
+      setAddDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
+    } else {
+      setAddDate("");
+    }
+    setAddTitle(""); setAddDesc(""); setAddType("custom"); setAddRecurring(false); setAddColor("#185FA5");
+    setAddDialogOpen(true);
+  };
+
+  useEffect(() => { load(); loadCustomEvents(); }, []);
 
   // Events that occur in the currently viewed calendar month
   const calMonthEvents = useMemo(() => {
@@ -333,7 +404,7 @@ function EventsPage() {
     });
   }, [events, calYear, calMonth]);
 
-  // Map: day → events (for CalendarGrid)
+  // Map: day → events (for CalendarGrid) — merge CRM events + custom events
   const eventsByDay = useMemo(() => {
     const map = new Map<number, CRMEvent[]>();
     for (const ev of calMonthEvents) {
@@ -341,8 +412,26 @@ function EventsPage() {
       if (!map.has(day)) map.set(day, []);
       map.get(day)!.push(ev);
     }
+    // Add custom events for this month
+    for (const ce of customEvents) {
+      const d = new Date(ce.event_date);
+      const matchMonth = ce.is_recurring
+        ? d.getMonth() === calMonth // recurring: match month/day any year
+        : d.getFullYear() === calYear && d.getMonth() === calMonth;
+      if (!matchMonth) continue;
+      const day = d.getDate();
+      if (!map.has(day)) map.set(day, []);
+      map.get(day)!.push({
+        id: `custom-${ce.id}`, type: "custom_event",
+        label: ce.title, detail: ce.description ?? undefined,
+        accountId: null, eventDate: ce.event_date,
+        nextOccurrence: new Date(calYear, calMonth, day),
+        daysUntil: daysUntilDate(new Date(calYear, calMonth, day)),
+        _customId: ce.id, _color: ce.color,
+      } as any);
+    }
     return map;
-  }, [calMonthEvents]);
+  }, [calMonthEvents, customEvents, calYear, calMonth]);
 
   // Events for selected day (calendar detail panel)
   const selectedDayEvents = useMemo(() => {
@@ -478,6 +567,12 @@ function EventsPage() {
                     : "ไม่มีเหตุการณ์เดือนนี้"}
                 </span>
                 <button
+                  onClick={() => openAddDialog()}
+                  className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" /> เพิ่มวันสำคัญ
+                </button>
+                <button
                   onClick={goToday}
                   className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted transition-colors"
                 >
@@ -500,7 +595,15 @@ function EventsPage() {
               year={calYear}
               month={calMonth}
               eventsByDay={eventsByDay}
-              onDayClick={(day) => setSelectedDay(selectedDay === day ? null : day)}
+              onDayClick={(day) => {
+                const hasEvents = (eventsByDay.get(day) ?? []).length > 0;
+                if (hasEvents) {
+                  setSelectedDay(selectedDay === day ? null : day);
+                } else {
+                  // Empty day → open add dialog with pre-filled date
+                  openAddDialog(day);
+                }
+              }}
               selectedDay={selectedDay}
             />
           </div>
@@ -519,7 +622,12 @@ function EventsPage() {
                   <h3 className="text-sm font-semibold">
                     {selectedDay} {MONTHS_TH_FULL[calMonth]} {calYear + 543}
                   </h3>
-                  <span className="text-xs text-muted-foreground">{selectedDayEvents.length} รายการ</span>
+                  <button
+                    onClick={() => openAddDialog(selectedDay!)}
+                    className="flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] text-muted-foreground hover:bg-primary/5 hover:text-primary hover:border-primary transition-colors"
+                  >
+                    <Plus className="h-3 w-3" /> เพิ่ม
+                  </button>
                 </div>
                 <div className="space-y-2">
                   {selectedDayEvents.map((ev) => {
@@ -559,6 +667,14 @@ function EventsPage() {
                             >
                               ดูบริษัท →
                             </Link>
+                          )}
+                          {(ev as any)._customId && (
+                            <button
+                              onClick={() => deleteCustomEvent((ev as any)._customId)}
+                              className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground hover:text-red-600 transition-colors"
+                            >
+                              <Trash2 className="h-3 w-3" /> ลบ
+                            </button>
                           )}
                         </div>
                       </div>
@@ -615,6 +731,105 @@ function EventsPage() {
           )}
         </div>
       )}
+
+      {/* ── Add Custom Event Dialog ── */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-4 w-4 text-primary" />
+              เพิ่มวันสำคัญ
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {/* Title */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">ชื่อวันสำคัญ <span className="text-red-500">*</span></Label>
+              <input
+                autoFocus
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                placeholder="เช่น วันครบรอบสัญญา, วันหยุดธนาคาร"
+                value={addTitle}
+                onChange={(e) => setAddTitle(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveCustomEvent()}
+              />
+            </div>
+
+            {/* Date + Type in 2 col */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">วันที่ <span className="text-red-500">*</span></Label>
+                <input
+                  type="date"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  value={addDate}
+                  onChange={(e) => setAddDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">ประเภท</Label>
+                <Select value={addType} onValueChange={(v) => setAddType(v as CustomEvent["event_type"])}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="custom">📌 วันสำคัญทั่วไป</SelectItem>
+                    <SelectItem value="reminder">🔔 แจ้งเตือน</SelectItem>
+                    <SelectItem value="holiday">🏖 วันหยุด</SelectItem>
+                    <SelectItem value="meeting">👥 นัดประชุม</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">รายละเอียด (optional)</Label>
+              <Textarea
+                rows={2}
+                placeholder="รายละเอียดเพิ่มเติม..."
+                value={addDesc}
+                onChange={(e) => setAddDesc(e.target.value)}
+                className="resize-none text-sm"
+              />
+            </div>
+
+            {/* Color + Recurring */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs">สี</Label>
+                <div className="flex gap-1.5">
+                  {["#185FA5","#D85A30","#3B6D11","#BA7517","#7C3AED","#E24B4A"].map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setAddColor(c)}
+                      className={`h-5 w-5 rounded-full transition-transform ${addColor === c ? "ring-2 ring-offset-1 ring-foreground scale-110" : ""}`}
+                      style={{ background: c }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={addRecurring}
+                  onChange={(e) => setAddRecurring(e.target.checked)}
+                  className="h-3.5 w-3.5"
+                />
+                <span className="text-xs text-muted-foreground">เกิดซ้ำทุกปี</span>
+              </label>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-2">
+            <Button variant="ghost" onClick={() => setAddDialogOpen(false)}>ยกเลิก</Button>
+            <Button onClick={saveCustomEvent} disabled={saving}>
+              {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              บันทึกวันสำคัญ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
