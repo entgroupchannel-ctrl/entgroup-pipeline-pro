@@ -161,11 +161,13 @@ function KeyAccountsPage() {
       (profilesRes.data ?? []).map((p: any) => [p.id, p.full_name]),
     );
     setProfileMap(profileMap);
+    setProfiles(profilesRes.data ?? []);
 
     const raw = (accRes.data ?? []) as any[];
     const accs: KeyAccount[] = raw.map((a) => ({
       ...a,
     }));
+
 
     const leadIds = accs.flatMap((a) => (a.leads ?? []).map((l) => l.id)).filter(Boolean);
 
