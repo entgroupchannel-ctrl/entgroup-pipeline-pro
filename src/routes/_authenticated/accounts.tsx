@@ -278,8 +278,23 @@ function AccountsPage() {
                         )}
                       </div>
                     </td>
+                    <td className="px-4 py-3">
+                      {a.industry ? (
+                        <Badge className={`text-[11px] ${INDUSTRY_COLOR[a.industry] ?? "bg-muted text-muted-foreground"}`}>
+                          {a.industry}
+                        </Badge>
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {a.tax_id ?? "—"}
+                    </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {a.industry ?? "—"}
+                      {a.credit_days != null ? `${a.credit_days} วัน` : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      <span className="truncate block max-w-[200px]" title={a.full_address ?? undefined}>
+                        {a.full_address ?? "—"}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-xs" onClick={(e) => e.stopPropagation()}>
                       {a.website ? (
