@@ -10,6 +10,7 @@ import {
   LogOut,
   Target,
   Mail,
+  Crown,
 } from "lucide-react";
 import {
   Sidebar,
