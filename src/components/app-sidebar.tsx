@@ -60,7 +60,20 @@ export function AppSidebar() {
   const { profile, role, signOut } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isActive = (url: string) => pathname === url || pathname.startsWith(url + "/");
+  const isAdmin = role === "admin";
   const isManager = role === "manager" || role === "admin";
+
+  const group1 = [...salesItems];
+  const group2 = [...docItems];
+  let group3: readonly { title: string; url: string; icon: React.ComponentType<{ className?: string }> }[] = [{ title: "KPI", url: "/kpi", icon: Target }];
+
+  if (isAdmin) {
+    group3 = [adminFirstItems[0], ...group3, ...overviewItems.slice(2)];
+  } else if (isManager) {
+    group3 = [...group3, ...managerExtraItems];
+  }
+
+  const menuGroups = [group1, group2, group3];
 
   const initials = (profile?.full_name ?? "?")
     .split(" ")
@@ -86,35 +99,20 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                    <Link to={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+              {menuGroups.map((group, groupIndex) => (
+                <div key={groupIndex} className={groupIndex > 0 ? "border-t pt-2 mt-2" : undefined}>
+                  {group.map((item) => (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
+                        <Link to={item.url}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </div>
               ))}
-              {isManager &&
-                managerItems.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                      <Link to={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={isActive("/settings")} tooltip="ตั้งค่า">
-                  <Link to="/settings">
-                    <Settings />
-                    <span>ตั้งค่า</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
