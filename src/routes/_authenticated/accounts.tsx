@@ -208,6 +208,25 @@ function AccountsPage() {
         </div>
       </div>
 
+      {/* Industry filter */}
+      <div className="mb-4 -mx-6 px-6">
+        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
+          {INDUSTRIES.map((ind) => (
+            <button
+              key={ind}
+              onClick={() => setIndustryFilter(ind)}
+              className={`shrink-0 rounded-full border px-3 py-1 text-xs transition-colors ${
+                industryFilter === ind
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "bg-background hover:bg-muted"
+              }`}
+            >
+              {ind}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* List */}
       <BulkActionBar
         count={selected.size}
