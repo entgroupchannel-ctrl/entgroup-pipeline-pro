@@ -19,6 +19,7 @@ import { fetchFADocuments, type FADocument } from "@/lib/flowaccount-client";
 import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete } from "@/components/ui/row-actions";
 import { exportToCsv, quotationsToRows } from "@/lib/export-csv";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ListPagination, usePagination } from "@/components/list-pagination";
 
 export const Route = createFileRoute("/_authenticated/quotations")({
   component: QuotationsPage,
