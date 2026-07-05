@@ -13,7 +13,7 @@ import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { formatBaht } from "@/lib/format";
 import {
-  fetchUnmatchedQuotes, STATUS_LABEL, STATUS_COLOR,
+  fetchUnmatchedQuotes, claimQuoteRequest, STATUS_LABEL, STATUS_COLOR,
   type B2BQuoteRequest,
 } from "@/lib/b2b-client";
 
