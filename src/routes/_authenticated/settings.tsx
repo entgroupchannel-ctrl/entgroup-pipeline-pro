@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -33,78 +34,114 @@ function SettingsPage() {
   const { role } = useAuth();
   const isAdmin = role === "admin";
   const isManager = role === "manager" || role === "admin";
+  const [active, setActive] = useState("profile");
+
+  // Menu groups definition
+  type MenuItem = { key: string; label: string; adminOnly?: boolean; managerOnly?: boolean };
+  type MenuGroup = { group: string; items: MenuItem[] };
+
+  const menuGroups: MenuGroup[] = [
+    {
+      group: "บัญชีและทีม",
+      items: [
+        { key: "profile", label: "โปรไฟล์ของฉัน" },
+        { key: "team", label: "ทีมขาย", adminOnly: true },
+        { key: "permissions", label: "สิทธิ์การใช้งาน", adminOnly: true },
+      ],
+    },
+    {
+      group: "Pipeline และการขาย",
+      items: [
+        { key: "stages", label: "Pipeline Stages" },
+        { key: "script", label: "Sales Script", managerOnly: true },
+      ],
+    },
+    {
+      group: "อีเมล",
+      items: [
+        { key: "email", label: "ตั้งค่า Email (Resend)", adminOnly: true },
+        { key: "email_templates", label: "Email Templates" },
+        { key: "media", label: "Media Library", adminOnly: true },
+      ],
+    },
+    {
+      group: "การตั้งค่า API",
+      items: [
+        { key: "flowaccount", label: "FlowAccount", adminOnly: true },
+        { key: "line", label: "LINE OA", adminOnly: true },
+        { key: "ai", label: "AI ✦", adminOnly: true },
+      ],
+    },
+  ];
+
+  // Filter items by role
+  const visibleGroups = menuGroups.map((g) => ({
+    ...g,
+    items: g.items.filter((item) => {
+      if (item.adminOnly && !isAdmin) return false;
+      if (item.managerOnly && !isManager) return false;
+      return true;
+    }),
+  })).filter((g) => g.items.length > 0);
+
+  const CONTENT: Record<string, React.ReactNode> = {
+    profile:         <ProfileTab />,
+    team:            isAdmin ? <TeamTab /> : null,
+    permissions:     isAdmin ? <PermissionsTab /> : null,
+    stages:          <StagesTab />,
+    script:          isManager ? <SalesScriptTab /> : null,
+    email:           isAdmin ? <EmailConfigTab /> : null,
+    email_templates: <EmailTemplatesTab />,
+    media:           isAdmin ? <MediaLibraryTab /> : null,
+    flowaccount:     isAdmin ? <FlowAccountTab /> : null,
+    line:            isAdmin ? <LineOATab /> : null,
+    ai:              isAdmin ? <AISettingsTab /> : null,
+  };
+
+  const activeLabel = visibleGroups.flatMap((g) => g.items).find((i) => i.key === active)?.label ?? "";
+
   return (
-    <div className="p-6 page-fade-in">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold">ตั้งค่า</h1>
-        <p className="text-xs text-muted-foreground">จัดการโปรไฟล์ ทีม และการแสดงผล</p>
+    <div className="flex h-full page-fade-in">
+
+      {/* ── Sidebar ── */}
+      <div className="w-56 shrink-0 border-r bg-muted/20 overflow-y-auto">
+        <div className="px-4 py-5 border-b">
+          <h1 className="text-sm font-semibold">ตั้งค่า</h1>
+        </div>
+        <nav className="py-3 space-y-4 px-2">
+          {visibleGroups.map((g) => (
+            <div key={g.group}>
+              <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {g.group}
+              </p>
+              {g.items.map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => setActive(item.key)}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
+                    active === item.key
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  <span>{item.label}</span>
+                  {active === item.key && <ChevronRight className="h-3.5 w-3.5 opacity-60" />}
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
       </div>
 
-      <Tabs defaultValue="profile" className="w-full">
-        <TabsList>
-          <TabsTrigger value="profile">โปรไฟล์</TabsTrigger>
-          {isAdmin && <TabsTrigger value="team">ทีมขาย</TabsTrigger>}
-          <TabsTrigger value="stages">Pipeline Stages</TabsTrigger>
-          {isManager && <TabsTrigger value="script">Sales Script</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="flowaccount">FlowAccount</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="email">อีเมล</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="line">LINE OA</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="ai">AI ✦</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="permissions">สิทธิ์การใช้งาน</TabsTrigger>}
-          <TabsTrigger value="email_templates">Email Templates</TabsTrigger>
-          {isAdmin && <TabsTrigger value="media">Media Library</TabsTrigger>}
-        </TabsList>
-
-        <TabsContent value="profile" className="mt-6 max-w-lg">
-          <ProfileTab />
-        </TabsContent>
-        {isAdmin && (
-          <TabsContent value="team" className="mt-6">
-            <TeamTab />
-          </TabsContent>
-        )}
-        <TabsContent value="stages" className="mt-6 max-w-lg">
-          <StagesTab />
-        </TabsContent>
-        {isManager && (
-          <TabsContent value="script" className="mt-6">
-            <SalesScriptTab />
-          </TabsContent>
-        )}
-        {isAdmin && (
-          <TabsContent value="flowaccount" className="mt-6">
-            <FlowAccountTab />
-          </TabsContent>
-        )}
-        {isAdmin && (
-          <TabsContent value="email" className="mt-6">
-            <EmailConfigTab />
-          </TabsContent>
-        )}
-        {isAdmin && (
-          <TabsContent value="line" className="mt-6">
-            <LineOATab />
-          </TabsContent>
-        )}
-        {isAdmin && (
-          <TabsContent value="ai" className="mt-6">
-            <AISettingsTab />
-          </TabsContent>
-        )}
-        {isAdmin && (
-          <TabsContent value="permissions" className="mt-6">
-            <PermissionsTab />
-          </TabsContent>
-        )}
-        <TabsContent value="email_templates" className="mt-6">
-          <EmailTemplatesTab />
-        </TabsContent>
-        {isAdmin && (
-          <TabsContent value="media" className="mt-6">
-            <MediaLibraryTab />
-          </TabsContent>
-        )}
-      </Tabs>
+      {/* ── Content ── */}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="mb-5 border-b pb-4">
+          <h2 className="text-lg font-semibold">{activeLabel}</h2>
+        </div>
+        <div className="max-w-3xl">
+          {CONTENT[active] ?? null}
+        </div>
+      </div>
     </div>
   );
 }
