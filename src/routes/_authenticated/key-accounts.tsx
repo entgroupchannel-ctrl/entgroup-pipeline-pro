@@ -10,6 +10,8 @@ import {
   FileText,
   Users,
   ChevronDown,
+  FileDown,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { crmDb } from "@/lib/crm";
@@ -23,6 +25,16 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { fetchFADocuments, type FADocument } from "@/lib/flowaccount-client";
+
 
 
 export const Route = createFileRoute("/_authenticated/key-accounts")({
@@ -108,6 +120,7 @@ function KeyAccountsPage() {
   const [accounts, setAccounts] = useState<KeyAccount[]>([]);
   const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [profileMap, setProfileMap] = useState<Map<string, string | null>>(new Map());
+  const [profiles, setProfiles] = useState<any[]>([]);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("ทั้งหมด");
   const [selected, setSelected] = useState<KeyAccount | null>(null);
@@ -115,6 +128,8 @@ function KeyAccountsPage() {
   const [logOpen, setLogOpen] = useState(false);
   const [logType, setLogType] = useState("meeting");
   const [logNote, setLogNote] = useState("");
+  const [addDealOpen, setAddDealOpen] = useState(false);
+
 
 
   const load = async () => {
@@ -146,11 +161,13 @@ function KeyAccountsPage() {
       (profilesRes.data ?? []).map((p: any) => [p.id, p.full_name]),
     );
     setProfileMap(profileMap);
+    setProfiles(profilesRes.data ?? []);
 
     const raw = (accRes.data ?? []) as any[];
     const accs: KeyAccount[] = raw.map((a) => ({
       ...a,
     }));
+
 
     const leadIds = accs.flatMap((a) => (a.leads ?? []).map((l) => l.id)).filter(Boolean);
 
@@ -455,7 +472,7 @@ function KeyAccountsPage() {
             {tab === "ดีลที่เกี่ยวข้อง" && (
               <DealsTab
                 leads={getAccLeads(selected)}
-                onAddDeal={() => setTab("บันทึกกิจกรรม")}
+                onAddDeal={() => setAddDealOpen(true)}
               />
             )}
 
@@ -524,6 +541,17 @@ function KeyAccountsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {selected && (
+        <AddDealDialog
+          open={addDealOpen}
+          onOpenChange={setAddDealOpen}
+          account={selected}
+          ownerId={user?.id ?? null}
+          profiles={profiles}
+          onCreated={() => { setAddDealOpen(false); load(); }}
+        />
+      )}
     </div>
   );
 }
@@ -908,6 +936,319 @@ function DealsTab({ leads, onAddDeal }: { leads: any[]; onAddDeal: () => void })
   );
 }
 
+
+function AddDealDialog({
+  open,
+  onOpenChange,
+  account,
+  ownerId,
+  profiles,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  account: KeyAccount;
+  ownerId: string | null;
+  profiles: any[];
+  onCreated: () => void;
+}) {
+  const [form, setForm] = useState({
+    title: "",
+    expected_value: "",
+    expected_close_date: "",
+    stage: "new",
+    source: "key_account",
+    flowaccount_quotation_no: "",
+    owner_id: ownerId ?? "",
+  });
+  const [faDocs, setFaDocs] = useState<FADocument[]>([]);
+  const [faLoading, setFaLoading] = useState(false);
+  const [faQ, setFaQ] = useState("");
+  const [faMode, setFaMode] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      title: "",
+      expected_value: "",
+      expected_close_date: "",
+      stage: "new",
+      source: "key_account",
+      flowaccount_quotation_no: "",
+      owner_id: ownerId ?? "",
+    });
+    setFaMode(false);
+    setFaQ("");
+  }, [open, ownerId]);
+
+  const loadFA = async () => {
+    setFaLoading(true);
+    try {
+      const docs = await fetchFADocuments();
+      setFaDocs(
+        docs.filter(
+          (d) =>
+            d.document_type === "quotation" &&
+            (d.contact_name ?? "")
+              .toLowerCase()
+              .includes(account.name.toLowerCase().slice(0, 6)),
+        ),
+      );
+    } catch {
+      toast.error("โหลด FlowAccount ไม่สำเร็จ");
+    } finally {
+      setFaLoading(false);
+    }
+  };
+
+  const pickFA = (doc: FADocument) => {
+    setForm((f) => ({
+      ...f,
+      title: `${account.name} — ${doc.document_serial}`,
+      expected_value: doc.grand_total != null ? String(doc.grand_total) : "",
+      flowaccount_quotation_no: doc.document_serial,
+      source: "flowaccount",
+    }));
+    setFaMode(false);
+  };
+
+  const handleSave = async () => {
+    if (!form.title.trim()) {
+      toast.error("กรุณาระบุชื่อดีล");
+      return;
+    }
+    setSaving(true);
+    const { error } = await crmDb().from("leads").insert({
+      title: form.title.trim(),
+      account_id: account.id,
+      stage: form.stage,
+      expected_value: form.expected_value ? Number(form.expected_value) : null,
+      expected_close_date: form.expected_close_date || null,
+      source: form.source || null,
+      flowaccount_quotation_no: form.flowaccount_quotation_no || null,
+      owner_id: form.owner_id || ownerId || null,
+      created_by: ownerId,
+    });
+    setSaving(false);
+    if (error) {
+      toast.error("สร้างดีลไม่สำเร็จ: " + error.message);
+      return;
+    }
+    toast.success("สร้างดีลใหม่แล้ว");
+    onCreated();
+  };
+
+  const STAGES = [
+    { value: "new", label: "ใหม่" },
+    { value: "qualified", label: "คัดกรอง" },
+    { value: "proposal", label: "เสนอราคา" },
+    { value: "negotiation", label: "เจรจา" },
+    { value: "closing", label: "ปิดขาย" },
+  ];
+
+  const filteredFA = faDocs.filter(
+    (d) =>
+      !faQ ||
+      (d.document_serial ?? "").toLowerCase().includes(faQ.toLowerCase()) ||
+      (d.contact_name ?? "").toLowerCase().includes(faQ.toLowerCase()),
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>เพิ่มดีลใหม่ — {account.name}</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4 py-2">
+          {/* FA import panel */}
+          {faMode && (
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-medium">เลือกจาก FlowAccount</span>
+                <button
+                  onClick={() => setFaMode(false)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="relative mb-2">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="ค้นหาใบเสนอราคา..."
+                  value={faQ}
+                  onChange={(e) => setFaQ(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                {faLoading ? (
+                  <div className="py-6 text-center text-sm text-muted-foreground">กำลังโหลด...</div>
+                ) : filteredFA.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-muted-foreground">ไม่พบเอกสาร</div>
+                ) : (
+                  filteredFA.map((doc) => (
+                    <button
+                      key={doc.id}
+                      onClick={() => pickFA(doc)}
+                      className="flex w-full items-center gap-2 border-b px-3 py-2.5 text-left hover:bg-muted/50"
+                    >
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                        QT
+                      </span>
+                      <div className="flex-1">
+                        <div className="text-xs font-medium">{doc.document_serial}</div>
+                        <div className="text-[10px] text-muted-foreground">{doc.contact_name ?? "—"}</div>
+                      </div>
+                      <div className="text-xs font-medium">
+                        {doc.grand_total != null
+                          ? `฿${Number(doc.grand_total).toLocaleString()}`
+                          : "—"}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Form */}
+          <div className="flex flex-col gap-4">
+            {/* Import FA button */}
+            {!faMode && (
+              <button
+                onClick={() => {
+                  setFaMode(true);
+                  if (faDocs.length === 0) loadFA();
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-amber-300 py-2.5 text-xs text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+              >
+                <FileDown className="h-4 w-4" />
+                นำเข้าจาก FlowAccount (ใบเสนอราคาของ {account.name})
+              </button>
+            )}
+
+            {/* ชื่อดีล */}
+            <div className="flex flex-col gap-1.5">
+              <Label>ชื่อดีล *</Label>
+              <Input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="ระบุชื่อดีล"
+              />
+            </div>
+
+            {/* Stage + Owner */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label>Stage เริ่มต้น</Label>
+                <Select
+                  value={form.stage}
+                  onValueChange={(v) => setForm({ ...form, stage: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STAGES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Sales เจ้าของดีล</Label>
+                <Select
+                  value={form.owner_id || "none"}
+                  onValueChange={(v) => setForm({ ...form, owner_id: v === "none" ? "" : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— ไม่ระบุ —</SelectItem>
+                    {profiles
+                      .filter((p) => p.is_active !== false)
+                      .map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.full_name ?? p.id.slice(0, 8)}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* มูลค่า + วันปิด */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label>มูลค่าคาดหวัง (บาท)</Label>
+                <Input
+                  type="number"
+                  value={form.expected_value}
+                  onChange={(e) => setForm({ ...form, expected_value: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>วันที่คาดปิดดีล</Label>
+                <Input
+                  type="date"
+                  value={form.expected_close_date}
+                  onChange={(e) => setForm({ ...form, expected_close_date: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* ที่มา + เลข QT */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label>ที่มา</Label>
+                <Select
+                  value={form.source || "none"}
+                  onValueChange={(v) => setForm({ ...form, source: v === "none" ? "" : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="key_account">Key Account</SelectItem>
+                    <SelectItem value="flowaccount">FlowAccount</SelectItem>
+                    <SelectItem value="line">LINE OA</SelectItem>
+                    <SelectItem value="referral">แนะนำ</SelectItem>
+                    <SelectItem value="website">เว็บไซต์</SelectItem>
+                    <SelectItem value="other">อื่นๆ</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>เลขที่ใบเสนอราคา FA</Label>
+                <Input
+                  value={form.flowaccount_quotation_no}
+                  onChange={(e) => setForm({ ...form, flowaccount_quotation_no: e.target.value })}
+                  placeholder="QT-XXXX"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            ยกเลิก
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving && <Plus className="mr-1 h-4 w-4 animate-spin" />}
+            สร้างดีล
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function SummaryCard({
   label,
