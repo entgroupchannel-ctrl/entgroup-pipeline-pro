@@ -970,6 +970,7 @@ function CallDialog({ open, onOpenChange, contactPhone, leadId, ownerId, onLogge
   const [body, setBody] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [saving, setSaving] = useState(false);
+  const [createFollowup, setCreateFollowup] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
@@ -983,9 +984,20 @@ function CallDialog({ open, onOpenChange, contactPhone, leadId, ownerId, onLogge
       done_at: new Date().toISOString(),
       owner_id: ownerId,
     });
+    if (createFollowup && dueAt) {
+      await crmDb().from("activities").insert({
+        lead_id: leadId,
+        type: "call",
+        subject: "Follow-up โทร",
+        done: false,
+        due_at: dueAt,
+        owner_id: ownerId,
+      });
+    }
     setSaving(false);
     setBody("");
     setDueAt("");
+    setCreateFollowup(false);
     onOpenChange(false);
     onLogged();
     toast.success("บันทึกผลการโทรแล้ว");
@@ -993,7 +1005,7 @@ function CallDialog({ open, onOpenChange, contactPhone, leadId, ownerId, onLogge
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>บันทึกการโทร</DialogTitle>
         </DialogHeader>
@@ -1008,11 +1020,22 @@ function CallDialog({ open, onOpenChange, contactPhone, leadId, ownerId, onLogge
           )}
           <div>
             <Label className="text-xs">ผลการโทร / บันทึก</Label>
-            <Textarea rows={3} placeholder="สรุปการสนทนา..." value={body} onChange={(e) => setBody(e.target.value)} />
+            <Textarea rows={5} placeholder="สรุปการสนทนา..." value={body} onChange={(e) => setBody(e.target.value)} />
           </div>
           <div>
             <Label className="text-xs">นัดหมายครั้งต่อไป</Label>
             <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="create-followup"
+              checked={createFollowup}
+              onChange={e => setCreateFollowup(e.target.checked)}
+            />
+            <label htmlFor="create-followup" className="text-xs text-muted-foreground cursor-pointer">
+              สร้างกิจกรรม follow-up อัตโนมัติ
+            </label>
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
