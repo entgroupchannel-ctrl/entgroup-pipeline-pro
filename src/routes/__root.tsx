@@ -12,7 +12,10 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "@/lib/auth-context";
+import { PreferencesProvider } from "@/lib/preferences-context";
 import { Toaster } from "@/components/ui/sonner";
+
+const PREFS_INIT_SCRIPT = `(function(){try{var d=document.documentElement;var f=localStorage.getItem('crm.fontSize');if(f!=='sm'&&f!=='md'&&f!=='lg'&&f!=='xl')f='md';d.dataset.fontSize=f;var t=localStorage.getItem('crm.theme');if(t!=='light'&&t!=='dark')t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')d.classList.add('dark');}catch(e){}})();`;
 
 function NotFoundComponent() {
   return (
