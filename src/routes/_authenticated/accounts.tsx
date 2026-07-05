@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Search, Plus, Building2, Star, Crown, Trash2, Download } from "lucide-react";
-import { RowActions, BulkActionBar, stdEdit, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
+import { Loader2, Search, Plus, Building2, Crown, Trash2, Download } from "lucide-react";
+import { RowActions, BulkActionBar, stdDupe, stdDelete, stdOpen } from "@/components/ui/row-actions";
 import { exportToCsv, accountsToRows } from "@/lib/export-csv";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { formatThaiDate } from "@/lib/format";
