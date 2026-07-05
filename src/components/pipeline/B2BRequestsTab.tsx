@@ -14,6 +14,10 @@ import {
   fetchUnmatchedQuotes, claimQuoteRequest,
   STATUS_LABEL, type B2BQuoteRequest,
 } from "@/lib/b2b-client";
+import { Pagination } from "./LineRequestsTab";
+
+const PAGE_SIZE = 10;
+
 
 const MONTHS_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
 function fmtDate(iso: string) {
