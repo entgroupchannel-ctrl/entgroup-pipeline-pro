@@ -5,24 +5,14 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-async function assertAdmin(userId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await (supabaseAdmin as any)
-    .from("crm.user_profiles")
+async function assertAdmin(supabase: any, userId: string) {
+  const { data, error } = await supabase
+    .schema("crm")
+    .from("user_profiles")
     .select("role")
     .eq("id", userId)
     .maybeSingle();
-  // fallback: try schema chaining
-  if (error) {
-    const { data: d2 } = await (supabaseAdmin as any)
-      .schema("crm")
-      .from("user_profiles")
-      .select("role")
-      .eq("id", userId)
-      .maybeSingle();
-    if ((d2 as any)?.role !== "admin") throw new Error("Forbidden: admin only");
-    return;
-  }
+  if (error) throw new Error(`ตรวจสิทธิ์ไม่สำเร็จ: ${error.message}`);
   if ((data as any)?.role !== "admin") throw new Error("Forbidden: admin only");
 }
 
