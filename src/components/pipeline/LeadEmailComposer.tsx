@@ -38,15 +38,35 @@ interface Props {
   onSent?: () => void;
 }
 
-// ── AI template suggestions ───────────────────────────────────────────────────
+// ── AI templates, tones, lengths ─────────────────────────────────────────────
 
-const QUICK_BRIEFS = [
-  { label: "ติดตามหลังนำเสนอ",    text: "ติดตามผลหลังจากนำเสนอสินค้า/บริการ ถามว่ามีคำถามหรือต้องการข้อมูลเพิ่มเติมไหม" },
-  { label: "ส่งใบเสนอราคา",       text: "แจ้งว่าได้ส่งใบเสนอราคาให้แล้ว ขอให้ตรวจสอบและแจ้งผล" },
-  { label: "ติดตาม Follow Up",     text: "ติดตามสถานะการพิจารณา ถามว่ามีข้อสงสัยหรือต้องการนัดคุยเพิ่มเติมไหม" },
-  { label: "ขอบคุณหลังประชุม",    text: "ขอบคุณสำหรับเวลาในการประชุม สรุปประเด็นสำคัญและ next step" },
-  { label: "แจ้งโปรโมชัน",        text: "แจ้งโปรโมชันพิเศษที่น่าสนใจสำหรับลูกค้า ไม่กดดัน เปิดให้ถาม" },
+const TEMPLATES: {
+  id: string; label: string; icon: any; brief: string;
+}[] = [
+  { id: "meeting",      label: "นัดประชุม",      icon: CalendarClock,     brief: "อยากนัดประชุมกับลูกค้าเพื่อคุยรายละเอียดเพิ่มเติม เสนอ 2-3 ช่วงเวลาที่สะดวก" },
+  { id: "followup",     label: "ติดตามผล",       icon: BellRing,          brief: "ติดตามผลหลังจากคุยครั้งล่าสุด สอบถามความคืบหน้าและมีอะไรให้ช่วยเพิ่มไหม" },
+  { id: "thanks",       label: "ขอบคุณ",         icon: HandHeart,         brief: "ขอบคุณลูกค้าสำหรับเวลาในการประชุม/สั่งซื้อ สรุปประเด็นและ next step" },
+  { id: "quotation",    label: "ส่งใบเสนอราคา",  icon: FileText,          brief: "แจ้งว่าได้ส่งใบเสนอราคาให้แล้ว ขอให้ตรวจสอบและแจ้งผลกลับ" },
+  { id: "introduction", label: "แนะนำตัว",       icon: UserPlus,          brief: "แนะนำตัวและบริษัท ENTGROUP พร้อมเสนอโอกาสความร่วมมือกับลูกค้า" },
+  { id: "reminder",     label: "เตือนอย่างสุภาพ", icon: MessageCircleHeart, brief: "เตือนลูกค้าอย่างสุภาพเรื่องที่ยังค้างอยู่ เช่น เอกสารหรือการตัดสินใจ" },
+  { id: "promotion",    label: "แจ้งโปรโมชัน",   icon: Tag,               brief: "แจ้งโปรโมชันพิเศษที่น่าสนใจสำหรับลูกค้า ไม่กดดัน เปิดให้สอบถาม" },
+  { id: "custom",       label: "กำหนดเอง",       icon: Wand2,             brief: "" },
 ];
+
+const TONE_OPTIONS = [
+  { value: "formal",     label: "สุภาพทางการ" },
+  { value: "friendly",   label: "สุภาพเป็นกันเอง" },
+  { value: "concise",    label: "กระชับตรงประเด็น" },
+  { value: "warm",       label: "อบอุ่นเป็นมิตร" },
+  { value: "persuasive", label: "โน้มน้าวมืออาชีพ" },
+];
+
+const LENGTH_OPTIONS = [
+  { value: "short",  label: "สั้น (2-3 ประโยค)" },
+  { value: "medium", label: "ปานกลาง (4-6 ประโยค)" },
+  { value: "long",   label: "ยาว (7-10 ประโยค)" },
+];
+
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
