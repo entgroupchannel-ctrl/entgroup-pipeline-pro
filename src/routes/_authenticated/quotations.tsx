@@ -293,6 +293,14 @@ function QuotationsPage() {
               </tbody>
             </table>
           </div>
+          <ListPagination
+            page={page}
+            pageSize={pageSize}
+            total={pagedTotal}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 
