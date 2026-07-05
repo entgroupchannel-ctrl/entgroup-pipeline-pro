@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   Mail, Sparkles, Send, Loader2, RotateCcw, Search, Save, Trash2,
-  AlertTriangle, CheckCircle2, Settings,
+  AlertTriangle, CheckCircle2, Settings, Paperclip, X as XIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { crmDb } from "@/lib/crm";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { draftLeadEmail, sendLeadEmail } from "@/lib/lead-email.functions";
 import { loadAISettings, type AISettings } from "@/lib/ai-settings.functions";
@@ -121,6 +122,7 @@ function EmailsPage() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [tplName, setTplName] = useState("");
   const [tplPickerOpen, setTplPickerOpen] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<{id:string;filename:string;mime_type:string;public_url:string;size:number}[]>([]);
 
   const loadTemplates = async () => {
     const { data } = await crmDb().from("email_templates").select("*").eq("is_active", true).order("is_system", { ascending: false }).order("category").order("name");
@@ -133,7 +135,7 @@ function EmailsPage() {
     doLoadAI().then((cfg) => setAiCfg(cfg as AISettings)).catch(() => {});
   }, []);
 
-  const applyTemplate = (t: SavedTemplate) => {
+  const applyTemplate = async (t: SavedTemplate) => {
     const vars: Record<string, string> = {
       "ชื่อผู้รับ":  toName || "คุณลูกค้า",
       "ชื่อบริษัท": selected?.company_name || "",
@@ -146,6 +148,16 @@ function EmailsPage() {
     setBody(applyMergeTags(t.body, vars));
     setStep("preview");
     setTplPickerOpen(false);
+
+    // Load template attachments if any
+    const attachIds = (t as any).attachments ?? [];
+    if (attachIds.length > 0) {
+      const { data } = await crmDb().from("email_attachments").select("id,filename,mime_type,public_url,size").in("id", attachIds);
+      setPendingAttachments((data ?? []) as any[]);
+    } else {
+      setPendingAttachments([]);
+    }
+
     toast.success(`โหลด template: ${t.name}`);
   };
   const deleteTemplate = async (id: string) => {
@@ -235,19 +247,35 @@ function EmailsPage() {
     if (!body.trim())    { toast.error("กรุณาระบุเนื้อหา");      return; }
     setSending(true);
     try {
+      // Convert attachments from URL to base64
+      const attachments: { filename: string; content: string; type: string }[] = [];
+      for (const att of pendingAttachments) {
+        try {
+          const resp = await fetch(att.public_url);
+          const blob = await resp.blob();
+          const b64 = await new Promise<string>((res) => {
+            const reader = new FileReader();
+            reader.onload = () => res((reader.result as string).split(",")[1]);
+            reader.readAsDataURL(blob);
+          });
+          attachments.push({ filename: att.filename, content: b64, type: att.mime_type });
+        } catch { /* skip failed attachment */ }
+      }
+
       await doSend({
         data: {
-          to:         to.trim(),
-          to_name:    toName.trim() || undefined,
-          subject:    subject.trim(),
-          body:       body.trim(),
-          contact_id: selected?.id,
+          to:          to.trim(),
+          to_name:     toName.trim() || undefined,
+          subject:     subject.trim(),
+          body:        body.trim(),
+          contact_id:  selected?.id,
+          attachments: attachments.length > 0 ? attachments : undefined,
         },
       });
-      toast.success("ส่งอีเมลแล้ว ✓", { description: `ถึง ${toName || to}` });
+      toast.success("ส่งอีเมลแล้ว ✓", { description: `ถึง ${toName || to}${attachments.length > 0 ? ` พร้อมไฟล์แนบ ${attachments.length} ไฟล์` : ""}` });
       // reset
       setBrief(""); setSubject(""); setBody(""); setTo(""); setToName("");
-      setSelected(null); setStep("compose");
+      setSelected(null); setStep("compose"); setPendingAttachments([]);
       loadLogs();
     } catch (e: any) {
       toast.error("ส่งอีเมลไม่สำเร็จ", { description: e?.message });
@@ -527,6 +555,25 @@ function EmailsPage() {
                     <span>{subject || "—"}</span>
                   </div>
                 </div>
+
+                {/* Attachment preview */}
+                {pendingAttachments.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
+                      <Paperclip className="h-3.5 w-3.5" /> ไฟล์แนบ ({pendingAttachments.length})
+                    </p>
+                    {pendingAttachments.map((att) => (
+                      <div key={att.id} className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+                        <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <span className="flex-1 truncate text-xs">{att.filename}</span>
+                        <span className="text-[10px] text-muted-foreground">{(att.size/1024/1024).toFixed(1)}MB</span>
+                        <button onClick={() => setPendingAttachments((p) => p.filter((x) => x.id !== att.id))}>
+                          <XIcon className="h-3.5 w-3.5 text-muted-foreground hover:text-red-500" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <Button onClick={handleSend} disabled={sending || !to || !subject || !body} className="w-full">
                   {sending

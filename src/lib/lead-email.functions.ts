@@ -150,6 +150,11 @@ export const sendLeadEmail = createServerFn({ method: "POST" })
       body:          z.string().min(1, "กรุณาระบุเนื้อหา"),
       lead_id:       z.string().uuid().optional(),
       contact_id:    z.string().uuid().optional(),
+      attachments:   z.array(z.object({
+        filename: z.string(),
+        content:  z.string(), // base64
+        type:     z.string(),
+      })).optional(),
     }).parse(input)
   )
   .handler(async ({ data, context }) => {
@@ -176,6 +181,15 @@ export const sendLeadEmail = createServerFn({ method: "POST" })
       text: data.body,
     };
     if (cfg.replyTo) payload.reply_to = cfg.replyTo;
+
+    // Add attachments to Resend payload (base64 encoded)
+    if (data.attachments && data.attachments.length > 0) {
+      payload.attachments = data.attachments.map((a) => ({
+        filename: a.filename,
+        content:  a.content,
+        type:     a.type,
+      }));
+    }
 
     const resp = await fetch("https://api.resend.com/emails", {
       method: "POST",

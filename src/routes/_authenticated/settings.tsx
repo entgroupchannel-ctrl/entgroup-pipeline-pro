@@ -21,6 +21,7 @@ import { LineOATab } from "@/components/settings/LineOATab";
 import { AISettingsTab } from "@/components/settings/AISettingsTab";
 import { PermissionsTab } from "@/components/settings/PermissionsTab";
 import { EmailTemplatesTab } from "@/components/settings/EmailTemplatesTab";
+import { MediaLibraryTab } from "@/components/settings/MediaLibraryTab";
 import { deactivateCrmUser } from "@/lib/invite-user.functions";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
@@ -51,6 +52,7 @@ function SettingsPage() {
           {isAdmin && <TabsTrigger value="ai">AI ✦</TabsTrigger>}
           {isAdmin && <TabsTrigger value="permissions">สิทธิ์การใช้งาน</TabsTrigger>}
           <TabsTrigger value="email_templates">Email Templates</TabsTrigger>
+          {isAdmin && <TabsTrigger value="media">Media Library</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="mt-6 max-w-lg">
@@ -97,6 +99,11 @@ function SettingsPage() {
         <TabsContent value="email_templates" className="mt-6">
           <EmailTemplatesTab />
         </TabsContent>
+        {isAdmin && (
+          <TabsContent value="media" className="mt-6">
+            <MediaLibraryTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

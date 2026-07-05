@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Edit2, Trash2, Loader2, Save, X, Globe, User, Copy } from "lucide-react";
+import { Plus, Edit2, Trash2, Loader2, Save, X, Globe, User, Copy, Paperclip, CheckSquare, Square } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,8 +18,19 @@ interface EmailTemplate {
   body: string;
   is_system: boolean;
   is_active: boolean;
+  attachments: string[]; // array of email_attachment IDs
   created_by: string | null;
   created_at: string;
+}
+
+interface MediaFile {
+  id: string;
+  name: string;
+  filename: string;
+  size: number;
+  mime_type: string;
+  public_url: string;
+  category: string;
 }
 
 const CATEGORIES = ["แนะนำองค์กร", "ใบเสนอราคา", "Follow Up", "สินค้าและบริการ", "โปรโมชัน", "ทั่วไป"];
@@ -51,6 +62,19 @@ function TemplateForm({
   const [body, setBody] = useState(initial?.body ?? "");
   const [isSystem, setIsSystem] = useState(initial?.is_system ?? false);
   const [saving, setSaving] = useState(false);
+  const [selectedAttachments, setSelectedAttachments] = useState<string[]>(initial?.attachments ?? []);
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const [showAttachPicker, setShowAttachPicker] = useState(false);
+
+  useEffect(() => {
+    crmDb().from("email_attachments").select("id,name,filename,size,mime_type,public_url,category").order("category").then(({ data }) => {
+      setMediaFiles((data ?? []) as MediaFile[]);
+    });
+  }, []);
+
+  const toggleAttachment = (id: string) => {
+    setSelectedAttachments((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  };
 
   const insertTag = (tag: string) => {
     setBody((prev) => prev + tag);
@@ -61,7 +85,7 @@ function TemplateForm({
     if (!subject.trim()) { toast.error("กรุณาระบุหัวข้ออีเมล"); return; }
     if (!body.trim()) { toast.error("กรุณาระบุเนื้อหา"); return; }
     setSaving(true);
-    const payload = { name: name.trim(), category, subject: subject.trim(), body: body.trim(), is_system: isAdmin ? isSystem : false };
+    const payload = { name: name.trim(), category, subject: subject.trim(), body: body.trim(), is_system: isAdmin ? isSystem : false, attachments: selectedAttachments };
     let error;
     if (initial?.id) {
       ({ error } = await crmDb().from("email_templates").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", initial.id));
@@ -125,6 +149,39 @@ function TemplateForm({
         </div>
         <Textarea rows={10} placeholder="เนื้อหาอีเมล..." value={body} onChange={(e) => setBody(e.target.value)} className="font-mono text-xs" />
         <p className="mt-1 text-[10px] text-muted-foreground">คลิก tag ด้านบนเพื่อแทรก merge tag — ระบบจะแทนค่าอัตโนมัติเมื่อส่ง</p>
+      </div>
+
+      {/* Attachment picker */}
+      <div>
+        <button type="button" onClick={() => setShowAttachPicker((v) => !v)}
+          className="flex items-center gap-1.5 text-xs text-primary hover:underline">
+          <Paperclip className="h-3.5 w-3.5" />
+          แนบไฟล์ ({selectedAttachments.length} ไฟล์)
+        </button>
+        {showAttachPicker && (
+          <div className="mt-2 rounded-xl border bg-card overflow-hidden max-h-48 overflow-y-auto">
+            {mediaFiles.length === 0 ? (
+              <p className="p-4 text-xs text-muted-foreground">ยังไม่มีไฟล์ — อัปโหลดที่ Settings &gt; Media Library</p>
+            ) : (
+              <ul className="divide-y">
+                {mediaFiles.map((f) => {
+                  const checked = selectedAttachments.includes(f.id);
+                  return (
+                    <li key={f.id} onClick={() => toggleAttachment(f.id)}
+                      className={`flex items-center gap-2.5 cursor-pointer px-3 py-2.5 hover:bg-muted/40 transition-colors ${checked ? "bg-primary/5" : ""}`}>
+                      {checked ? <CheckSquare className="h-4 w-4 shrink-0 text-primary" /> : <Square className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium truncate">{f.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{f.filename} · {(f.size/1024/1024).toFixed(1)}MB</p>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground shrink-0">{f.category}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end gap-2 border-t pt-3">
