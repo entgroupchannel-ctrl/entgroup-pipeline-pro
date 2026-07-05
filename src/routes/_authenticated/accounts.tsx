@@ -167,6 +167,16 @@ function AccountsPage() {
     });
   }, [accounts, q, industryFilter]);
 
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalPages,
+    total: pagedTotal,
+    paged: pageItems,
+  } = usePagination(filtered ?? [], 25);
+
   const handleExport = () => {
     if (!isAdmin) { toast.error("ไม่มีสิทธิ์ Export — เฉพาะ Admin เท่านั้น"); return; }
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
