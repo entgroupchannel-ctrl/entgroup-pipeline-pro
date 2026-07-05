@@ -275,7 +275,7 @@ function QuotationsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtered.map((r) => (
+                {pageItems.map((r) => (
                   <QuotationRow
                     key={r.id}
                     row={r}
