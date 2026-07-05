@@ -414,7 +414,61 @@ function KeyAccountsPage() {
             );
           })}
         </div>
+
+        {accTotalPages > 1 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "8px 12px",
+              borderTop: "0.5px solid var(--border)",
+              fontSize: 11,
+              color: "var(--text-muted)",
+              gap: 8,
+            }}
+          >
+            <span>
+              {(accPageSafe - 1) * ACC_PAGE_SIZE + 1}–
+              {Math.min(accPageSafe * ACC_PAGE_SIZE, filteredAccounts.length)} / {filteredAccounts.length}
+            </span>
+            <div style={{ display: "flex", gap: 4 }}>
+              <button
+                onClick={() => setAccPage((p) => Math.max(1, p - 1))}
+                disabled={accPageSafe <= 1}
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 6,
+                  border: "0.5px solid var(--border)",
+                  background: "transparent",
+                  cursor: accPageSafe <= 1 ? "not-allowed" : "pointer",
+                  opacity: accPageSafe <= 1 ? 0.4 : 1,
+                }}
+              >
+                ก่อนหน้า
+              </button>
+              <span style={{ padding: "3px 8px" }}>
+                {accPageSafe} / {accTotalPages}
+              </span>
+              <button
+                onClick={() => setAccPage((p) => Math.min(accTotalPages, p + 1))}
+                disabled={accPageSafe >= accTotalPages}
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 6,
+                  border: "0.5px solid var(--border)",
+                  background: "transparent",
+                  cursor: accPageSafe >= accTotalPages ? "not-allowed" : "pointer",
+                  opacity: accPageSafe >= accTotalPages ? 0.4 : 1,
+                }}
+              >
+                ถัดไป
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
 
       {/* RIGHT PANEL */}
       {selected ? (
