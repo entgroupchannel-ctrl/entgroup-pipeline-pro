@@ -466,6 +466,8 @@ function LeadsPage() {
         คลิกแถวเพื่อดูรายละเอียดดีล
       </p>
 
+      </div>
+
       <NewLeadDialog open={newOpen} onOpenChange={setNewOpen} onCreated={load} />
     </div>
   );
