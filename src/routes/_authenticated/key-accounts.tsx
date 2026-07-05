@@ -44,9 +44,24 @@ interface KeyAccount {
   owner_id: string | null;
   is_key_account: boolean;
   owner?: { full_name: string | null } | null;
-  leads?: { id: string; expected_value: number | null }[];
+  leads?: {
+    id: string;
+    title: string;
+    stage: string;
+    expected_value: number | null;
+    created_at: string;
+    quotations: {
+      id: string;
+      quotation_no: string | null;
+      title: string | null;
+      grand_total: number | null;
+      status: string | null;
+      flowaccount_quotation_url: string | null;
+    }[];
+  }[];
   target?: KeyAccountTarget[];
 }
+
 
 interface ActivityRow {
   lead_id: string;
