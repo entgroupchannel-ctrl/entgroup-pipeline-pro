@@ -268,6 +268,19 @@ function KpiCard({ label, value, sub, icon, tone }: { label: string; value: stri
   );
 }
 
+function ChartModeBtn({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition ${active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
 function ActivityIcon({ type, done }: { type: string; done: boolean }) {
   const Icon = type === "call" ? Phone : type === "email" ? Mail : type === "line" ? MessageCircle : type === "note" ? StickyNote : CheckCircle2;
   return (
