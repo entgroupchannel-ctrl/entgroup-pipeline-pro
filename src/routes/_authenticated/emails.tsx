@@ -1,11 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   Mail, Sparkles, Send, Loader2, RotateCcw, Search, Save, Trash2,
   AlertTriangle, CheckCircle2, Settings, Paperclip, X as XIcon,
-  Users, Briefcase, ChevronDown,
+  Users, Briefcase, ChevronDown, Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
