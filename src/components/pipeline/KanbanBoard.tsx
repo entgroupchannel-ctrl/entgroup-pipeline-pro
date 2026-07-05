@@ -28,6 +28,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { RefreshCw } from "lucide-react";
 import { useLineRealtime } from "@/hooks/useLineRealtime";
 
+import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
 import type { Activity } from "@/lib/activities";
 
 interface LeadWithRelations extends Lead {
@@ -37,11 +38,12 @@ interface LeadWithRelations extends Lead {
 }
 
 interface KanbanBoardProps {
+  onQuickLog?: (leadId: string, type: ActivityKind) => void;
   sourceFilter?: "all" | "line";
   showClaimButton?: boolean;
 }
 
-export function KanbanBoard({ sourceFilter = "all", showClaimButton = false }: KanbanBoardProps = {}) {
+export function KanbanBoard({ sourceFilter = "all", showClaimButton = false, onQuickLog }: KanbanBoardProps = {}) {
   const { user } = useAuth();
   const [leads, setLeads] = useState<LeadWithRelations[]>([]);
   const [linePreviews, setLinePreviews] = useState<Record<string, string>>({});
@@ -345,6 +347,7 @@ export function KanbanBoard({ sourceFilter = "all", showClaimButton = false }: K
                 currentUserId={user?.id}
                 onClaim={loadLeads}
                 linePreviews={sourceFilter === "line" ? linePreviews : undefined}
+                onQuickLog={onQuickLog}
               />
             ))}
           </div>
@@ -428,6 +431,7 @@ function Column({
   currentUserId,
   onClaim,
   linePreviews,
+  onQuickLog,
 }: {
   stage: LeadStage;
   leads: LeadWithRelations[];
@@ -443,6 +447,7 @@ function Column({
   currentUserId?: string;
   onClaim?: () => void;
   linePreviews?: Record<string, string>;
+  onQuickLog?: (leadId: string, type: ActivityKind) => void;
 }) {
 
   const { setNodeRef, isOver } = useDroppable({ id: stage });
@@ -532,6 +537,7 @@ function Column({
                   currentUserId={currentUserId}
                   onClaim={onClaim}
                   linePreview={linePreviews?.[l.id]}
+                  onQuickLog={onQuickLog}
                 />
 
               </div>
