@@ -191,7 +191,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filtered.map((req) => {
+                  {pageItems.map((req) => {
                     const isExpanded = expandedItems.has(req.id);
                     const firstItem = req.items?.[0];
                     const moreCount = (req.items?.length ?? 0) - 1;
