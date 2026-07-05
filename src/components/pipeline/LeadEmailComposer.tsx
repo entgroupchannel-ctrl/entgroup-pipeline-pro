@@ -89,6 +89,9 @@ export function LeadEmailComposer({
   const [drafting, setDrafting]   = useState(false);
   const [sending,  setSending]    = useState(false);
   const [showCtx,  setShowCtx]    = useState(false);
+  const [template, setTemplate]   = useState<string>("followup");
+  const [tone,     setTone]       = useState<string>("friendly");
+  const [length,   setLength]     = useState<string>("medium");
 
   const stageLabel = stage ? (STAGE_LABEL_TH[stage as LeadStage] ?? stage) : undefined;
 
@@ -96,11 +99,18 @@ export function LeadEmailComposer({
     setBrief(""); setSubject(""); setBody("");
     setToEmail(contactEmail ?? ""); setToName(contactName ?? "");
     setStep("compose"); setShowCtx(false);
+    setTemplate("followup"); setTone("friendly"); setLength("medium");
   };
 
   const handleOpenChange = (o: boolean) => {
     if (!o) reset();
     onOpenChange(o);
+  };
+
+  const pickTemplate = (id: string) => {
+    setTemplate(id);
+    const t = TEMPLATES.find((x) => x.id === id);
+    if (t && t.brief && !brief.trim()) setBrief(t.brief);
   };
 
   const handleDraft = async () => {
@@ -115,6 +125,9 @@ export function LeadEmailComposer({
           company_name: companyName,
           stage:        stageLabel,
           sender_name:  profile?.full_name || user?.email,
+          tone,
+          length,
+          template,
         },
       }) as { subject: string; body: string };
       setSubject(result.subject);
@@ -126,6 +139,7 @@ export function LeadEmailComposer({
       setDrafting(false);
     }
   };
+
 
   const handleSend = async () => {
     if (!toEmail.trim()) { toast.error("กรุณาระบุอีเมลผู้รับ"); return; }
