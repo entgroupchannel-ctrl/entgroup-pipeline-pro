@@ -316,67 +316,57 @@ function QuotationsPage() {
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
 function QuotationRow({
-  row, selected, onSelect, leadTitle, accountName, ownerName, onEdit, onStatusChange, onDelete, onDuplicate,
+  row, selected, onSelect, accountName, onEdit, onStatusChange, onDelete, onDuplicate,
 }: {
   row: Quotation;
   selected?: boolean;
   onSelect?: () => void;
-  leadTitle?: string;
   accountName?: string;
-  ownerName?: string;
   onEdit: () => void;
   onStatusChange: (s: QuotationStatus) => void;
   onDelete?: () => void;
   onDuplicate?: () => void;
 }) {
   const [statusOpen, setStatusOpen] = useState(false);
+  const expired = row.valid_until && new Date(row.valid_until).getTime() < Date.now();
 
   return (
     <tr
       className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected ? "bg-primary/5" : ""}`}
       onClick={(e) => {
-        // ไม่ trigger ถ้าคลิก checkbox, RowActions, หรือ status dropdown
         const target = e.target as HTMLElement;
         if (target.closest('[role="checkbox"]') || target.closest('[data-radix-collection-item]') || target.closest('button') || target.closest('[role="menuitem"]')) return;
         onEdit();
       }}
     >
       <td className="px-3 py-3"><Checkbox checked={!!selected} onCheckedChange={() => onSelect?.()} /></td>
-      <td className="px-4 py-3">
-        <span className="font-mono text-xs font-semibold text-muted-foreground">
-          {row.quotation_no ?? "—"}
-        </span>
-      </td>
-      <td className="px-4 py-3 max-w-[200px]">
-        <div className="truncate font-medium">{row.title}</div>
-        {accountName && <div className="truncate text-xs text-muted-foreground">{accountName}</div>}
+      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+        {formatThaiDate(row.issued_date)}
       </td>
       <td className="px-4 py-3">
-        {row.lead_id && leadTitle ? (
-          <Link
-            to="/leads/$leadId"
-            params={{ leadId: row.lead_id }}
-            className="max-w-[140px] truncate block text-xs text-primary hover:underline"
-          >
-            {leadTitle}
-          </Link>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
+        <div className="flex items-center gap-2">
+          <span
+            className={`shrink-0 h-1.5 w-1.5 rounded-full ${
+              row.source === "flowaccount" ? "bg-amber-500" : "bg-sky-500"
+            }`}
+            title={row.source === "flowaccount" ? "FlowAccount" : "CRM"}
+          />
+          <span className="font-mono text-xs font-semibold text-muted-foreground">
+            {row.quotation_no ?? "—"}
+          </span>
+        </div>
+      </td>
+      <td className="px-4 py-3 max-w-[420px]">
+        <div className="truncate font-medium">{accountName ?? "—"}</div>
+        {row.title && row.title !== accountName && (
+          <div className="truncate text-xs text-muted-foreground">{row.title}</div>
         )}
       </td>
-      <td className="px-4 py-3 text-right font-medium">
+      <td className="px-4 py-3 text-right font-medium whitespace-nowrap">
         {formatBaht(row.grand_total)}
-      </td>
-      <td className="px-4 py-3 text-center">
-        <span
-          className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-            row.source === "flowaccount"
-              ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-              : "bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
-          }`}
-        >
-          {row.source === "flowaccount" ? "FA" : "CRM"}
-        </span>
+        {expired && (
+          <div className="text-[10px] text-red-500 font-normal">หมดอายุ</div>
+        )}
       </td>
       <td className="px-4 py-3 text-center">
         <div className="relative inline-block">
@@ -390,7 +380,7 @@ function QuotationRow({
           {statusOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setStatusOpen(false)} />
-              <div className="absolute left-0 top-full z-20 mt-1 rounded-lg border bg-popover py-1 shadow-md min-w-[120px]">
+              <div className="absolute right-0 top-full z-20 mt-1 rounded-lg border bg-popover py-1 shadow-md min-w-[120px]">
                 {(Object.keys(STATUS_LABEL) as QuotationStatus[]).map((s) => (
                   <button
                     key={s}
@@ -405,23 +395,6 @@ function QuotationRow({
             </>
           )}
         </div>
-      </td>
-      <td className="px-4 py-3 text-xs text-muted-foreground">
-        {formatThaiDate(row.issued_date)}
-      </td>
-      <td className="px-4 py-3 text-xs">
-        {row.valid_until ? (
-          <span className={
-            new Date(row.valid_until).getTime() < Date.now()
-              ? "font-medium text-red-600"
-              : "text-muted-foreground"
-          }>
-            {formatThaiDate(row.valid_until)}
-          </span>
-        ) : <span className="text-muted-foreground">—</span>}
-      </td>
-      <td className="px-4 py-3 text-xs text-muted-foreground">
-        {ownerName ?? "—"}
       </td>
       <td className="px-2 py-3">
         <RowActions actions={[
