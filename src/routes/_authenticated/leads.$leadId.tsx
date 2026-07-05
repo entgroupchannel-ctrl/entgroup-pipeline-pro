@@ -61,6 +61,13 @@ function LeadDetailPage() {
   const [lostConfirmOpen, setLostConfirmOpen] = useState(false);
   const [lostReason, setLostReason] = useState("");
 
+  const [keyOwners, setKeyOwners] = useState<any[]>([]);
+  const [keyOwnerOpen, setKeyOwnerOpen] = useState(false);
+  const [keyOwnerUser, setKeyOwnerUser] = useState("");
+  const [keyOwnerContact, setKeyOwnerContact] = useState("");
+  const [keyOwnerNote, setKeyOwnerNote] = useState("");
+  const [contacts, setContacts] = useState<any[]>([]);
+
   const [form, setForm] = useState({
     title: "",
     expected_value: "",
