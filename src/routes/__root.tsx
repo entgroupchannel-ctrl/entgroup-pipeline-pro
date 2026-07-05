@@ -106,6 +106,7 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="th">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: PREFS_INIT_SCRIPT }} />
       </head>
       <body>
         {children}
@@ -120,10 +121,12 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Outlet />
-        <Toaster richColors position="top-right" />
-      </AuthProvider>
+      <PreferencesProvider>
+        <AuthProvider>
+          <Outlet />
+          <Toaster richColors position="top-right" />
+        </AuthProvider>
+      </PreferencesProvider>
     </QueryClientProvider>
   );
 }
