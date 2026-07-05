@@ -1,31 +1,34 @@
-## สาเหตุ
+## ปัญหา
+หน้า `/key-accounts` โหลดไม่สำเร็จ เพราะ database schema ยังไม่มี:
+- คอลัมน์ `is_key_account` ใน `crm.accounts`
+- ตาราง `crm.key_account_targets`
 
-`assertAdmin` ใน `src/lib/flowaccount.functions.ts` ใช้ `supabaseAdmin` (service_role key) เพื่ออ่าน `crm.user_profiles`:
-- บรรทัด 11 เรียก `.from("crm.user_profiles")` → PostgREST error (ไม่รองรับชื่อ schema ในสตริง)
-- fallback บรรทัด 17-23 ใช้ `.schema("crm")` แต่ Lovable Cloud อาจ inject secret key รูปแบบใหม่ (`sb_secret_*`) ที่ทำให้ Data API/PostgREST reads ล้มเหลว → `d2` เป็น null → throw "Forbidden: admin only"
+โค้ดหน้า route ถูกสร้างไว้แล้ว แต่ query อ้างถึงสิ่งที่ยังไม่มีจริง → PostgREST return error → toast "โหลด Key Accounts ไม่สำเร็จ"
 
-ยืนยันจาก DB: user `therdpoom@entgroup.co.th` มี `role='admin'` จริง
+## แผนแก้
 
-## แผนแก้ (กระทบเฉพาะ assertAdmin)
+### 1. Migration (schema `crm`)
+```sql
+ALTER TABLE crm.accounts
+  ADD COLUMN IF NOT EXISTS is_key_account boolean NOT NULL DEFAULT false;
 
-เปลี่ยน `assertAdmin` ให้ใช้ **`context.supabase`** (authenticated user client จาก `requireSupabaseAuth`) แทน `supabaseAdmin`:
+CREATE TABLE IF NOT EXISTS crm.key_account_targets (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id uuid NOT NULL UNIQUE REFERENCES crm.accounts(id) ON DELETE CASCADE,
+  visit_target int NOT NULL DEFAULT 1,
+  call_target  int NOT NULL DEFAULT 2,
+  line_target  int NOT NULL DEFAULT 3,
+  email_target int NOT NULL DEFAULT 1,
+  quote_target int NOT NULL DEFAULT 1,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 
-```ts
-async function assertAdmin(supabase: any, userId: string) {
-  const { data } = await supabase
-    .schema("crm")
-    .from("user_profiles")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle();
-  if (data?.role !== "admin") throw new Error("Forbidden: admin only");
-}
+-- GRANT + RLS ตาม pattern เดียวกับตาราง crm อื่น ๆ (authenticated เต็มสิทธิ์, service_role ALL)
 ```
 
-ทุก call site (`testFAConnection`, `loadFASettings`, และอื่นๆ ใน flowaccount.functions.ts) เปลี่ยนจาก `assertAdmin(context.userId)` → `assertAdmin(context.supabase, context.userId)`
+### 2. ไม่แตะโค้ดหน้า
+หลัง migration ผ่าน + types regenerate หน้า `/key-accounts` จะโหลดได้ทันที (ตอนนี้ยังไม่มีบริษัทที่ `is_key_account=true` ดังนั้นรายการจะว่าง — เป็นพฤติกรรมที่ถูกต้อง ผู้ใช้ต้องไป toggle จากหน้า accounts เอง)
 
-## ทำไมวิธีนี้ปลอดภัย + ไม่กระทบอื่น
-- RLS + grants บน schema `crm` เปิดให้ `authenticated` แล้ว (จาก migration ล่าสุด)
-- ผู้ใช้อ่านแถวตัวเองได้เสมอ, ตรวจ role='admin' ทำงานถูกต้อง
-- ไม่แตะ `supabaseAdmin` client, ไม่กระทบ server function อื่น
-- แก้ไฟล์เดียว: `src/lib/flowaccount.functions.ts`
+## หมายเหตุ
+ยังไม่มี UI สำหรับ toggle `is_key_account` หรือแก้ target — ถ้าต้องการให้เพิ่มด้วย บอกได้ (ต้องแก้ `accounts.tsx` เพิ่ม)
