@@ -672,6 +672,24 @@ function LeadDetailPage() {
           </div>
         </aside>
       </div>
+
+      <CallDialog
+        open={callOpen}
+        onOpenChange={setCallOpen}
+        contactPhone={contact?.phone ?? null}
+        leadId={lead.id}
+        ownerId={user?.id ?? null}
+        onLogged={load}
+      />
+
+      <LineDialog
+        open={lineOpen}
+        onOpenChange={setLineOpen}
+        contactLineId={contact?.line_id ?? null}
+        leadId={lead.id}
+        ownerId={user?.id ?? null}
+        onLogged={load}
+      />
     </div>
   );
 }
