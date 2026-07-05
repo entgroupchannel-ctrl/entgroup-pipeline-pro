@@ -73,8 +73,17 @@ export function AccountEmailDialog({ open, onOpenChange, accountId, accountName 
       crmDb().from("email_attachments").select("id,name,filename,size,mime_type,public_url").order("created_at", { ascending: false }),
     ]).then(([tpl, ct, med]) => {
       setTemplates((tpl.data ?? []) as EmailTemplate[]);
-      setContacts((ct.data ?? []) as Contact[]);
+      const loadedContacts = (ct.data ?? []) as Contact[];
+      setContacts(loadedContacts);
       setMediaFiles((med.data ?? []) as MediaFile[]);
+      // Auto-select first contact that has email
+      const firstWithEmail = loadedContacts.find((c) => c.email);
+      if (firstWithEmail) {
+        setSelectedContact(firstWithEmail);
+        setToEmail(firstWithEmail.email!);
+        setToName(firstWithEmail.name);
+        setTab("compose");
+      }
     });
   }, [open, accountId]);
 
@@ -252,11 +261,12 @@ export function AccountEmailDialog({ open, onOpenChange, accountId, accountName 
                           <SelectItem value="__manual__">— ระบุเอง —</SelectItem>
                           {contacts.map((c) => (
                             <SelectItem key={c.id} value={c.id} disabled={!c.email}>
-                              <span className="font-medium">{c.name}</span>
-                              {c.position && <span className="text-muted-foreground ml-1 text-xs">· {c.position}</span>}
-                              {c.email
-                                ? <span className="text-primary/70 ml-1 text-xs">· {c.email}</span>
-                                : <span className="text-amber-600 ml-1 text-xs">· ไม่มีอีเมล</span>}
+                              <div className="flex flex-col py-0.5">
+                                <span className="font-medium text-sm">{c.name}{c.position ? ` · ${c.position}` : ""}</span>
+                                {c.email
+                                  ? <span className="text-xs text-primary/70">{c.email}</span>
+                                  : <span className="text-xs text-amber-600">ไม่มีอีเมล</span>}
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -357,7 +367,13 @@ export function AccountEmailDialog({ open, onOpenChange, accountId, accountName 
             {/* Footer */}
             <div className="border-t px-4 py-3 shrink-0 flex items-center justify-between gap-3 bg-muted/5">
               <p className="text-xs text-muted-foreground truncate flex-1">
-                {emailToSend ? `→ ${toName || selectedContact?.name || ""} <${emailToSend}>` : "ยังไม่ได้เลือกผู้รับ"}
+                {emailToSend ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                    ✓ {toName || selectedContact?.name || "ผู้รับ"} · {emailToSend}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">ยังไม่ได้เลือกผู้รับ</span>
+                )}
               </p>
               <div className="flex gap-2 shrink-0">
                 {tab === "tpl" && (
