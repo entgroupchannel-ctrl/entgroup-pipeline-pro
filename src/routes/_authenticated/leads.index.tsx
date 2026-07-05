@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/auth-context";
 import { NewLeadDialog } from "@/components/pipeline/NewLeadDialog";
 import { RowActions, BulkActionBar, stdOpen, stdDupe, stdDelete } from "@/components/ui/row-actions";
 import { exportToCsv, leadsToRows } from "@/lib/export-csv";
+import { ListPagination, usePagination } from "@/components/list-pagination";
 
 // ── Types & constants ─────────────────────────────────────────────────────────
 
