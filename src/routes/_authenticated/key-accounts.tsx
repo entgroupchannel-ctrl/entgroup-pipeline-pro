@@ -870,14 +870,14 @@ function DealsTab({ leads, onAddDeal }: { leads: any[]; onAddDeal: () => void })
       </div>
 
       {/* Empty state */}
-      {leads.length === 0 && (
+      {sortedLeads.length === 0 && (
         <div className="text-center py-10 text-sm text-muted-foreground">
           ยังไม่มีดีลสำหรับ Account นี้
         </div>
       )}
 
       {/* Deal cards */}
-      {leads.map((lead) => {
+      {pagedLeads.map((lead) => {
         const isOpen = expanded.has(lead.id);
         const qts: any[] = lead.quotations ?? [];
         const leadQtTotal = qts.reduce(
