@@ -320,7 +320,15 @@ function QuotationRow({
   const [statusOpen, setStatusOpen] = useState(false);
 
   return (
-    <tr className={`hover:bg-muted/30 transition-colors ${selected ? "bg-primary/5" : ""}`}>
+    <tr
+      className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected ? "bg-primary/5" : ""}`}
+      onClick={(e) => {
+        // ไม่ trigger ถ้าคลิก checkbox, RowActions, หรือ status dropdown
+        const target = e.target as HTMLElement;
+        if (target.closest('[role="checkbox"]') || target.closest('[data-radix-collection-item]') || target.closest('button') || target.closest('[role="menuitem"]')) return;
+        onEdit();
+      }}
+    >
       <td className="px-3 py-3"><Checkbox checked={!!selected} onCheckedChange={() => onSelect?.()} /></td>
       <td className="px-4 py-3">
         <span className="font-mono text-xs font-semibold text-muted-foreground">
