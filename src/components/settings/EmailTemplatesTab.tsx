@@ -67,7 +67,7 @@ function TemplateForm({
   const [showAttachPicker, setShowAttachPicker] = useState(false);
 
   useEffect(() => {
-    crmDb().from("email_attachments").select("id,name,filename,size,mime_type,public_url,category").order("category").then(({ data }) => {
+    crmDb().from("email_attachments").select("id,name,filename,size,mime_type,public_url,category").order("category").then(({ data }: { data: MediaFile[] | null }) => {
       setMediaFiles((data ?? []) as MediaFile[]);
     });
   }, []);
