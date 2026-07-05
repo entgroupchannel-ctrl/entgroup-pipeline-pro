@@ -299,7 +299,17 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                 </tbody>
               </table>
             </div>
+            {totalPages > 1 && (
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                total={filtered.length}
+                pageSize={PAGE_SIZE}
+                onChange={setPage}
+              />
+            )}
           </div>
+
         )}
       </div>
 
