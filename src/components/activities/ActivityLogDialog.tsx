@@ -4,7 +4,7 @@
  * No DB migration needed — works with existing schema
  */
 import { useEffect, useState } from "react";
-import { Loader2, Phone, Mail, Users, FileText, MessageCircle, ThumbsUp, ThumbsDown, Minus } from "lucide-react";
+import { Loader2, Phone, Mail, Users, FileText, MessageCircle, ThumbsUp, ThumbsDown, Minus, CheckCircle2, XCircle, Voicemail, Clock, Eye, EyeOff, Bell, AlertTriangle, Target } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -190,9 +190,9 @@ function CallFields({ log, set }: { log: CallLog; set: (p: Partial<CallLog>) => 
         <Select value={log.answered} onValueChange={v => set({ answered: v as CallLog["answered"] })}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="yes">รับสาย ✅</SelectItem>
-            <SelectItem value="no">ไม่รับสาย ❌</SelectItem>
-            <SelectItem value="voicemail">ฝากข้อความ 📱</SelectItem>
+            <SelectItem value="yes"><span style={{display:"flex",alignItems:"center",gap:6}}><CheckCircle2 size={12} style={{color:"#3B6D11"}}/>รับสาย</span></SelectItem>
+            <SelectItem value="no"><span style={{display:"flex",alignItems:"center",gap:6}}><XCircle size={12} style={{color:"#E24B4A"}}/>ไม่รับสาย</span></SelectItem>
+            <SelectItem value="voicemail"><span style={{display:"flex",alignItems:"center",gap:6}}><Voicemail size={12} style={{color:"#BA7517"}}/>ฝากข้อความ</span></SelectItem>
           </SelectContent>
         </Select>
       </Field>
@@ -241,9 +241,9 @@ function LineFields({ log, set }: { log: LineLog; set: (p: Partial<LineLog>) => 
         <Select value={log.read_status} onValueChange={v => set({ read_status: v as LineLog["read_status"] })}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="read">อ่านแล้ว / ตอบแล้ว ✅</SelectItem>
-            <SelectItem value="replied">ลูกค้าตอบกลับ 💬</SelectItem>
-            <SelectItem value="unread">ยังไม่ได้อ่าน ⏳</SelectItem>
+            <SelectItem value="read"><span style={{display:"flex",alignItems:"center",gap:6}}><CheckCircle2 size={12} style={{color:"#3B6D11"}}/>อ่านแล้ว / ตอบแล้ว</span></SelectItem>
+            <SelectItem value="replied"><span style={{display:"flex",alignItems:"center",gap:6}}><MessageCircle size={12} style={{color:"#185FA5"}}/>ลูกค้าตอบกลับ</span></SelectItem>
+            <SelectItem value="unread"><span style={{display:"flex",alignItems:"center",gap:6}}><Clock size={12} style={{color:"#BA7517"}}/>ยังไม่ได้อ่าน</span></SelectItem>
           </SelectContent>
         </Select>
       </Field>
@@ -262,8 +262,8 @@ function EmailFields({ log, set }: { log: EmailLog; set: (p: Partial<EmailLog>) 
           <Select value={log.opened} onValueChange={v => set({ opened: v as EmailLog["opened"] })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="yes">เปิดอ่านแล้ว ✅</SelectItem>
-              <SelectItem value="no">ยังไม่เปิด ❌</SelectItem>
+              <SelectItem value="yes"><span style={{display:"flex",alignItems:"center",gap:6}}><Eye size={12} style={{color:"#3B6D11"}}/>เปิดอ่านแล้ว</span></SelectItem>
+              <SelectItem value="no"><span style={{display:"flex",alignItems:"center",gap:6}}><EyeOff size={12} style={{color:"#E24B4A"}}/>ยังไม่เปิด</span></SelectItem>
               <SelectItem value="unknown">ไม่ทราบ</SelectItem>
             </SelectContent>
           </Select>
@@ -272,8 +272,8 @@ function EmailFields({ log, set }: { log: EmailLog; set: (p: Partial<EmailLog>) 
           <Select value={log.replied} onValueChange={v => set({ replied: v as EmailLog["replied"] })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="yes">ตอบกลับแล้ว ✅</SelectItem>
-              <SelectItem value="no">ยังไม่ตอบ ❌</SelectItem>
+              <SelectItem value="yes"><span style={{display:"flex",alignItems:"center",gap:6}}><CheckCircle2 size={12} style={{color:"#3B6D11"}}/>ตอบกลับแล้ว</span></SelectItem>
+              <SelectItem value="no"><span style={{display:"flex",alignItems:"center",gap:6}}><XCircle size={12} style={{color:"#E24B4A"}}/>ยังไม่ตอบ</span></SelectItem>
             </SelectContent>
           </Select>
         </Field>
@@ -288,10 +288,10 @@ function NoteFields({ log, set }: { log: NoteLog; set: (p: Partial<NoteLog>) => 
       <Select value={log.note_category} onValueChange={v => set({ note_category: v as NoteLog["note_category"] })}>
         <SelectTrigger><SelectValue /></SelectTrigger>
         <SelectContent>
-          <SelectItem value="internal">📌 บันทึกภายใน</SelectItem>
-          <SelectItem value="reminder">⏰ แจ้งเตือน / Reminder</SelectItem>
-          <SelectItem value="risk">⚠️ ความเสี่ยง</SelectItem>
-          <SelectItem value="opportunity">🎯 โอกาส</SelectItem>
+          <SelectItem value="internal"><span style={{display:"flex",alignItems:"center",gap:6}}><FileText size={12} style={{color:"#185FA5"}}/>บันทึกภายใน</span></SelectItem>
+          <SelectItem value="reminder"><span style={{display:"flex",alignItems:"center",gap:6}}><Bell size={12} style={{color:"#BA7517"}}/>แจ้งเตือน / Reminder</span></SelectItem>
+          <SelectItem value="risk"><span style={{display:"flex",alignItems:"center",gap:6}}><AlertTriangle size={12} style={{color:"#E24B4A"}}/>ความเสี่ยง</span></SelectItem>
+          <SelectItem value="opportunity"><span style={{display:"flex",alignItems:"center",gap:6}}><Target size={12} style={{color:"#3B6D11"}}/>โอกาส</span></SelectItem>
         </SelectContent>
       </Select>
     </Field>
@@ -432,7 +432,14 @@ export function ActivityLogDialog({
                 value={log.kind}
                 onValueChange={(v) => setLog(defaultLog(v as ActivityKind))}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      {(() => { const Ic = KIND_ICONS[log.kind]; return <Ic size={13} />; })()}
+                      {KIND_LABELS[log.kind]}
+                    </span>
+                  </SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {(Object.keys(KIND_LABELS) as ActivityKind[]).map((k) => {
                     const Ic = KIND_ICONS[k];
