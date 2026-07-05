@@ -29,6 +29,7 @@ import {
 import { fetchFADocuments, type FADocument } from "@/lib/flowaccount-client";
 import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
 import { AccountEmailDialog } from "@/components/accounts/AccountEmailDialog";
+import { AddContactDialog } from "@/components/accounts/AddContactDialog";
 
 
 
@@ -125,6 +126,8 @@ function KeyAccountsPage() {
   const [logLeadId, setLogLeadId] = useState<string | null>(null);
   const [addDealOpen, setAddDealOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<any>(null);
   const [accPage, setAccPage] = useState(1);
   const ACC_PAGE_SIZE = 20;
 
@@ -539,7 +542,13 @@ function KeyAccountsPage() {
               />
             )}
             {tab === "ผู้ติดต่อ" && (
-              <ContactsTab accountId={selected.id} accountName={selected.name} onEmail={() => setEmailOpen(true)} />
+              <ContactsTab
+                accountId={selected.id}
+                accountName={selected.name}
+                onEmail={() => setEmailOpen(true)}
+                onAddContact={() => { setEditingContact(null); setContactDialogOpen(true); }}
+                onEditContact={(c) => { setEditingContact(c); setContactDialogOpen(true); }}
+              />
             )}
             {tab === "อีเมล" && (
               <EmailLogTab accountId={selected.id} />
@@ -599,6 +608,21 @@ function KeyAccountsPage() {
           onOpenChange={setEmailOpen}
           accountId={selected.id}
           accountName={selected.name}
+        />
+      )}
+
+      {selected && contactDialogOpen && (
+        <AddContactDialog
+          open={contactDialogOpen}
+          onOpenChange={setContactDialogOpen}
+          accountId={selected.id}
+          accountName={selected.name}
+          initial={editingContact}
+          onSaved={() => {
+            setContactDialogOpen(false);
+            setEditingContact(null);
+            // Trigger ContactsTab to reload by changing key via tab reset
+          }}
         />
       )}
     </div>
@@ -1476,98 +1500,111 @@ function ActivityHistoryTab({ accountId }: { accountId: string }) {
 }
 
 // ── ContactsTab ───────────────────────────────────────────────────────────────
-function ContactsTab({ accountId, accountName, onEmail }: { accountId: string; accountName: string; onEmail: () => void }) {
+interface ContactsTabProps {
+  accountId: string;
+  accountName: string;
+  onEmail: () => void;
+  onAddContact: () => void;
+  onEditContact: (contact: any) => void;
+}
+
+function ContactsTab({ accountId, onEmail, onAddContact, onEditContact }: ContactsTabProps) {
   const [contacts, setContacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const { data } = await crmDb()
-        .from("contacts")
-        .select("id, name, position, email, phone, line_id")
-        .eq("account_id", accountId)
-        .order("name");
-      setContacts(data ?? []);
-      setLoading(false);
-    })();
-  }, [accountId]);
+  const loadContacts = async () => {
+    setLoading(true);
+    const { data } = await crmDb()
+      .from("contacts")
+      .select("id, name, nickname, position, email, phone, line_id")
+      .eq("account_id", accountId)
+      .order("name");
+    setContacts(data ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadContacts(); }, [accountId]);
 
   if (loading) return <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
 
   return (
     <div className="space-y-3">
-      {/* Header: count + link to account detail */}
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-muted-foreground">{contacts.length} ผู้ติดต่อ</p>
-        <Link
-          to="/accounts/$accountId"
-          params={{ accountId }}
-          className="flex items-center gap-1.5 text-sm text-primary hover:underline"
-        >
-          <ExternalLink className="h-3.5 w-3.5" /> จัดการผู้ติดต่อ
-        </Link>
+        <p className="text-sm font-medium text-muted-foreground">
+          {contacts.length > 0 ? `${contacts.length} ผู้ติดต่อ` : "ยังไม่มีผู้ติดต่อ"}
+        </p>
+        <Button size="sm" variant="outline" onClick={onAddContact}>
+          <UserPlus className="mr-1.5 h-4 w-4" /> เพิ่มผู้ติดต่อ
+        </Button>
       </div>
 
       {contacts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-12 text-muted-foreground gap-3">
-          <UserPlus className="h-10 w-10 opacity-20" />
-          <p className="text-sm">ยังไม่มีผู้ติดต่อ</p>
-          <Link
-            to="/accounts/$accountId"
-            params={{ accountId }}
-            className="flex items-center gap-1.5 rounded-lg border bg-card px-4 py-2 text-sm font-medium text-primary hover:bg-muted transition-colors"
-          >
-            <UserPlus className="h-4 w-4" /> เพิ่มผู้ติดต่อ
-          </Link>
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-14 text-muted-foreground gap-3">
+          <UserPlus className="h-12 w-12 opacity-20" />
+          <p className="text-sm font-medium">ยังไม่มีผู้ติดต่อในระบบ</p>
+          <p className="text-xs">เพิ่มชื่อ โทร อีเมล Line ของคนติดต่อในบริษัทนี้</p>
+          <Button size="sm" onClick={onAddContact}>
+            <UserPlus className="mr-1.5 h-4 w-4" /> เพิ่มผู้ติดต่อคนแรก
+          </Button>
         </div>
       ) : (
-        contacts.map((c) => (
-          <div key={c.id} className="rounded-xl border bg-card px-4 py-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-base font-semibold truncate">{c.name}</p>
-                {c.position && <p className="text-sm text-muted-foreground mt-0.5">{c.position}</p>}
-                <div className="mt-2 space-y-1">
-                  {c.email && (
-                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Mail className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{c.email}</span>
-                    </p>
-                  )}
+        <div className="space-y-2">
+          {contacts.map((c) => (
+            <div key={c.id}
+              className="group rounded-xl border bg-card px-4 py-4 hover:border-primary/30 cursor-pointer transition-colors"
+              onClick={() => onEditContact(c)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-base font-semibold truncate">{c.name}</p>
+                    {c.nickname && <span className="text-xs text-muted-foreground">({c.nickname})</span>}
+                  </div>
+                  {c.position && <p className="text-sm text-muted-foreground mt-0.5">{c.position}</p>}
+                  <div className="mt-2 space-y-1">
+                    {c.email && (
+                      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Mail className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                        <span className="truncate">{c.email}</span>
+                      </p>
+                    )}
+                    {c.phone && (
+                      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Phone className="h-3.5 w-3.5 shrink-0 text-emerald-600" />{c.phone}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 pt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   {c.phone && (
-                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Phone className="h-3.5 w-3.5 shrink-0" />{c.phone}
-                    </p>
+                    <a href={`tel:${c.phone}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground hover:text-emerald-600 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors"
+                      title={c.phone}>
+                      <Phone className="h-4 w-4" />
+                    </a>
+                  )}
+                  {c.line_id && (
+                    <a href={`https://line.me/ti/p/~${c.line_id}`} target="_blank" rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground hover:text-green-600 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors"
+                      title={`Line: ${c.line_id}`}>
+                      <MessageCircle className="h-4 w-4" />
+                    </a>
+                  )}
+                  {c.email && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onEmail(); }}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors"
+                      title={`ส่งอีเมล: ${c.email}`}>
+                      <Send className="h-4 w-4" />
+                    </button>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
-                {c.phone && (
-                  <a href={`tel:${c.phone}`}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground hover:text-emerald-600 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors"
-                    title={c.phone}>
-                    <Phone className="h-4 w-4" />
-                  </a>
-                )}
-                {c.line_id && (
-                  <a href={`https://line.me/ti/p/~${c.line_id}`} target="_blank" rel="noreferrer"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground hover:text-green-600 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors"
-                    title={`Line: ${c.line_id}`}>
-                    <MessageCircle className="h-4 w-4" />
-                  </a>
-                )}
-                {c.email && (
-                  <button onClick={onEmail}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors"
-                    title={c.email}>
-                    <Send className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
             </div>
-          </div>
-        ))
+          ))}
+        </div>
       )}
     </div>
   );
