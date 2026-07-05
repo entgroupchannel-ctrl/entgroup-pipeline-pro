@@ -177,7 +177,10 @@ function KeyAccountsPage() {
     return activities.filter((a) => ids.has(a.lead_id));
   };
 
+  const getAccLeads = (acc: KeyAccount) => (acc as any).leads ?? [];
+
   const filteredAccounts = useMemo(() => {
+
     const ql = q.trim().toLowerCase();
     return accounts.filter((a) => {
       if (ql && !a.name.toLowerCase().includes(ql)) return false;
