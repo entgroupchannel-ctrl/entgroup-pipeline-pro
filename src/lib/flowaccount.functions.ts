@@ -5,24 +5,14 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-async function assertAdmin(userId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await (supabaseAdmin as any)
-    .from("crm.user_profiles")
+async function assertAdmin(supabase: any, userId: string) {
+  const { data, error } = await supabase
+    .schema("crm")
+    .from("user_profiles")
     .select("role")
     .eq("id", userId)
     .maybeSingle();
-  // fallback: try schema chaining
-  if (error) {
-    const { data: d2 } = await (supabaseAdmin as any)
-      .schema("crm")
-      .from("user_profiles")
-      .select("role")
-      .eq("id", userId)
-      .maybeSingle();
-    if ((d2 as any)?.role !== "admin") throw new Error("Forbidden: admin only");
-    return;
-  }
+  if (error) throw new Error(`ตรวจสิทธิ์ไม่สำเร็จ: ${error.message}`);
   if ((data as any)?.role !== "admin") throw new Error("Forbidden: admin only");
 }
 
@@ -42,7 +32,7 @@ async function getIntegration(supabaseAdmin: any) {
 export const testFAConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { faFetch } = await import("./flowaccount.server");
     const { status, body, text } = await faFetch("/quotations?currentPage=1&pageSize=1");
     if (status < 200 || status >= 300) {
@@ -66,7 +56,7 @@ export const saveFACredentials = createServerFn({ method: "POST" })
     }).parse(input)
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Build update payload — only overwrite secret if not sentinel
@@ -98,7 +88,7 @@ export const saveFACredentials = createServerFn({ method: "POST" })
 export const loadFASettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data, error } = await (supabaseAdmin as any)
@@ -137,7 +127,7 @@ export const loadFASettings = createServerFn({ method: "GET" })
 export const syncFADocuments = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { faFetch, pickArray, pickSerial, pickNumber, extractSalesName, extractSalesEmail } =
       await import("./flowaccount.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
