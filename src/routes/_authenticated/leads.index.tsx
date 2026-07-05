@@ -212,6 +212,9 @@ function LeadsPage() {
   };
 
   const handleExport = () => {
+    if (!filtered?.length) return;
+    // Sales: filtered already scoped to own leads by query (owner_id = user.id)
+    // Manager/Admin: exports all visible leads
     // Sales: export only own leads (filtered already scoped by owner_id from query)
     // Manager/Admin: export all visible
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
@@ -351,7 +354,7 @@ function LeadsPage() {
           )}
 
           <Button variant="outline" size="sm" className="h-8" onClick={handleExport} disabled={!filtered?.length}
-            title={!isManager ? "Export เฉพาะดีลของคุณ" : "Export CSV ทั้งหมด"}>
+            title={isManager ? "Export CSV ทั้งหมด" : "Export เฉพาะดีลของคุณ"}>
             <ArrowRight className="mr-1.5 h-3.5 w-3.5 rotate-90" />
             {isManager ? "Export CSV" : "Export ดีลของฉัน"}
           </Button>

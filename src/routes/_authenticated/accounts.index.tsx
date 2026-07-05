@@ -192,8 +192,9 @@ function AccountsPage() {
   } = usePagination(filtered ?? [], 25);
 
   const handleExport = () => {
-    if (!isAdmin) { toast.error("เฉพาะ Admin เท่านั้นที่ Export รายชื่อลูกค้าได้"); return; }
+    // Admin only — non-admin cannot export customer list
     if (!isAdmin) { toast.error("ไม่มีสิทธิ์ Export — เฉพาะ Admin เท่านั้น"); return; }
+    if (!filtered?.length) return;
     if (!filtered?.length) { toast.error("ไม่มีข้อมูลที่จะ export"); return; }
     const profMap = new Map<string, { name: string }>(
       Array.from(new Set(filtered.map(a => a.owner_id).filter((id): id is string => id !== null))).map(id => [id, { name: id }])
