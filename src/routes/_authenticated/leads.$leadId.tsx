@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -54,6 +55,8 @@ function LeadDetailPage() {
   const [faDoc, setFaDoc] = useState<FADocument | null>(null);
   const [faImportOpen, setFaImportOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
+  const [callOpen, setCallOpen] = useState(false);
+  const [lineOpen, setLineOpen] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
@@ -278,10 +281,10 @@ function LeadDetailPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => quickLog("call")}>
+          <Button variant="outline" size="sm" onClick={() => setCallOpen(true)}>
             <Phone className="mr-1 h-4 w-4" /> โทรหา
           </Button>
-          <Button variant="outline" size="sm" onClick={() => quickLog("line")}>
+          <Button variant="outline" size="sm" onClick={() => setLineOpen(true)}>
             <MessageCircle className="mr-1 h-4 w-4" /> ส่ง Line
           </Button>
           <Button variant="outline" size="sm" onClick={() => setEmailOpen(true)}>
@@ -552,10 +555,10 @@ function LeadDetailPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2 border-b px-4 py-3">
-              <Button size="sm" variant="outline" onClick={() => quickLog("call")}>
+              <Button size="sm" variant="outline" onClick={() => setCallOpen(true)}>
                 <Phone className="mr-1 h-3.5 w-3.5" /> โทรหา
               </Button>
-              <Button size="sm" variant="outline" onClick={() => quickLog("line")}>
+              <Button size="sm" variant="outline" onClick={() => setLineOpen(true)}>
                 <MessageCircle className="mr-1 h-3.5 w-3.5" /> ส่ง Line
               </Button>
               <Button size="sm" variant="outline" onClick={() => setEmailOpen(true)}>
@@ -669,6 +672,24 @@ function LeadDetailPage() {
           </div>
         </aside>
       </div>
+
+      <CallDialog
+        open={callOpen}
+        onOpenChange={setCallOpen}
+        contactPhone={contact?.phone ?? null}
+        leadId={lead.id}
+        ownerId={user?.id ?? null}
+        onLogged={load}
+      />
+
+      <LineDialog
+        open={lineOpen}
+        onOpenChange={setLineOpen}
+        contactLineId={contact?.line_id ?? null}
+        leadId={lead.id}
+        ownerId={user?.id ?? null}
+        onLogged={load}
+      />
     </div>
   );
 }
@@ -688,5 +709,125 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
     </div>
+  );
+}
+
+function CallDialog({ open, onOpenChange, contactPhone, leadId, ownerId, onLogged }: { open: boolean; onOpenChange: (v: boolean) => void; contactPhone: string | null; leadId: string; ownerId: string | null; onLogged: () => void }) {
+  const [body, setBody] = useState("");
+  const [dueAt, setDueAt] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await crmDb().from("activities").insert({
+      lead_id: leadId,
+      type: "call",
+      subject: "โทรติดตาม",
+      body: body.trim() || null,
+      due_at: dueAt || null,
+      done: true,
+      done_at: new Date().toISOString(),
+      owner_id: ownerId,
+    });
+    setSaving(false);
+    setBody("");
+    setDueAt("");
+    onOpenChange(false);
+    onLogged();
+    toast.success("บันทึกผลการโทรแล้ว");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>บันทึกการโทร</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          {contactPhone && (
+            <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2">
+              <span className="text-sm font-medium">{contactPhone}</span>
+              <a href={`tel:${contactPhone}`} className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
+                <Phone className="h-3.5 w-3.5" /> โทรเลย
+              </a>
+            </div>
+          )}
+          <div>
+            <Label className="text-xs">ผลการโทร / บันทึก</Label>
+            <Textarea rows={3} placeholder="สรุปการสนทนา..." value={body} onChange={(e) => setBody(e.target.value)} />
+          </div>
+          <div>
+            <Label className="text-xs">นัดหมายครั้งต่อไป</Label>
+            <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              บันทึก
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LineDialog({ open, onOpenChange, contactLineId, leadId, ownerId, onLogged }: { open: boolean; onOpenChange: (v: boolean) => void; contactLineId: string | null; leadId: string; ownerId: string | null; onLogged: () => void }) {
+  const [body, setBody] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await crmDb().from("activities").insert({
+      lead_id: leadId,
+      type: "line",
+      subject: "ส่ง Line ติดตาม",
+      body: body.trim() || null,
+      done: true,
+      done_at: new Date().toISOString(),
+      owner_id: ownerId,
+    });
+    setSaving(false);
+    setBody("");
+    onOpenChange(false);
+    onLogged();
+    toast.success("บันทึกการส่ง Line แล้ว");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>ส่ง LINE</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          {contactLineId && (
+            <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2">
+              <span className="text-sm font-medium text-[#06C755]">{contactLineId}</span>
+              <a
+                href={`https://line.me/ti/p/${contactLineId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-md bg-[#06C755] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#05a847]"
+              >
+                <MessageCircle className="h-3.5 w-3.5" /> เปิด LINE
+              </a>
+            </div>
+          )}
+          <div>
+            <Label className="text-xs">บันทึกข้อความที่ส่ง</Label>
+            <Textarea rows={3} placeholder="สรุปข้อความที่ส่งไป..." value={body} onChange={(e) => setBody(e.target.value)} />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              บันทึก
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
