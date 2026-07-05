@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, Phone, MessageCircle, Save, ExternalLink, Loader2, Check, Plus, Send, Mail,
+  ArrowLeft, Phone, MessageCircle, Save, ExternalLink, Loader2, Check, Plus, Send, Mail, Trophy, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
