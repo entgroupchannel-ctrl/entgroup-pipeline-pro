@@ -711,3 +711,123 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
+
+function CallDialog({ open, onOpenChange, contactPhone, leadId, ownerId, onLogged }: { open: boolean; onOpenChange: (v: boolean) => void; contactPhone: string | null; leadId: string; ownerId: string | null; onLogged: () => void }) {
+  const [body, setBody] = useState("");
+  const [dueAt, setDueAt] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await crmDb().from("activities").insert({
+      lead_id: leadId,
+      type: "call",
+      subject: "โทรติดตาม",
+      body: body.trim() || null,
+      due_at: dueAt || null,
+      done: true,
+      done_at: new Date().toISOString(),
+      owner_id: ownerId,
+    });
+    setSaving(false);
+    setBody("");
+    setDueAt("");
+    onOpenChange(false);
+    onLogged();
+    toast.success("บันทึกผลการโทรแล้ว");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>บันทึกการโทร</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          {contactPhone && (
+            <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2">
+              <span className="text-sm font-medium">{contactPhone}</span>
+              <a href={`tel:${contactPhone}`} className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
+                <Phone className="h-3.5 w-3.5" /> โทรเลย
+              </a>
+            </div>
+          )}
+          <div>
+            <Label className="text-xs">ผลการโทร / บันทึก</Label>
+            <Textarea rows={3} placeholder="สรุปการสนทนา..." value={body} onChange={(e) => setBody(e.target.value)} />
+          </div>
+          <div>
+            <Label className="text-xs">นัดหมายครั้งต่อไป</Label>
+            <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              บันทึก
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LineDialog({ open, onOpenChange, contactLineId, leadId, ownerId, onLogged }: { open: boolean; onOpenChange: (v: boolean) => void; contactLineId: string | null; leadId: string; ownerId: string | null; onLogged: () => void }) {
+  const [body, setBody] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await crmDb().from("activities").insert({
+      lead_id: leadId,
+      type: "line",
+      subject: "ส่ง Line ติดตาม",
+      body: body.trim() || null,
+      done: true,
+      done_at: new Date().toISOString(),
+      owner_id: ownerId,
+    });
+    setSaving(false);
+    setBody("");
+    onOpenChange(false);
+    onLogged();
+    toast.success("บันทึกการส่ง Line แล้ว");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>ส่ง LINE</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          {contactLineId && (
+            <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2">
+              <span className="text-sm font-medium text-[#06C755]">{contactLineId}</span>
+              <a
+                href={`https://line.me/ti/p/${contactLineId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-md bg-[#06C755] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#05a847]"
+              >
+                <MessageCircle className="h-3.5 w-3.5" /> เปิด LINE
+              </a>
+            </div>
+          )}
+          <div>
+            <Label className="text-xs">บันทึกข้อความที่ส่ง</Label>
+            <Textarea rows={3} placeholder="สรุปข้อความที่ส่งไป..." value={body} onChange={(e) => setBody(e.target.value)} />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              บันทึก
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
