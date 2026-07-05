@@ -135,7 +135,7 @@ export function LeadQuotationsSection({ leadId, accountId }: Props) {
 }
 
 function QuotationMiniRow({
-  row, onEdit, onStatusChange, onDelete,
+  row, onEdit, onStatusChange, onDelete, canEdit,
 }: {
   row: Quotation;
   onEdit: () => void;
