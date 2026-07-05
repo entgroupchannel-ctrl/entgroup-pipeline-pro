@@ -254,6 +254,9 @@ function AccountsPage() {
                   <th className="px-3 py-2.5 w-8"><Checkbox checked={!!filtered?.length && selected.size === filtered.length} onCheckedChange={(v) => v ? selectAll() : clearAll()} /></th>
                   <th className="px-4 py-2.5 text-left font-medium">ชื่อบริษัท</th>
                   <th className="px-4 py-2.5 text-left font-medium">อุตสาหกรรม</th>
+                  <th className="px-4 py-2.5 text-left font-medium">เลขประจำตัวผู้เสียภาษี</th>
+                  <th className="px-4 py-2.5 text-left font-medium">เครดิต</th>
+                  <th className="px-4 py-2.5 text-left font-medium">ที่อยู่</th>
                   <th className="px-4 py-2.5 text-left font-medium">เว็บไซต์</th>
                   <th className="px-4 py-2.5 text-left font-medium">โทรศัพท์</th>
                   <th className="px-4 py-2.5 text-center font-medium">ดีล</th>
