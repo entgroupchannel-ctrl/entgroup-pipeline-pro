@@ -8,7 +8,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
-import { activityIcon, formatThaiDate, ACTIVITY_TYPE_LABEL, type Activity, type ActivityType } from "@/lib/activities";
+import { activityIcon, formatThaiDate, ACTIVITY_TYPE_LABEL, ACTIVITY_TYPE_COLOR, type Activity, type ActivityType } from "@/lib/activities";
+import { formatThaiDateTime } from "@/lib/format";
 import { ListPagination, usePagination } from "@/components/list-pagination";
 import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
 
@@ -372,6 +373,8 @@ function ActivityRow({
     }
   }
 
+  const typeCfg = ACTIVITY_TYPE_COLOR[a.type] ?? ACTIVITY_TYPE_COLOR["note"];
+
   return (
     <li
       className={`flex items-center gap-3 px-4 py-3 transition-colors ${pCfg.rowClass} ${
@@ -383,9 +386,10 @@ function ActivityRow({
         <Checkbox checked={a.done} onCheckedChange={(v) => onToggle(a, !!v)} />
       </div>
 
-      {/* Type icon */}
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <Icon className="h-4 w-4" />
+      {/* Type badge (icon + label) */}
+      <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${typeCfg.bg} ${typeCfg.text}`}>
+        <Icon className={`h-3 w-3 ${typeCfg.icon}`} />
+        {ACTIVITY_TYPE_LABEL[a.type as ActivityType] ?? a.type}
       </span>
 
       {/* Main content */}
@@ -406,19 +410,24 @@ function ActivityRow({
         {lead && a.lead_id && (
           <div className="truncate text-xs text-primary mt-0.5">{lead.title}</div>
         )}
-        {/* Body preview */}
+        {/* Body preview with tooltip */}
         {bodyPreview && !a.done && (
-          <div className="truncate text-xs text-muted-foreground mt-0.5 italic">{bodyPreview}</div>
+          <div
+            className="truncate text-xs text-muted-foreground mt-0.5 italic max-w-xs cursor-default"
+            title={bodyPreview}
+          >
+            {bodyPreview}
+          </div>
         )}
       </div>
 
-      {/* Due date */}
+      {/* Due date + time */}
       <div className={`shrink-0 text-xs ${
         priority === "urgent" ? "font-semibold text-red-600" :
         priority === "high"   ? "font-medium text-amber-600" :
         "text-muted-foreground"
       }`}>
-        {a.due_at ? formatThaiDate(a.due_at) : "—"}
+        {a.due_at ? formatThaiDateTime(a.due_at) : "—"}
       </div>
 
       {/* Owner avatar */}
