@@ -1,15 +1,9 @@
-## Problem
-The AI Settings tab writes to `crm.integrations` (id=`claude_ai`) using 4 columns that don't exist yet: `claude_api_key`, `ai_model`, `email_draft_enabled`, `max_tokens`.
+แทนที่ `src/routes/_authenticated/accounts.$accountId.tsx` ด้วยไฟล์ที่แนบมา (`accounts.$accountId_1.tsx`, 761 บรรทัด) ตามเนื้อหาเป๊ะ
 
-## Fix
-Single migration adding the missing columns to `crm.integrations`:
+เปลี่ยนจาก 2-column แน่น → Tab layout 3 แท็บ:
+- ข้อมูลบริษัท — form + ปุ่ม Save ชัดเจน (แทน auto-save onBlur)
+- ผู้ติดต่อ (N) — list cards + ปุ่มเพิ่ม
+- ดีล (N) — list + pipeline summary
+- Top bar โชว์ KPI inline, ปุ่ม Back → "รายชื่อลูกค้า"
 
-```sql
-ALTER TABLE crm.integrations
-  ADD COLUMN IF NOT EXISTS claude_api_key      text,
-  ADD COLUMN IF NOT EXISTS ai_model            text,
-  ADD COLUMN IF NOT EXISTS email_draft_enabled boolean DEFAULT true,
-  ADD COLUMN IF NOT EXISTS max_tokens          integer DEFAULT 1000;
-```
-
-No code changes needed — existing `ai-settings.functions.ts` and `lead-email.functions.ts` already reference these columns correctly.
+หลัง deploy จะรัน typecheck + build ยืนยัน
