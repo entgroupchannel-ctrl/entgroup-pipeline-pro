@@ -555,10 +555,10 @@ function LeadDetailPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2 border-b px-4 py-3">
-              <Button size="sm" variant="outline" onClick={() => quickLog("call")}>
+              <Button size="sm" variant="outline" onClick={() => setCallOpen(true)}>
                 <Phone className="mr-1 h-3.5 w-3.5" /> โทรหา
               </Button>
-              <Button size="sm" variant="outline" onClick={() => quickLog("line")}>
+              <Button size="sm" variant="outline" onClick={() => setLineOpen(true)}>
                 <MessageCircle className="mr-1 h-3.5 w-3.5" /> ส่ง Line
               </Button>
               <Button size="sm" variant="outline" onClick={() => setEmailOpen(true)}>
