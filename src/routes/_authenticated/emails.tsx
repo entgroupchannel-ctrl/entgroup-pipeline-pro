@@ -155,7 +155,8 @@ function RecipientSelector({
   };
 
   useEffect(() => {
-    const t = setTimeout(() => search(query), 300);
+    if (query.trim().length < 2) { setResults([]); return; }
+    const t = setTimeout(() => search(query), 450);
     return () => clearTimeout(t);
   }, [query, mode]);
 
@@ -227,7 +228,7 @@ function RecipientSelector({
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-8 text-sm"
-              placeholder={mode === "contact" ? "ค้นหาชื่อ หรืออีเมล…" : "ค้นหาชื่อดีล / Lead…"}
+              placeholder={mode === "contact" ? "พิมพ์ชื่อหรืออีเมล (อย่างน้อย 2 ตัว)…" : "พิมพ์ชื่อบริษัท หรือเลขดีล (อย่างน้อย 2 ตัว)…"}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -244,15 +245,23 @@ function RecipientSelector({
                 >
                   {mode === "lead" ? (
                     <>
-                      <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/50" />
                       <div className="flex-1 min-w-0">
+                        {/* Row 1: deal_number + stage badge */}
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium truncate">{item.title}</span>
+                          <span className="font-mono text-xs font-bold text-primary">{item.deal_number ?? item.title}</span>
                           <Badge variant="outline" className="text-[10px] shrink-0">{STAGE_LABEL[item.stage] ?? item.stage}</Badge>
                         </div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {item.account?.name ?? "ไม่มีบริษัท"} · {item.contact?.name ?? "ไม่มีผู้ติดต่อ"}
-                          {item.contact?.email ? ` · ${item.contact.email}` : " · ไม่มีอีเมล"}
+                        {/* Row 2: company */}
+                        <div className="text-sm font-medium truncate">{item.account?.name ?? "—"}</div>
+                        {/* Row 3: contact + email */}
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span>{item.contact?.name ?? "ไม่มีผู้ติดต่อ"}</span>
+                          {item.contact?.email ? (
+                            <span className="text-primary/70">· {item.contact.email}</span>
+                          ) : (
+                            <span className="text-amber-600">· ไม่มีอีเมล</span>
+                          )}
                         </div>
                       </div>
                     </>
@@ -260,9 +269,14 @@ function RecipientSelector({
                     <>
                       <Users className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium">{item.name}</span>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {item.company_name ? `${item.company_name} · ` : ""}{item.email || "ไม่มีอีเมล"}
+                        <div className="text-sm font-medium">{item.name}</div>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          {item.company_name && <span>{item.company_name} ·</span>}
+                          {item.email ? (
+                            <span className="text-primary/70">{item.email}</span>
+                          ) : (
+                            <span className="text-amber-600">ไม่มีอีเมล</span>
+                          )}
                         </div>
                       </div>
                     </>
