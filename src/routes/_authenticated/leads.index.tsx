@@ -221,132 +221,140 @@ function LeadsPage() {
 
   // ── render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 page-fade-in space-y-5">
+    <div className="flex h-full flex-col page-fade-in">
 
       {/* ── Header ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b bg-background">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">รายการดีล</h1>
-          <p className="text-xs text-muted-foreground">
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            รายการดีล
+            {filtered != null && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-[10px] font-bold text-primary">
+                {filtered.length}
+              </span>
+            )}
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
             {filtered == null ? "กำลังโหลด…" : `${filtered.length} ดีล`}
             {mode !== "all" && ` · ${periodLabel(mode, year, month, quarter)}`}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={!filtered?.length}>
-            <ArrowRight className="mr-1.5 h-4 w-4 rotate-90" /> Export CSV
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="h-8 w-64 pl-8 text-xs"
+              placeholder="ค้นหาดีล / บริษัท"
+              value={qFilter}
+              onChange={(e) => setSearch({ q: e.target.value || undefined })}
+            />
+          </div>
+
+          <Select value={stageFilter} onValueChange={(v) => setSearch({ stage: v === "active" ? undefined : v })}>
+            <SelectTrigger className="h-8 w-36 text-xs">
+              <SelectValue placeholder="Stage" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="all">ทั้งหมด</SelectItem>
+              {ALL_STAGES.map(s => <SelectItem key={s} value={s}>{STAGE_LABEL_TH[s]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          {isManager && (
+            <Select value={ownerFilter} onValueChange={(v) => setSearch({ owner: v === "all" ? undefined : v })}>
+              <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Sales ทั้งหมด" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Sales ทั้งหมด</SelectItem>
+                {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+
+          <Button variant="outline" size="sm" className="h-8" onClick={handleExport} disabled={!filtered?.length}>
+            <ArrowRight className="mr-1.5 h-3.5 w-3.5 rotate-90" /> Export CSV
           </Button>
           {canCreate && (
-            <Button size="sm" onClick={() => setNewOpen(true)}>
-              <Plus className="mr-1.5 h-4 w-4" /> ดีลใหม่
+            <Button size="sm" className="h-8" onClick={() => setNewOpen(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> ดีลใหม่
             </Button>
           )}
         </div>
       </div>
 
-      {/* ── Period selector ── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex rounded-md border bg-muted/30 p-0.5 gap-0.5">
-          {([
-            { key: "all",     label: "ทั้งหมด", icon: <BarChart2 className="h-3.5 w-3.5" /> },
-            { key: "month",   label: "รายเดือน", icon: <Calendar className="h-3.5 w-3.5" /> },
-            { key: "quarter", label: "รายไตรมาส", icon: <Calendar className="h-3.5 w-3.5" /> },
-            { key: "year",    label: "รายปี",     icon: <TrendingUp className="h-3.5 w-3.5" /> },
-          ] as { key: PeriodMode; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
-            <button
-              key={key}
-              onClick={() => setSearch({ period: key === "all" ? undefined : key })}
-              className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                mode === key
-                  ? "bg-background shadow-sm text-foreground border border-border"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {icon} {label}
-            </button>
-          ))}
-        </div>
+      {/* ── Content ── */}
+      <div className="flex-1 overflow-auto p-6 space-y-5">
 
-        {mode !== "all" && (
-          <div className="flex items-center gap-1 rounded-md border bg-background px-2 py-1">
-            <button onClick={prevPeriod} className="rounded p-0.5 hover:bg-muted">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="min-w-[96px] text-center text-sm font-medium">
-              {periodLabel(mode, year, month, quarter)}
-            </span>
-            <button onClick={nextPeriod} className="rounded p-0.5 hover:bg-muted">
-              <ChevronRight className="h-4 w-4" />
-            </button>
+        {/* ── Period selector ── */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-md border bg-muted/30 p-0.5 gap-0.5">
+            {([
+              { key: "all",     label: "ทั้งหมด", icon: <BarChart2 className="h-3.5 w-3.5" /> },
+              { key: "month",   label: "รายเดือน", icon: <Calendar className="h-3.5 w-3.5" /> },
+              { key: "quarter", label: "รายไตรมาส", icon: <Calendar className="h-3.5 w-3.5" /> },
+              { key: "year",    label: "รายปี",     icon: <TrendingUp className="h-3.5 w-3.5" /> },
+            ] as { key: PeriodMode; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
+              <button
+                key={key}
+                onClick={() => setSearch({ period: key === "all" ? undefined : key })}
+                className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                  mode === key
+                    ? "bg-background shadow-sm text-foreground border border-border"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {icon} {label}
+              </button>
+            ))}
           </div>
-        )}
 
-        {mode === "year" && (
-          <Select value={String(year)} onValueChange={(v) => setSearch({ py: v })}>
-            <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {[-2, -1, 0, 1].map(o => {
-                const y = now.getFullYear() + o;
-                return <SelectItem key={y} value={String(y)}>{y + 543}</SelectItem>;
-              })}
-            </SelectContent>
-          </Select>
-        )}
+          {mode !== "all" && (
+            <div className="flex items-center gap-1 rounded-md border bg-background px-2 py-1">
+              <button onClick={prevPeriod} className="rounded p-0.5 hover:bg-muted">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="min-w-[96px] text-center text-sm font-medium">
+                {periodLabel(mode, year, month, quarter)}
+              </span>
+              <button onClick={nextPeriod} className="rounded p-0.5 hover:bg-muted">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
-        {mode === "quarter" && (
-          <Select value={String(quarter)} onValueChange={(v) => setSearch({ pq: v })}>
-            <SelectTrigger className="h-8 w-20 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {[1,2,3,4].map(q => <SelectItem key={q} value={String(q)}>Q{q}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
-      </div>
+          {mode === "year" && (
+            <Select value={String(year)} onValueChange={(v) => setSearch({ py: v })}>
+              <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[-2, -1, 0, 1].map(o => {
+                  const y = now.getFullYear() + o;
+                  return <SelectItem key={y} value={String(y)}>{y + 543}</SelectItem>;
+                })}
+              </SelectContent>
+            </Select>
+          )}
 
-      {/* ── Period KPI bar (neutral) ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <PeriodKpiCard icon={<BarChart2 className="h-4 w-4" />} label="ดีลทั้งหมด"   value={String(kpi.totalCount)}      unit="ดีล" />
-        <PeriodKpiCard icon={<TrendingUp className="h-4 w-4" />} label="Active"       value={String(kpi.activeCount)}    unit="ดีล" />
-        <PeriodKpiCard icon={<DollarSign className="h-4 w-4" />} label="Pipeline"     value={formatBaht(kpi.pipeline)} />
-        <PeriodKpiCard icon={<Trophy className="h-4 w-4" />}     label="ชนะ"          value={formatBaht(kpi.wonRevenue)} unit={`(${kpi.wonCount} ดีล)`} />
-        <PeriodKpiCard icon={<AlertTriangle className="h-4 w-4" />} label="แพ้"       value={formatBaht(kpi.lostValue)}  unit={`(${kpi.lostCount} ดีล)`} />
-        <PeriodKpiCard icon={<FileText className="h-4 w-4" />}     label="Win Rate"
-          value={kpi.winRate != null ? `${kpi.winRate}%` : "—"} />
-      </div>
-
-      {/* ── Filters ── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="h-9 w-56 pl-8 text-sm bg-background"
-            placeholder="ค้นหาดีล / บริษัท"
-            value={qFilter}
-            onChange={(e) => setSearch({ q: e.target.value || undefined })}
-          />
+          {mode === "quarter" && (
+            <Select value={String(quarter)} onValueChange={(v) => setSearch({ pq: v })}>
+              <SelectTrigger className="h-8 w-20 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[1,2,3,4].map(q => <SelectItem key={q} value={String(q)}>Q{q}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
-        <Select value={stageFilter} onValueChange={(v) => setSearch({ stage: v === "active" ? undefined : v })}>
-          <SelectTrigger className="h-9 w-36 text-xs bg-background">
-            <SelectValue placeholder="Stage" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="all">ทั้งหมด</SelectItem>
-            {ALL_STAGES.map(s => <SelectItem key={s} value={s}>{STAGE_LABEL_TH[s]}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {/* ── Period KPI bar (neutral) ── */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <PeriodKpiCard icon={<BarChart2 className="h-4 w-4" />} label="ดีลทั้งหมด"   value={String(kpi.totalCount)}      unit="ดีล" />
+          <PeriodKpiCard icon={<TrendingUp className="h-4 w-4" />} label="Active"       value={String(kpi.activeCount)}    unit="ดีล" />
+          <PeriodKpiCard icon={<DollarSign className="h-4 w-4" />} label="Pipeline"     value={formatBaht(kpi.pipeline)} />
+          <PeriodKpiCard icon={<Trophy className="h-4 w-4" />}     label="ชนะ"          value={formatBaht(kpi.wonRevenue)} unit={`(${kpi.wonCount} ดีล)`} />
+          <PeriodKpiCard icon={<AlertTriangle className="h-4 w-4" />} label="แพ้"       value={formatBaht(kpi.lostValue)}  unit={`(${kpi.lostCount} ดีล)`} />
+          <PeriodKpiCard icon={<FileText className="h-4 w-4" />}     label="Win Rate"
+            value={kpi.winRate != null ? `${kpi.winRate}%` : "—"} />
+        </div>
 
-        {isManager && (
-          <Select value={ownerFilter} onValueChange={(v) => setSearch({ owner: v === "all" ? undefined : v })}>
-            <SelectTrigger className="h-9 w-40 text-xs bg-background"><SelectValue placeholder="Sales ทั้งหมด" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Sales ทั้งหมด</SelectItem>
-              {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
-      </div>
 
       {/* ── Table ── */}
       {filtered === null ? (
