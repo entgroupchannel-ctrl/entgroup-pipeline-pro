@@ -125,9 +125,15 @@ export function AccountEmailDialog({ open, onOpenChange, accountId, accountName 
         } catch { /* skip */ }
       }
       await doSend({ data: {
-        to: email, to_name: (toName || selectedContact?.name || "").trim() || undefined,
-        subject: subject.trim(), body: body.trim(),
-        cc: cc.trim() || undefined, bcc: bcc.trim() || undefined,
+        to:         email,
+        to_name:    (toName || selectedContact?.name || "").trim() || undefined,
+        subject:    subject.trim(),
+        body:       body.trim(),
+        cc:         cc.trim() || undefined,
+        bcc:        bcc.trim() || undefined,
+        account_id: accountId,
+        contact_id: selectedContact?.id,
+        source:     "account_list",
         attachments: attachments.length > 0 ? attachments : undefined,
       }});
       toast.success("ส่งอีเมลแล้ว ✓", { description: `ถึง ${toName || email} · ${accountName}` });

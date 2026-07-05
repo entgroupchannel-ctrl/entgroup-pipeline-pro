@@ -1,0 +1,1 @@
+ALTER TABLE crm.email_send_log ADD COLUMN IF NOT EXISTS recipient_name text;

@@ -150,6 +150,10 @@ export const sendLeadEmail = createServerFn({ method: "POST" })
       body:          z.string().min(1, "กรุณาระบุเนื้อหา"),
       lead_id:       z.string().uuid().optional(),
       contact_id:    z.string().uuid().optional(),
+      account_id:    z.string().uuid().optional(),
+      cc:            z.string().optional(),
+      bcc:           z.string().optional(),
+      source:        z.string().optional(), // 'account_list' | 'emails_page' | 'lead_detail'
       attachments:   z.array(z.object({
         filename: z.string(),
         content:  z.string(), // base64
@@ -181,6 +185,8 @@ export const sendLeadEmail = createServerFn({ method: "POST" })
       text: data.body,
     };
     if (cfg.replyTo) payload.reply_to = cfg.replyTo;
+    if (data.cc)  payload.cc  = data.cc.split(",").map((e: string) => e.trim()).filter(Boolean);
+    if (data.bcc) payload.bcc = data.bcc.split(",").map((e: string) => e.trim()).filter(Boolean);
 
     // Add attachments to Resend payload (base64 encoded)
     if (data.attachments && data.attachments.length > 0) {
@@ -207,18 +213,24 @@ export const sendLeadEmail = createServerFn({ method: "POST" })
       .schema("crm").from("email_send_log")
       .insert({
         recipient_email:     data.to,
-        template_name:       "lead_email_manual",
+        recipient_name:      data.to_name ?? null,
+        template_name:       data.source ?? "lead_email_manual",
         subject:             data.subject,
         status:              resp.ok ? "sent" : "failed",
         provider_message_id: respBody?.id ?? null,
         error_message:       resp.ok ? null : (respBody?.message ?? `HTTP ${resp.status}`),
-        related_id:          data.lead_id    ?? null,
+        related_id:          data.lead_id ?? data.account_id ?? data.contact_id ?? null,
         related_type:        data.lead_id    ? "lead"    :
+                             data.account_id ? "account" :
                              data.contact_id ? "contact" : null,
         triggered_by:        context.userId,
         metadata: {
           contact_id: data.contact_id ?? null,
           lead_id:    data.lead_id    ?? null,
+          account_id: data.account_id ?? null,
+          cc:         data.cc         ?? null,
+          bcc:        data.bcc        ?? null,
+          source:     data.source     ?? null,
         },
       });
 
