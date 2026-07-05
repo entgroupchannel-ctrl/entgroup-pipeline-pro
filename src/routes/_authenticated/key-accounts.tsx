@@ -187,7 +187,11 @@ function KeyAccountsPage() {
 
     setAccounts(accs);
     setActivities(acts);
-    setSelected((prev) => (prev ? accs.find((a) => a.id === prev.id) ?? null : null));
+    setSelected((prev) => {
+      if (prev) return accs.find((a) => a.id === prev.id) ?? null;
+      // Auto-select first account on initial load
+      return accs[0] ?? null;
+    });
   };
 
 
@@ -539,13 +543,16 @@ function KeyAccountsPage() {
           style={{
             flex: 1,
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
+            gap: 8,
             color: "var(--text-muted)",
             fontSize: 13,
           }}
         >
-          เลือกบริษัทจากรายการด้านซ้าย
+          <Crown className="h-8 w-8 opacity-20" />
+          <span>เลือกบริษัทจากรายการด้านซ้าย</span>
         </div>
       )}
 
