@@ -239,8 +239,8 @@ function AccountDetailPage() {
           <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/accounts" })}>
             <ArrowLeft className="mr-1 h-4 w-4" /> รายชื่อลูกค้า
           </Button>
+          <div className="h-4 w-px bg-border" />
           <div className="flex items-center gap-2 min-w-0">
-            <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
             <h1 className="text-base font-semibold truncate">{account.name}</h1>
             {form.is_key_account && (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
@@ -249,11 +249,12 @@ function AccountDetailPage() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* KPI inline */}
-          <span className="text-xs text-muted-foreground hidden sm:inline">
-            {activeLeads.length} ดีล Active · {formatBaht(pipeline)}
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground">
+            <span><span className="font-semibold text-foreground">{activeLeads.length}</span> ดีล Active</span>
+            <span className="text-primary font-semibold">{formatBaht(pipeline)}</span>
+            <span><span className="font-semibold text-foreground">{contacts.length}</span> ผู้ติดต่อ</span>
+          </div>
           <Button size="sm" onClick={save} disabled={saving}>
             {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
             บันทึก
@@ -263,203 +264,262 @@ function AccountDetailPage() {
 
       {/* ── Tabs ── */}
       <div className="border-b bg-background px-6">
-        <div className="flex gap-0">
+        <div className="flex">
           {([
-            { key: "info",     label: "ข้อมูลบริษัท",     icon: Building2 },
+            { key: "info",     label: "ข้อมูลบริษัท", icon: Building2 },
             { key: "contacts", label: `ผู้ติดต่อ${contacts.length > 0 ? ` (${contacts.length})` : ""}`, icon: Users },
             { key: "deals",    label: `ดีล${leads.length > 0 ? ` (${leads.length})` : ""}`, icon: Star },
-          ] as { key: "info" | "contacts" | "deals"; label: string; icon: React.ElementType }[]).map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
+          ] as { key: "info"|"contacts"|"deals"; label: string; icon: React.ElementType }[]).map(({ key, label, icon: Icon }) => (
+            <button key={key} onClick={() => setTab(key)}
               className={`flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm transition-colors ${
-                tab === key
-                  ? "border-primary text-primary font-medium"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                tab === key ? "border-primary text-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
+              <Icon className="h-3.5 w-3.5" />{label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ── Content ── */}
+      {/* ── Body ── */}
       <div className="flex-1 overflow-auto">
 
-        {/* ── TAB: ข้อมูลบริษัท ── */}
+        {/* ════ TAB: ข้อมูลบริษัท ════ */}
         {tab === "info" && (
-          <div className="mx-auto max-w-2xl space-y-5 p-6">
+          <div className="p-6">
 
-            {/* Upcoming events banner */}
+            {/* upcoming events banner */}
             {(upcomingContacts.length > 0 || (companyAnnivDays !== null && companyAnnivDays <= 30) || (customerAnnivDays !== null && customerAnnivDays <= 30)) && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-1.5 dark:border-amber-900/40 dark:bg-amber-950/20">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
-                  <Star className="h-3.5 w-3.5" /> เหตุการณ์สำคัญใน 30 วัน
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                  <span className="flex items-center gap-1 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                    <Star className="h-3.5 w-3.5" /> เหตุการณ์ใน 30 วัน
+                  </span>
+                  {companyAnnivDays !== null && companyAnnivDays <= 30 && (
+                    <span className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                      <CalendarDays className="h-3 w-3" /> ครบรอบก่อตั้ง <DaysUntilBadge days={companyAnnivDays} />
+                    </span>
+                  )}
+                  {customerAnnivDays !== null && customerAnnivDays <= 30 && (
+                    <span className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                      <Star className="h-3 w-3" /> ครบรอบลูกค้า <DaysUntilBadge days={customerAnnivDays} />
+                    </span>
+                  )}
+                  {upcomingContacts.map((c) => (
+                    <span key={c.id} className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                      <Cake className="h-3 w-3" /> วันเกิด {c.nickname ?? c.name} <DaysUntilBadge days={c.days} />
+                    </span>
+                  ))}
                 </div>
-                {companyAnnivDays !== null && companyAnnivDays <= 30 && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-amber-700 dark:text-amber-400 flex items-center gap-1"><CalendarDays className="h-3 w-3" /> ครบรอบก่อตั้ง</span>
-                    <DaysUntilBadge days={companyAnnivDays} />
-                  </div>
-                )}
-                {customerAnnivDays !== null && customerAnnivDays <= 30 && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-amber-700 dark:text-amber-400 flex items-center gap-1"><Star className="h-3 w-3" /> ครบรอบลูกค้า</span>
-                    <DaysUntilBadge days={customerAnnivDays} />
-                  </div>
-                )}
-                {upcomingContacts.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between text-xs">
-                    <span className="text-amber-700 dark:text-amber-400 flex items-center gap-1"><Cake className="h-3 w-3" /> วันเกิด {c.nickname ?? c.name}</span>
-                    <DaysUntilBadge days={c.days} />
-                  </div>
-                ))}
               </div>
             )}
 
-            {/* ── ข้อมูลหลัก ── */}
-            <section className="rounded-xl border bg-card p-5 space-y-4">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">ข้อมูลทั่วไป</h2>
+            {/* 2-column grid — ทุกอย่างอยู่หน้าเดียวไม่ต้องเลื่อน */}
+            <div className="grid gap-4 lg:grid-cols-2">
 
-              <div>
-                <Label className="text-xs">ชื่อบริษัท <span className="text-red-500">*</span></Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              </div>
+              {/* ─── คอลัมน์ซ้าย: ข้อมูลหลัก ─── */}
+              <div className="space-y-3 rounded-xl border bg-card p-5">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">ข้อมูลบริษัท</h2>
 
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs">อุตสาหกรรม</Label>
-                  <Input placeholder="เช่น อาหาร, IT" value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
+                  <Label className="text-xs">ชื่อบริษัท <span className="text-red-500">*</span></Label>
+                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                 </div>
-                <div>
-                  <Label className="text-xs">ประเภทบัญชี</Label>
-                  <div className="flex items-center gap-1.5 pt-1">
-                    <Switch checked={form.is_key_account} onCheckedChange={(v) => setForm({ ...form, is_key_account: v })} />
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Crown className="h-3 w-3 text-amber-500" /> Key Account
-                    </span>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">อุตสาหกรรม</Label>
+                    <Input placeholder="เช่น IT, โลจิสติกส์" value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">โทรศัพท์</Label>
+                    <Input placeholder="02-xxx-xxxx" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                   </div>
                 </div>
-              </div>
 
-              {form.is_key_account && (
-                <div>
-                  <Label className="text-xs">หมายเหตุ Key Account</Label>
-                  <Input placeholder="เช่น ลูกค้า VIP ดูแลพิเศษ" value={form.key_account_note} onChange={(e) => setForm({ ...form, key_account_note: e.target.value })} />
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">โทรศัพท์</Label>
-                  <Input placeholder="02-xxx-xxxx" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-                </div>
                 <div>
                   <Label className="text-xs">เว็บไซต์</Label>
                   <div className="flex gap-1.5">
                     <Input placeholder="example.com" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} />
                     {form.website && (
-                      <a href={form.website.startsWith("http") ? form.website : `https://${form.website}`} target="_blank" rel="noreferrer" className="flex items-center px-2 border rounded-md text-muted-foreground hover:text-foreground">
+                      <a href={form.website.startsWith("http") ? form.website : `https://${form.website}`}
+                        target="_blank" rel="noreferrer"
+                        className="flex shrink-0 items-center rounded-md border px-2 text-muted-foreground hover:text-foreground">
                         <ExternalLink className="h-4 w-4" />
                       </a>
                     )}
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <Label className="text-xs">ที่อยู่</Label>
-                <Input placeholder="ที่อยู่บริษัท" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs">จำนวนพนักงาน</Label>
-                  <Select value={form.employee_count || "none"} onValueChange={(v) => setForm({ ...form, employee_count: v === "none" ? "" : v })}>
-                    <SelectTrigger><SelectValue placeholder="เลือก" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— ไม่ระบุ —</SelectItem>
-                      <SelectItem value="1-10">1–10 คน</SelectItem>
-                      <SelectItem value="11-50">11–50 คน</SelectItem>
-                      <SelectItem value="51-200">51–200 คน</SelectItem>
-                      <SelectItem value="200+">200+ คน</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs">ที่อยู่</Label>
+                  <Input placeholder="ที่อยู่บริษัท" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
                 </div>
-                <div>
-                  <Label className="text-xs">รายได้ต่อปี (ประมาณ)</Label>
-                  <Select value={form.annual_revenue_range || "none"} onValueChange={(v) => setForm({ ...form, annual_revenue_range: v === "none" ? "" : v })}>
-                    <SelectTrigger><SelectValue placeholder="เลือก" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— ไม่ระบุ —</SelectItem>
-                      <SelectItem value="<5M">น้อยกว่า 5 ล้าน</SelectItem>
-                      <SelectItem value="5-50M">5–50 ล้าน</SelectItem>
-                      <SelectItem value="50-500M">50–500 ล้าน</SelectItem>
-                      <SelectItem value="500M+">500 ล้านขึ้นไป</SelectItem>
-                    </SelectContent>
-                  </Select>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">จำนวนพนักงาน</Label>
+                    <Select value={form.employee_count || "none"} onValueChange={(v) => setForm({ ...form, employee_count: v === "none" ? "" : v })}>
+                      <SelectTrigger><SelectValue placeholder="เลือก" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— ไม่ระบุ —</SelectItem>
+                        <SelectItem value="1-10">1–10 คน</SelectItem>
+                        <SelectItem value="11-50">11–50 คน</SelectItem>
+                        <SelectItem value="51-200">51–200 คน</SelectItem>
+                        <SelectItem value="200+">200+ คน</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">รายได้ต่อปี</Label>
+                    <Select value={form.annual_revenue_range || "none"} onValueChange={(v) => setForm({ ...form, annual_revenue_range: v === "none" ? "" : v })}>
+                      <SelectTrigger><SelectValue placeholder="เลือก" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— ไม่ระบุ —</SelectItem>
+                        <SelectItem value="<5M">น้อยกว่า 5 ล้าน</SelectItem>
+                        <SelectItem value="5-50M">5–50 ล้าน</SelectItem>
+                        <SelectItem value="50-500M">50–500 ล้าน</SelectItem>
+                        <SelectItem value="500M+">500 ล้านขึ้นไป</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+
+                <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
+                  <span className="flex items-center gap-1.5 text-xs font-medium">
+                    <Crown className="h-3.5 w-3.5 text-amber-500" /> Key Account (VIP)
+                  </span>
+                  <Switch checked={form.is_key_account} onCheckedChange={(v) => setForm({ ...form, is_key_account: v })} />
+                </div>
+                {form.is_key_account && (
+                  <Input placeholder="หมายเหตุ Key Account เช่น ดูแลพิเศษ" value={form.key_account_note} onChange={(e) => setForm({ ...form, key_account_note: e.target.value })} />
+                )}
+
+                <p className="text-[11px] text-muted-foreground">สร้างเมื่อ {formatThaiDate(account.created_at)}</p>
               </div>
 
-              <p className="text-[11px] text-muted-foreground">สร้างเมื่อ {formatThaiDate(account.created_at)}</p>
-            </section>
+              {/* ─── คอลัมน์ขวา: วันสำคัญ + ผู้ติดต่อ (preview) ─── */}
+              <div className="space-y-4">
 
-            {/* ── วันสำคัญ ── */}
-            <section className="rounded-xl border bg-card p-5 space-y-4">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                <CalendarDays className="h-4 w-4" /> วันสำคัญ
-              </h2>
+                {/* วันสำคัญ */}
+                <div className="rounded-xl border bg-card p-5 space-y-3">
+                  <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5" /> วันสำคัญ
+                  </h2>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs flex items-center justify-between">
-                    <span>วันก่อตั้งบริษัท</span>
-                    {form.founded_date && <DaysUntilBadge days={daysUntilNextOccurrence(form.founded_date)} />}
-                  </Label>
-                  <Input type="date" value={form.founded_date} onChange={(e) => setForm({ ...form, founded_date: e.target.value })} />
-                  {form.founded_date && (
-                    <p className="mt-1 text-[11px] text-muted-foreground">ก่อตั้งมา {new Date().getFullYear() - new Date(form.founded_date).getFullYear()} ปี</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs flex items-center justify-between">
+                        <span>ก่อตั้งบริษัท</span>
+                        {form.founded_date && <DaysUntilBadge days={daysUntilNextOccurrence(form.founded_date)} />}
+                      </Label>
+                      <Input type="date" value={form.founded_date} onChange={(e) => setForm({ ...form, founded_date: e.target.value })} />
+                      {form.founded_date && (
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          ก่อตั้งมา {new Date().getFullYear() - new Date(form.founded_date).getFullYear()} ปี
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-xs flex items-center justify-between">
+                        <span>เป็นลูกค้าตั้งแต่</span>
+                        {form.customer_since && <DaysUntilBadge days={daysUntilNextOccurrence(form.customer_since)} />}
+                      </Label>
+                      <Input type="date" value={form.customer_since} onChange={(e) => setForm({ ...form, customer_since: e.target.value })} />
+                      {form.customer_since && (
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          เป็นลูกค้ามา {new Date().getFullYear() - new Date(form.customer_since).getFullYear()} ปี
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs">เดือนปิดงบการเงิน</Label>
+                    <Select value={form.fiscal_year_end_month || "none"} onValueChange={(v) => setForm({ ...form, fiscal_year_end_month: v === "none" ? "" : v })}>
+                      <SelectTrigger><SelectValue placeholder="เลือกเดือน" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— ไม่ระบุ —</SelectItem>
+                        {MONTHS_TH.map((m, i) => (
+                          <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.fiscal_year_end_month && (
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">ติดตามก่อนปิดงบ — มักมีงบซื้อก่อนสิ้นปี</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* ผู้ติดต่อ preview */}
+                <div className="rounded-xl border bg-card p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5" /> ผู้ติดต่อ {contacts.length > 0 && `(${contacts.length})`}
+                    </h2>
+                    <button onClick={() => setTab("contacts")} className="text-xs text-primary hover:underline">
+                      {contacts.length > 0 ? "ดูทั้งหมด →" : "+ เพิ่ม"}
+                    </button>
+                  </div>
+                  {contacts.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">ยังไม่มีผู้ติดต่อ</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {contacts.slice(0, 3).map((c) => (
+                        <li key={c.id} className="flex items-center gap-2">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                            {c.name.slice(0, 1).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="truncate text-xs font-medium">{c.name}</div>
+                            {c.position && <div className="text-[11px] text-muted-foreground">{c.position}</div>}
+                          </div>
+                          {c.phone && <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{c.phone}</span>}
+                        </li>
+                      ))}
+                      {contacts.length > 3 && (
+                        <p className="text-[11px] text-muted-foreground">และอีก {contacts.length - 3} คน</p>
+                      )}
+                    </ul>
                   )}
                 </div>
-                <div>
-                  <Label className="text-xs flex items-center justify-between">
-                    <span>เป็นลูกค้าตั้งแต่</span>
-                    {form.customer_since && <DaysUntilBadge days={daysUntilNextOccurrence(form.customer_since)} />}
-                  </Label>
-                  <Input type="date" value={form.customer_since} onChange={(e) => setForm({ ...form, customer_since: e.target.value })} />
-                  {form.customer_since && (
-                    <p className="mt-1 text-[11px] text-muted-foreground">เป็นลูกค้ามา {new Date().getFullYear() - new Date(form.customer_since).getFullYear()} ปี</p>
-                  )}
+
+                {/* ดีล preview */}
+                {leads.length > 0 && (
+                  <div className="rounded-xl border bg-card p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                        <Star className="h-3.5 w-3.5" /> ดีล ({leads.length})
+                      </h2>
+                      <button onClick={() => setTab("deals")} className="text-xs text-primary hover:underline">ดูทั้งหมด →</button>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {leads.slice(0, 3).map((l) => (
+                        <li key={l.id} className="flex items-center gap-2">
+                          <Link to="/leads/$leadId" params={{ leadId: l.id }} className="min-w-0 flex-1 truncate text-xs font-medium text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                            {l.title}
+                          </Link>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${STAGE_COLOR[l.stage as LeadStage]}`}>
+                            {STAGE_LABEL_TH[l.stage as LeadStage]}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button onClick={save} disabled={saving}>
+                    {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
+                    บันทึก
+                  </Button>
                 </div>
               </div>
-
-              <div>
-                <Label className="text-xs">เดือนปิดงบการเงิน</Label>
-                <Select value={form.fiscal_year_end_month || "none"} onValueChange={(v) => setForm({ ...form, fiscal_year_end_month: v === "none" ? "" : v })}>
-                  <SelectTrigger><SelectValue placeholder="เลือกเดือน" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— ไม่ระบุ —</SelectItem>
-                    {MONTHS_TH.map((m, i) => (
-                      <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </section>
-
-            {/* Save button bottom */}
-            <div className="flex justify-end pb-4">
-              <Button onClick={save} disabled={saving}>
-                {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
-                บันทึกข้อมูล
-              </Button>
             </div>
           </div>
         )}
 
-        {/* ── TAB: ผู้ติดต่อ ── */}
+        {/* ════ TAB: ผู้ติดต่อ ════ */}
         {tab === "contacts" && (
           <div className="mx-auto max-w-2xl p-6">
             <div className="mb-4 flex items-center justify-between">
@@ -468,11 +528,10 @@ function AccountDetailPage() {
                 <Plus className="mr-1.5 h-3.5 w-3.5" /> เพิ่มผู้ติดต่อ
               </Button>
             </div>
-
             {contacts.length === 0 ? (
               <div className="rounded-xl border border-dashed py-16 text-center text-sm text-muted-foreground">
                 <Users className="mx-auto mb-2 h-8 w-8 opacity-30" />
-                ยังไม่มีผู้ติดต่อ — กด "เพิ่มผู้ติดต่อ" เพื่อเริ่มต้น
+                ยังไม่มีผู้ติดต่อ
               </div>
             ) : (
               <ul className="divide-y rounded-xl border bg-card overflow-hidden">
@@ -514,22 +573,17 @@ function AccountDetailPage() {
           </div>
         )}
 
-        {/* ── TAB: ดีล ── */}
+        {/* ════ TAB: ดีล ════ */}
         {tab === "deals" && (
           <div className="mx-auto max-w-2xl p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">ดีลทั้งหมด ({leads.length})</h2>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">{activeLeads.length} Active</span>
-                <span>·</span>
-                <span className="font-medium text-primary">{formatBaht(pipeline)}</span>
-              </div>
+              <h2 className="text-sm font-semibold">ดีล ({leads.length})</h2>
+              <span className="text-xs text-muted-foreground">{activeLeads.length} Active · {formatBaht(pipeline)}</span>
             </div>
-
             {leads.length === 0 ? (
               <div className="rounded-xl border border-dashed py-16 text-center text-sm text-muted-foreground">
                 <Star className="mx-auto mb-2 h-8 w-8 opacity-30" />
-                ยังไม่มีดีลที่เชื่อมกับบริษัทนี้
+                ยังไม่มีดีล
               </div>
             ) : (
               <ul className="divide-y rounded-xl border bg-card overflow-hidden">
@@ -543,9 +597,7 @@ function AccountDetailPage() {
                         {l.expected_close_date ? `ปิดคาดหวัง ${formatThaiDate(l.expected_close_date)}` : "ไม่ระบุวันปิด"}
                       </div>
                     </div>
-                    <div className="shrink-0 text-right">
-                      <div className="text-sm font-medium">{l.expected_value != null ? formatBaht(l.expected_value) : "—"}</div>
-                    </div>
+                    <div className="shrink-0 text-sm font-medium">{l.expected_value != null ? formatBaht(l.expected_value) : "—"}</div>
                     <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${STAGE_COLOR[l.stage as LeadStage]}`}>
                       {STAGE_LABEL_TH[l.stage as LeadStage]}
                     </span>
