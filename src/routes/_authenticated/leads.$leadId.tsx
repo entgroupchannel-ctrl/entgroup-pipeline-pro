@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, Phone, MessageCircle, Save, ExternalLink, Loader2, Check, Plus, Send, Mail, Trophy, XCircle,
+  ArrowLeft, Phone, MessageCircle, Save, ExternalLink, Loader2, Check, Plus, Send, Mail, Trophy, XCircle, Crown, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import { fetchFADocument, type FADocument } from "@/lib/flowaccount-client";
 import { FAImportModal } from "@/components/flowaccount/FAImportModal";
 import { LeadQuotationsSection } from "@/components/pipeline/LeadQuotationsSection";
 import { LeadEmailComposer } from "@/components/pipeline/LeadEmailComposer";
-import { X as XIcon, FileDown } from "lucide-react";
+import { FileDown } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/leads/$leadId")({
   component: LeadDetailPage,
