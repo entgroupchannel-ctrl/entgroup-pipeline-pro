@@ -125,7 +125,7 @@ function ActivitiesPage() {
         </div>
       ) : (
         <ul className="divide-y rounded-xl border bg-card">
-          {filtered.map((a) => {
+          {pageItems.map((a) => {
             const Icon = activityIcon(a.type);
             const overdue = !a.done && !!a.due_at && new Date(a.due_at).getTime() < Date.now();
             const lead = a.lead_id ? leadsMap.get(a.lead_id) : null;
