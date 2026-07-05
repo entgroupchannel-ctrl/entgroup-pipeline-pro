@@ -148,9 +148,10 @@ function EmailsPage() {
     setTplPickerOpen(false);
     toast.success(`โหลด template: ${t.name}`);
   };
-  const deleteTemplate = (id: string) => {
-    const next = templates.filter((t) => t.id !== id);
-    setTemplates(next); saveTemplates(next);
+  const deleteTemplate = async (id: string) => {
+    const { error } = await crmDb().from("email_templates").delete().eq("id", id);
+    if (error) { toast.error("ลบไม่สำเร็จ"); return; }
+    await loadTemplates();
     toast.success("ลบ template แล้ว");
   };
   const confirmSaveTemplate = async () => {
