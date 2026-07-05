@@ -541,6 +541,17 @@ function KeyAccountsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {selected && (
+        <AddDealDialog
+          open={addDealOpen}
+          onOpenChange={setAddDealOpen}
+          account={selected}
+          ownerId={user?.id ?? null}
+          profiles={profiles}
+          onCreated={() => { setAddDealOpen(false); load(); }}
+        />
+      )}
     </div>
   );
 }
