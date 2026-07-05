@@ -454,6 +454,9 @@ function EmailsPage() {
 
   // history
   const [logs, setLogs] = useState<any[]>([]);
+  const [logModalOpen, setLogModalOpen] = useState(false);
+  const [logFilter, setLogFilter] = useState<"all"|"sent"|"failed">("all");
+  const [allLogs, setAllLogs] = useState<any[]>([]);
 
   // templates
   const [templates, setTemplates]         = useState<SavedTemplate[]>([]);
@@ -555,8 +558,11 @@ function EmailsPage() {
       .from("email_send_log")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(20);
-    if (!error) setLogs(data ?? []);
+      .limit(100);
+    if (!error) {
+      setAllLogs(data ?? []);
+      setLogs((data ?? []).slice(0, 5));
+    }
   };
   useEffect(() => { loadLogs(); }, []);
 
@@ -987,42 +993,62 @@ function EmailsPage() {
             </div>
           )}
 
-          <div className="space-y-3">
+          {/* ── Email Log Panel ── */}
+          <div className="space-y-2">
+            {/* Header */}
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold">ประวัติการส่ง</h2>
-              <button onClick={loadLogs} className="text-xs text-muted-foreground hover:text-foreground">
-                รีเฟรช
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={loadLogs} className="text-[11px] text-muted-foreground hover:text-foreground">↺</button>
+                {allLogs.length > 0 && (
+                  <button onClick={() => setLogModalOpen(true)} className="text-[11px] text-primary hover:underline">
+                    ดูทั้งหมด →
+                  </button>
+                )}
+              </div>
             </div>
-            {logs.length === 0 ? (
-              <p className="text-xs text-muted-foreground">ยังไม่มีประวัติการส่ง</p>
-            ) : (
-              <div className="space-y-2">
-                {logs.map((log) => (
-                  <div key={log.id} className={`rounded-lg border bg-card p-3 space-y-1.5 ${log.status !== "sent" ? "border-red-200 dark:border-red-800" : ""}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-xs font-medium line-clamp-1 flex-1">{log.subject || "—"}</span>
-                      <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                        log.status === "sent"
-                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                          : "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
-                      }`}>
-                        {log.status === "sent" ? "✓ ส่งแล้ว" : "✗ ล้มเหลว"}
-                      </span>
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {log.recipient_name ? `${log.recipient_name} ` : ""}{log.recipient_email}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {new Date(log.created_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}
-                    </div>
-                    {log.error_message && (
-                      <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 rounded px-2 py-1">
-                        {log.error_message}
-                      </div>
-                    )}
+
+            {/* Summary stats */}
+            {allLogs.length > 0 && (
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { label: "สำเร็จ", count: allLogs.filter(l => l.status === "sent").length, color: "text-emerald-600 dark:text-emerald-400" },
+                  { label: "ล้มเหลว", count: allLogs.filter(l => l.status !== "sent").length, color: "text-red-500 dark:text-red-400" },
+                  { label: "รวม", count: allLogs.length, color: "text-primary" },
+                ].map(s => (
+                  <div key={s.label} className="rounded-lg border bg-card px-2 py-1.5 text-center">
+                    <div className={`text-base font-bold ${s.color}`}>{s.count}</div>
+                    <div className="text-[10px] text-muted-foreground">{s.label}</div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Compact list - 5 recent */}
+            {logs.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">ยังไม่มีประวัติการส่ง</p>
+            ) : (
+              <div className="rounded-xl border bg-card overflow-hidden">
+                {logs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-2 px-3 py-2.5 border-b last:border-0 hover:bg-muted/20 transition-colors">
+                    <div className={`mt-1 h-1.5 w-1.5 rounded-full shrink-0 ${log.status === "sent" ? "bg-emerald-500" : "bg-red-500"}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium truncate leading-tight">{log.subject || "—"}</p>
+                      <p className="text-[10px] text-muted-foreground truncate mt-0.5">{log.recipient_email}</p>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5 whitespace-nowrap">
+                      {new Date(log.created_at).toLocaleString("th-TH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" })}
+                    </span>
+                  </div>
+                ))}
+                {allLogs.length > 5 && (
+                  <button
+                    onClick={() => setLogModalOpen(true)}
+                    className="flex w-full items-center justify-center py-2 text-[11px] text-muted-foreground hover:text-primary hover:bg-muted/20 transition-colors border-t"
+                  >
+                    + อีก {allLogs.length - 5} รายการ
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1031,6 +1057,70 @@ function EmailsPage() {
 
       </div>
       </div>
+
+      {/* ── Email Log Modal ── */}
+      <Dialog open={logModalOpen} onOpenChange={setLogModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0">
+          <DialogHeader className="px-5 py-4 border-b shrink-0">
+            <DialogTitle className="flex items-center justify-between">
+              <span>ประวัติการส่งอีเมล</span>
+              <span className="text-sm font-normal text-muted-foreground">{allLogs.length} รายการ</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Filter tabs */}
+          <div className="flex gap-1.5 px-5 py-3 border-b shrink-0">
+            {(["all","sent","failed"] as const).map((f) => {
+              const count = f === "all" ? allLogs.length : allLogs.filter(l => f === "sent" ? l.status === "sent" : l.status !== "sent").length;
+              return (
+                <button key={f} onClick={() => setLogFilter(f)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    logFilter === f ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                  }`}>
+                  {f === "all" ? "ทั้งหมด" : f === "sent" ? "✓ สำเร็จ" : "✗ ล้มเหลว"} ({count})
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Log list */}
+          <div className="flex-1 overflow-y-auto divide-y">
+            {allLogs
+              .filter(l => logFilter === "all" ? true : logFilter === "sent" ? l.status === "sent" : l.status !== "sent")
+              .map((log) => (
+                <div key={log.id} className="flex items-start gap-3 px-5 py-3 hover:bg-muted/20 transition-colors">
+                  <div className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${log.status === "sent" ? "bg-emerald-500" : "bg-red-500"}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium leading-snug">{log.subject || "—"}</p>
+                      <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                        log.status === "sent"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                          : "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                      }`}>
+                        {log.status === "sent" ? "✓ ส่งแล้ว" : "✗ ล้มเหลว"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {log.recipient_name ? `${log.recipient_name} · ` : ""}{log.recipient_email}
+                    </p>
+                    {log.error_message && (
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1 bg-red-50 dark:bg-red-950/20 rounded px-2 py-1">
+                        {log.error_message}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap">
+                    {new Date(log.created_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}
+                  </span>
+                </div>
+              ))}
+            {allLogs.filter(l => logFilter === "all" ? true : logFilter === "sent" ? l.status === "sent" : l.status !== "sent").length === 0 && (
+              <div className="flex justify-center py-10 text-sm text-muted-foreground">ไม่มีรายการ</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Save template dialog */}
       <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
