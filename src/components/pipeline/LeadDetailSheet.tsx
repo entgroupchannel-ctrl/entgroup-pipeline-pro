@@ -184,7 +184,7 @@ export function LeadDetailSheet({ leadId, onClose, onChanged }: Props) {
           <div className="border-b px-5 py-4 shrink-0">
             <SheetHeader className="mb-0">
               <SheetTitle className="text-base">
-                {loading ? "กำลังโหลด..." : lead?.title ?? "รายละเอียดดีล"}
+                {loading ? "กำลังโหลด..." : lead?.deal_number ?? lead?.title ?? "รายละเอียดดีล"}
               </SheetTitle>
             </SheetHeader>
             {lead && !loading && (

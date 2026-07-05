@@ -33,6 +33,7 @@ export const STAGE_TOKEN: Record<LeadStage, string> = {
 export interface Lead {
   id: string;
   title: string;
+  deal_number: string | null;  // D-YYYYMMDD-NNN auto-generated
   stage: LeadStage;
   expected_value: number | null;
   expected_close_date: string | null;
@@ -43,6 +44,9 @@ export interface Lead {
   flowaccount_quotation_no: string | null;
   flowaccount_quotation_url: string | null;
   lost_reason: string | null;
+  b2b_request_id: string | null;
+  b2b_quote_number: string | null;
+  b2b_data: any | null;
   created_at: string;
   updated_at: string;
 }

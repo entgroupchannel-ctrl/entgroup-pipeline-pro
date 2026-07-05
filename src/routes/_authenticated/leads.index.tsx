@@ -195,7 +195,7 @@ function LeadsPage() {
 
   const duplicateLead = async (l: Lead) => {
     const { error } = await crmDb().from("leads").insert({
-      title: `${l.title} (สำเนา)`, stage: "new",
+      title: l.title && l.title !== (l as any).deal_number ? `${l.title} (สำเนา)` : null, stage: "new",
       expected_value: l.expected_value, expected_close_date: l.expected_close_date,
       account_id: l.account_id, source: l.source, owner_id: l.owner_id, created_by: user?.id,
     });

@@ -438,12 +438,12 @@ function ActivitiesPage() {
     if (!isManager && user) q = q.eq("owner_id", user.id);
     const [actRes, leadsRes, profRes] = await Promise.all([
       q,
-      crmDb().from("leads").select("id,title"),
+      crmDb().from("leads").select("id,title,deal_number"),
       crmDb().from("user_profiles").select("id,full_name"),
     ]);
     if (actRes.error) { toast.error("โหลดไม่สำเร็จ"); return; }
     setRows((actRes.data??[]) as Activity[]);
-    setLeadsMap(new Map((leadsRes.data??[]).map((l:any)=>[l.id,l.title])));
+    setLeadsMap(new Map((leadsRes.data??[]).map((l:any)=>[l.id, l.deal_number ?? l.title])));
     setProfilesMap(new Map((profRes.data??[]).map((p:any)=>[p.id,p.full_name??"?"])));
   };
 

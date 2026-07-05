@@ -81,7 +81,7 @@ export function KanbanBoard({ sourceFilter = "all", showClaimButton = false, onQ
 
   const duplicateLead = async (lead: LeadWithRelations) => {
     const { error } = await crmDb().from("leads").insert({
-      title: `${lead.title} (สำเนา)`, stage: "new",
+      title: lead.title && lead.title !== lead.deal_number ? `${lead.title} (สำเนา)` : null, stage: "new",
       expected_value: lead.expected_value, account_id: lead.account_id,
       contact_id: lead.contact_id, source: lead.source, owner_id: lead.owner_id,
       created_by: user?.id,
@@ -393,7 +393,10 @@ export function KanbanBoard({ sourceFilter = "all", showClaimButton = false, onQ
                       onClick={() => openLead(l.id)}
                       className="w-full rounded-md bg-background/70 px-3 py-2 text-left text-sm hover:bg-background"
                     >
-                      <div className="truncate font-medium">{l.title}</div>
+                      <div className="flex items-center gap-1.5">
+                        {l.deal_number && <span className="font-mono text-[10px] text-primary/70">{l.deal_number}</span>}
+                        <span className="truncate font-medium text-sm">{l.account?.name ?? l.title}</span>
+                      </div>
                       <div className="truncate text-xs text-muted-foreground">
                         {l.account?.name ?? "-"} · {formatBaht(Number(l.expected_value ?? 0))}
                       </div>

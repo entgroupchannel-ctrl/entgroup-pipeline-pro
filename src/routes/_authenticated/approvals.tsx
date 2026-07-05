@@ -83,7 +83,7 @@ function ApprovalsPage() {
     if (reqRes.error) { toast.error("โหลดไม่สำเร็จ"); setLoading(false); return; }
     setRequests((reqRes.data ?? []) as StageRequest[]);
     setProfiles(new Map((profRes.data ?? []).map((p: any) => [p.id, p.full_name ?? p.id.slice(0, 8)])));
-    setLeads(new Map((leadRes.data ?? []).map((l: any) => [l.id, l.title])));
+    setLeads(new Map((leadRes.data ?? []).map((l: any) => [l.id, l.deal_number ?? l.title])));
     setLoading(false);
   };
 
