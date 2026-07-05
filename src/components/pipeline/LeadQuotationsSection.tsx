@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, FileDown, FileText, ExternalLink, ChevronDown } from "lucide-react";
+import { Plus, FileDown, FileText, ExternalLink, ChevronDown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { crmDb } from "@/lib/crm";
@@ -50,6 +50,14 @@ export function LeadQuotationsSection({ leadId, accountId }: Props) {
     load();
   };
 
+  const deleteQuotation = async (id: string) => {
+    if (!window.confirm("ลบใบเสนอราคานี้ออกจากรายการ?")) return;
+    const { error } = await crmDb().from("quotations").delete().eq("id", id);
+    if (error) return toast.error("ลบไม่สำเร็จ", { description: error.message });
+    toast.success("ลบใบเสนอราคาแล้ว");
+    load();
+  };
+
   const totalAccepted = rows
     .filter((r) => r.status === "accepted")
     .reduce((sum, r) => sum + (r.grand_total ?? 0), 0);
@@ -93,6 +101,7 @@ export function LeadQuotationsSection({ leadId, accountId }: Props) {
               row={r}
               onEdit={() => { setEditTarget(r); setNewOpen(true); }}
               onStatusChange={(s) => updateStatus(r.id, s)}
+              onDelete={() => deleteQuotation(r.id)}
               canEdit={isManager || true}
             />
           ))}
@@ -117,11 +126,12 @@ export function LeadQuotationsSection({ leadId, accountId }: Props) {
 }
 
 function QuotationMiniRow({
-  row, onEdit, onStatusChange,
+  row, onEdit, onStatusChange, onDelete,
 }: {
   row: Quotation;
   onEdit: () => void;
   onStatusChange: (s: QuotationStatus) => void;
+  onDelete: () => void;
   canEdit: boolean;
 }) {
   const [statusOpen, setStatusOpen] = useState(false);
@@ -202,6 +212,15 @@ function QuotationMiniRow({
 
       <Button variant="ghost" size="sm" className="h-6 shrink-0 px-2 text-[11px]" onClick={onEdit}>
         แก้ไข
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 w-6 shrink-0 p-0 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+        onClick={onDelete}
+        title="ลบใบเสนอราคา"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
       </Button>
     </li>
   );
