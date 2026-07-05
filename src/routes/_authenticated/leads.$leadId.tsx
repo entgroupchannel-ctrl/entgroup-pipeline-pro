@@ -425,7 +425,7 @@ function LeadDetailPage() {
                     ดูใน FlowAccount <ExternalLink className="h-3 w-3" />
                   </a>
                   <Button variant="ghost" size="sm" onClick={unlinkFA}>
-                    <XIcon className="mr-1 h-3 w-3" /> ยกเลิก link
+                    <X className="mr-1 h-3 w-3" /> ยกเลิก link
                   </Button>
                 </div>
               </div>
