@@ -136,7 +136,6 @@ function KeyAccountsPage() {
       crmDb().from("user_profiles").select("id, full_name"),
     ]);
 
-
     if (accRes.error) {
       toast.error("โหลด Key Accounts ไม่สำเร็จ");
       return;
@@ -145,10 +144,11 @@ function KeyAccountsPage() {
     const profileMap = new Map<string, string | null>(
       (profilesRes.data ?? []).map((p: any) => [p.id, p.full_name]),
     );
+    setProfileMap(profileMap);
+
     const raw = (accRes.data ?? []) as any[];
     const accs: KeyAccount[] = raw.map((a) => ({
       ...a,
-      owner: a.owner_id ? { full_name: profileMap.get(a.owner_id) ?? null } : null,
     }));
 
     const leadIds = accs.flatMap((a) => (a.leads ?? []).map((l) => l.id)).filter(Boolean);
@@ -167,6 +167,7 @@ function KeyAccountsPage() {
     setActivities(acts);
     setSelected((prev) => (prev ? accs.find((a) => a.id === prev.id) ?? null : null));
   };
+
 
 
   useEffect(() => {
