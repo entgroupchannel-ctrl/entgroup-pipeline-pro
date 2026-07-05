@@ -78,7 +78,7 @@ function LoginPage() {
           {/* Top badge */}
           <div className="inline-flex items-center gap-2 self-start rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs uppercase tracking-widest text-primary font-semibold backdrop-blur-sm">
             <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            ENTGROUP CRM
+            CRM
           </div>
 
           {/* Bottom headline */}
@@ -113,9 +113,9 @@ function LoginPage() {
               className="mx-auto h-16 w-auto object-contain"
             />
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">ENTGROUP CRM</h1>
+              <h1 className="text-2xl font-bold tracking-tight">ระบบบริหารความสัมพันธ์ลูกค้าอัจฉริยะ</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                {mode === "signin" ? "เข้าสู่ระบบบริหารความสัมพันธ์ลูกค้า" : "รีเซ็ตรหัสผ่าน"}
+                {mode === "signin" ? "เข้าสู่ระบบ" : "รีเซ็ตรหัสผ่าน"}
               </p>
             </div>
           </div>
@@ -224,6 +224,9 @@ function LoginPage() {
             )}
           </div>
 
+          <p className="text-center text-xs text-muted-foreground/80">
+            ระบบบริหารความสัมพันธ์ลูกค้าอัจฉริยะ Version 1.0.20260706
+          </p>
           <p className="text-center text-[11px] text-muted-foreground">
             © {new Date().getFullYear()} ENTGROUP Co., Ltd. · All rights reserved
           </p>
