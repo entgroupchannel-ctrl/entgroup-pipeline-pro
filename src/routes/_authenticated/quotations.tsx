@@ -162,6 +162,11 @@ function QuotationsPage() {
     });
   }, [rows, q, statusFilter, accountsMap]);
 
+  const {
+    page, setPage, pageSize, setPageSize, totalPages,
+    total: pagedTotal, paged: pageItems,
+  } = usePagination(filtered ?? [], 25);
+
   const updateStatus = async (id: string, status: QuotationStatus) => {
     const { error } = await crmDb().from("quotations").update({ status }).eq("id", id);
     if (error) return toast.error("อัปเดตสถานะไม่สำเร็จ", { description: error.message });
