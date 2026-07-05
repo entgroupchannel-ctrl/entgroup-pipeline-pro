@@ -501,48 +501,49 @@ function ActivitiesPage() {
   if (!rows) return <div className="flex h-full items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
   return (
-    <div className="flex h-full flex-col page-fade-in">
+    <div className="p-6 page-fade-in space-y-5">
 
       {/* ── Header ── */}
-      <div className="border-b bg-background px-6 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-semibold">งานวันนี้</h1>
-            <p className="text-xs text-muted-foreground">{todayTH()}</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={()=>{setQuickAdd((v)=>!v); setLogOpen(false);}}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" /> เพิ่มงาน
-            </Button>
-            <Button size="sm" onClick={()=>{setLogOpen(true); setQuickAdd(false);}}>
-              <StickyNote className="mr-1.5 h-3.5 w-3.5" /> บันทึกกิจกรรม
-            </Button>
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">งานวันนี้</h1>
+          <p className="text-xs text-muted-foreground">{todayTH()}</p>
         </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={()=>{setQuickAdd((v)=>!v); setLogOpen(false);}}>
+            <Plus className="mr-1.5 h-4 w-4" /> เพิ่มงาน
+          </Button>
+          <Button size="sm" onClick={()=>{setLogOpen(true); setQuickAdd(false);}}>
+            <StickyNote className="mr-1.5 h-4 w-4" /> บันทึกกิจกรรม
+          </Button>
+        </div>
+      </div>
 
-        {/* KPI row */}
-        <div className="mt-3 grid grid-cols-4 gap-2">
-          <StatCard value={counts.overdue}  label="เลยกำหนด"     color="text-red-600 dark:text-red-400"     bg="bg-red-50 dark:bg-red-950/20"     border="border-red-200 dark:border-red-800" />
-          <StatCard value={counts.today}    label="วันนี้"         color="text-amber-700 dark:text-amber-400" bg="bg-amber-50 dark:bg-amber-950/20"  border="border-amber-200 dark:border-amber-800" />
-          <StatCard value={counts.upcoming} label="3 วันข้างหน้า" color="text-blue-700 dark:text-blue-400"  bg="bg-blue-50 dark:bg-blue-950/20"    border="border-blue-200 dark:border-blue-800" />
-          <StatCard value={counts.done}     label="เสร็จแล้ว"     color="text-emerald-700 dark:text-emerald-400" bg="bg-emerald-50 dark:bg-emerald-950/20" border="border-emerald-200 dark:border-emerald-800" />
-        </div>
+      {/* KPI row (matches leads.index PeriodKpiCard grid) */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard icon={<AlertTriangle className="h-4 w-4" />} value={counts.overdue}  label="เลยกำหนด"     tone="red" />
+        <StatCard icon={<Clock className="h-4 w-4" />}         value={counts.today}    label="วันนี้"        tone="amber" />
+        <StatCard icon={<Calendar className="h-4 w-4" />}      value={counts.upcoming} label="3 วันข้างหน้า" tone="blue" />
+        <StatCard icon={<CheckCircle2 className="h-4 w-4" />}  value={counts.done}     label="เสร็จแล้ว"     tone="emerald" />
+      </div>
 
-        {/* Search */}
-        <div className="relative mt-2">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input placeholder="ค้นหา..." value={search} onChange={(e)=>setSearch(e.target.value)} className="pl-8 h-8 text-xs" />
-        </div>
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Input placeholder="ค้นหา..." value={search} onChange={(e)=>setSearch(e.target.value)} className="pl-8 h-9 text-sm bg-background" />
       </div>
 
       {/* Quick add form */}
       {quickAdd && (
-        <QuickAddForm onSaved={()=>{ setQuickAdd(false); load(); }} onClose={()=>setQuickAdd(false)} />
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <QuickAddForm onSaved={()=>{ setQuickAdd(false); load(); }} onClose={()=>setQuickAdd(false)} />
+        </div>
       )}
 
       {/* ── 2-column content ── */}
-      <div className="flex-1 overflow-auto p-4">
+      <div>
         {groups.length === 0 ? (
+
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <CheckCircle2 className="h-10 w-10 mb-3 opacity-20" />
             <p className="text-sm font-medium">ไม่มีงานค้าง 🎉</p>
