@@ -382,24 +382,31 @@ function LeadDetailPage() {
           <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/pipeline" })}>
             <ArrowLeft className="mr-1 h-4 w-4" /> Pipeline
           </Button>
-          {titleEditing ? (
-            <Input
-              autoFocus
-              className="h-9 max-w-md text-lg font-semibold"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              onBlur={async () => { setTitleEditing(false); await saveLead(); }}
-              onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
-            />
-          ) : (
-            <h1
-              onClick={() => setTitleEditing(true)}
-              className="cursor-text truncate text-lg font-semibold hover:text-primary"
-              title="คลิกเพื่อแก้ไข"
-            >
-              {form.title || "-"}
-            </h1>
-          )}
+          <div className="flex items-center gap-2 min-w-0">
+            {lead?.deal_number && (
+              <span className="font-mono text-sm font-bold text-primary shrink-0 bg-primary/10 px-2 py-0.5 rounded">
+                {lead.deal_number}
+              </span>
+            )}
+            {titleEditing ? (
+              <Input
+                autoFocus
+                className="h-9 max-w-md text-lg font-semibold"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                onBlur={async () => { setTitleEditing(false); await saveLead(); }}
+                onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+              />
+            ) : (
+              <h1
+                onClick={() => setTitleEditing(true)}
+                className="cursor-text truncate text-base font-semibold hover:text-primary"
+                title="คลิกเพื่อแก้ไข"
+              >
+                {form.title && form.title !== lead?.deal_number ? form.title : ""}
+              </h1>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setCallOpen(true)}>
