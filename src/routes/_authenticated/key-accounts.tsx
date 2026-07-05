@@ -1020,15 +1020,44 @@ function DealsTab({ leads, onAddDeal }: { leads: any[]; onAddDeal: () => void })
         );
       })}
 
+      {/* Pagination */}
+      {dealsTotalPages > 1 && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-3">
+          <span>
+            แสดง {(dealsPageSafe - 1) * DEALS_PAGE_SIZE + 1}–
+            {Math.min(dealsPageSafe * DEALS_PAGE_SIZE, sortedLeads.length)} จาก {sortedLeads.length} ดีล
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setDealsPage((p) => Math.max(1, p - 1))}
+              disabled={dealsPageSafe <= 1}
+              className="px-2 py-1 border rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ก่อนหน้า
+            </button>
+            <span className="px-2">
+              {dealsPageSafe} / {dealsTotalPages}
+            </span>
+            <button
+              onClick={() => setDealsPage((p) => Math.min(dealsTotalPages, p + 1))}
+              disabled={dealsPageSafe >= dealsTotalPages}
+              className="px-2 py-1 border rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ถัดไป
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Grand total */}
-      {leads.length > 0 && (
+      {sortedLeads.length > 0 && (
         <div className="flex items-center justify-between rounded-xl border bg-muted/20 px-4 py-3">
           <div>
             <div className="text-[13px] text-muted-foreground">
               มูลค่ารวมทั้งหมด (จากใบเสนอราคา)
             </div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
-              จาก {allQTs.length} ใบเสนอราคา ใน {leads.length} deals
+              จาก {allQTs.length} ใบเสนอราคา ใน {sortedLeads.length} deals
             </div>
           </div>
           <div className="text-xl font-medium">฿{totalQT.toLocaleString()}</div>
