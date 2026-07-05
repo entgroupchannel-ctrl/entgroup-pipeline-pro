@@ -166,6 +166,20 @@ function ActivitiesPage() {
         </ul>
       )}
 
+      {filtered && filtered.length > 0 && (
+        <div className="mt-3 rounded-xl border bg-card overflow-hidden">
+          <ListPagination
+            page={page}
+            pageSize={pageSize}
+            total={pagedTotal}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            className="border-t-0"
+          />
+        </div>
+      )}
+
       
     </div>
   );
