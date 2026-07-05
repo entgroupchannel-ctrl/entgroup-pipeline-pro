@@ -428,7 +428,7 @@ function LeadsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtered.map((l) => {
+                {pageItems.map((l) => {
                   const owner       = l.owner_id    ? profilesMap.get(l.owner_id)   : null;
                   const accountName = l.account_id  ? accountsMap.get(l.account_id) : null;
                   const overdue = l.expected_close_date && ACTIVE_STAGES.includes(l.stage) &&
