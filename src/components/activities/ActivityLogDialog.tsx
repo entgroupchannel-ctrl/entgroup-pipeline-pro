@@ -386,27 +386,26 @@ export function ActivityLogDialog({
     // Serialize structured data to JSON body
     const body = JSON.stringify(log);
 
-    if (leadId) {
-      setSaving(true);
-      const { error } = await crmDb().from("activities").insert({
-        lead_id: leadId,
-        type: log.kind,
-        subject,
-        body,
-        done: true,
-        done_at: doneAt,
-        due_at: log.next_date ? new Date(log.next_date).toISOString() : null,
-        owner_id: user?.id,
-      });
-      setSaving(false);
-      if (error) {
-        toast.error("บันทึกไม่สำเร็จ: " + error.message);
-        return;
-      }
-      toast.success("บันทึกกิจกรรมแล้ว ✅");
-      onSaved?.();
+    // Save regardless of whether leadId is provided
+    // When leadId is null, activity is saved as a global (non-deal) activity
+    setSaving(true);
+    const { error } = await crmDb().from("activities").insert({
+      lead_id: leadId ?? null,
+      type: log.kind,
+      subject,
+      body,
+      done: true,
+      done_at: doneAt,
+      due_at: log.next_date ? new Date(log.next_date).toISOString() : null,
+      owner_id: user?.id,
+    });
+    setSaving(false);
+    if (error) {
+      toast.error("บันทึกไม่สำเร็จ: " + error.message);
+      return;
     }
-
+    toast.success("บันทึกกิจกรรมแล้ว ✅");
+    onSaved?.();
     onOpenChange(false);
   };
 

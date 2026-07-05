@@ -102,10 +102,11 @@ export function MyDayPanel({ defaultOpen = true, onRefresh }: Props) {
         .from("contacts")
         .select("id, name, nickname, birth_date, account_id")
         .not("birth_date", "is", null);
-      // Also get accounts with founded_date / customer_since
+      // Only fetch accounts that have at least one date field set
       let accountsQ = crmDb()
         .from("accounts")
-        .select("id, name, founded_date, customer_since");
+        .select("id, name, founded_date, customer_since")
+        .or("founded_date.not.is.null,customer_since.not.is.null");
 
       const [actRes, dealsRes, contactsRes, accRes] = await Promise.all([
         actQ, dealsQ, eventsQ, accountsQ,

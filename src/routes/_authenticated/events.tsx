@@ -33,8 +33,9 @@ interface CRMEvent {
 
 const MONTHS_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
 
-function nextOccurrenceOf(dateStr: string): Date {
+function nextOccurrenceOf(dateStr: string): Date | null {
   const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
   const now = new Date(); now.setHours(0, 0, 0, 0);
   const thisYear = new Date(now.getFullYear(), d.getMonth(), d.getDate());
   return thisYear >= now ? thisYear : new Date(now.getFullYear() + 1, d.getMonth(), d.getDate());
@@ -89,6 +90,7 @@ function EventsPage() {
     for (const c of (contactsRes.data ?? []) as any[]) {
       if (!c.birth_date) continue;
       const next = nextOccurrenceOf(c.birth_date);
+      if (!next) continue; // skip invalid dates
       all.push({
         id: `birthday-${c.id}`,
         type: "birthday",
@@ -108,33 +110,37 @@ function EventsPage() {
     for (const a of (accountsRes.data ?? []) as any[]) {
       if (a.founded_date) {
         const next = nextOccurrenceOf(a.founded_date);
-        const years = new Date().getFullYear() - new Date(a.founded_date).getFullYear();
-        all.push({
-          id: `company-${a.id}`,
-          type: "company_anniv",
-          label: a.name,
-          detail: `ปีที่ ${years}`,
-          accountId: a.id,
-          accountName: a.name,
-          eventDate: a.founded_date,
-          nextOccurrence: next,
-          daysUntil: daysUntilDate(next),
-        });
+        if (next) {
+          const years = new Date().getFullYear() - new Date(a.founded_date).getFullYear();
+          all.push({
+            id: `company-${a.id}`,
+            type: "company_anniv",
+            label: a.name,
+            detail: `ปีที่ ${years}`,
+            accountId: a.id,
+            accountName: a.name,
+            eventDate: a.founded_date,
+            nextOccurrence: next,
+            daysUntil: daysUntilDate(next),
+          });
+        }
       }
       if (a.customer_since) {
         const next = nextOccurrenceOf(a.customer_since);
-        const years = new Date().getFullYear() - new Date(a.customer_since).getFullYear();
-        all.push({
-          id: `customer-${a.id}`,
-          type: "customer_anniv",
-          label: a.name,
-          detail: `ลูกค้ามา ${years} ปี`,
-          accountId: a.id,
-          accountName: a.name,
-          eventDate: a.customer_since,
-          nextOccurrence: next,
-          daysUntil: daysUntilDate(next),
-        });
+        if (next) {
+          const years = new Date().getFullYear() - new Date(a.customer_since).getFullYear();
+          all.push({
+            id: `customer-${a.id}`,
+            type: "customer_anniv",
+            label: a.name,
+            detail: `ลูกค้ามา ${years} ปี`,
+            accountId: a.id,
+            accountName: a.name,
+            eventDate: a.customer_since,
+            nextOccurrence: next,
+            daysUntil: daysUntilDate(next),
+          });
+        }
       }
     }
 
