@@ -280,7 +280,7 @@ function AccountsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtered.map((a) => (
+                {pageItems.map((a) => (
                   <tr key={a.id} className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected.has(a.id) ? "bg-primary/5" : ""}`} onClick={() => navigate({ to: "/accounts/$accountId", params: { accountId: a.id } })}>
                     <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}><Checkbox checked={selected.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} /></td>
                     <td className="px-4 py-3">
