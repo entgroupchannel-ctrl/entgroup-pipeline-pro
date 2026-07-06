@@ -50,7 +50,7 @@ function LoginPage() {
     if (!email.trim()) { toast.error("กรุณากรอกอีเมลก่อน"); return; }
     setSubmitting(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/login`,
+      redirectTo: `${window.location.origin}/set-password`,
     });
     setSubmitting(false);
     if (error) { toast.error(error.message); return; }
