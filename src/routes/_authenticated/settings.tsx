@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/lib/auth-context";
 import { crmDb, ACTIVE_STAGES, OUTCOME_STAGES, STAGE_LABEL_TH, type LeadStage, type UserProfile } from "@/lib/crm";
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABEL, type ActivityType } from "@/lib/activities";
-import { Plus, UserPlus, Trash2 } from "lucide-react";
+import { Plus, UserPlus, Trash2, Mail } from "lucide-react";
 import { InviteUserModal } from "@/components/InviteUserModal";
 import { FlowAccountTab } from "@/components/settings/FlowAccountTab";
 import { EmailConfigTab } from "@/components/settings/EmailConfigTab";
@@ -23,7 +23,7 @@ import { AISettingsTab } from "@/components/settings/AISettingsTab";
 import { PermissionsTab } from "@/components/settings/PermissionsTab";
 import { EmailTemplatesTab } from "@/components/settings/EmailTemplatesTab";
 import { MediaLibraryTab } from "@/components/settings/MediaLibraryTab";
-import { deactivateCrmUser, listCrmUsersWithEmail } from "@/lib/invite-user.functions";
+import { deactivateCrmUser, listCrmUsersWithEmail, resendCrmInvite } from "@/lib/invite-user.functions";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -205,10 +205,12 @@ function ProfileTab() {
 function TeamTab() {
   const [rows, setRows] = useState<UserProfile[] | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const { user } = useAuth();
   const confirm = useConfirm();
   const deactivate = useServerFn(deactivateCrmUser);
   const fetchUsers = useServerFn(listCrmUsersWithEmail);
+  const resend = useServerFn(resendCrmInvite);
 
   const load = async () => {
     try {
@@ -227,6 +229,26 @@ function TeamTab() {
     if (error) return toast.error("อัปเดตไม่สำเร็จ", { description: error.message });
     toast.success("อัปเดตแล้ว");
     load();
+  };
+
+  const handleResend = async (u: UserProfile) => {
+    const confirmed = await confirm({
+      title: `ส่งลิงก์เชิญใหม่ให้ ${u.full_name ?? u.email ?? "ผู้ใช้"}?`,
+      confirmLabel: "ส่งเลย",
+      cancelLabel: "ยกเลิก",
+    });
+    if (!confirmed) return;
+    setResendingId(u.id);
+    try {
+      const res = await resend({ data: { user_id: u.id } });
+      toast.success(`ส่งลิงก์ใหม่ไปยัง ${res.email} แล้ว`, {
+        description: "ลิงก์มีอายุ 24 ชั่วโมง",
+      });
+    } catch (err: any) {
+      toast.error("ส่งลิงก์ไม่สำเร็จ", { description: err?.message ?? "ลองใหม่อีกครั้ง" });
+    } finally {
+      setResendingId(null);
+    }
   };
 
   const handleDelete = async (u: UserProfile) => {
@@ -266,21 +288,26 @@ function TeamTab() {
             <th className="px-4 py-3 font-medium">ชื่อ</th>
             <th className="px-4 py-3 font-medium">บทบาท</th>
             <th className="px-4 py-3 font-medium">สถานะ</th>
+            <th className="px-4 py-3 font-medium"></th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={3} className="py-6 text-center text-xs text-muted-foreground">ยังไม่มีผู้ใช้</td></tr>
+            <tr><td colSpan={4} className="py-6 text-center text-xs text-muted-foreground">ยังไม่มีผู้ใช้</td></tr>
           )}
-          {rows.map((u) => (
+          {rows.map((u) => {
+            const isSending = resendingId === u.id;
+            return (
             <tr key={u.id} className="border-b last:border-0">
-              <td className="px-4 py-3 font-medium">
-                {u.full_name
-                  ? u.full_name
-                  : u.email
-                    ? <span className="text-muted-foreground">{u.email}</span>
-                    : <span className="text-muted-foreground">-</span>
-                }
+              <td className="px-4 py-3">
+                <div>
+                  <p className="font-medium leading-tight">
+                    {u.full_name ?? <span className="text-muted-foreground italic">ยังไม่ตั้งชื่อ</span>}
+                  </p>
+                  {u.email && (
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{u.email}</p>
+                  )}
+                </div>
               </td>
               <td className="px-4 py-3">
                 <Select value={u.role} onValueChange={(v) => updateRow(u.id, { role: v as any })}>
@@ -296,21 +323,41 @@ function TeamTab() {
                 <div className="flex items-center gap-2">
                   <Switch checked={u.is_active} onCheckedChange={(v) => updateRow(u.id, { is_active: v })} />
                   <span className="text-xs text-muted-foreground">{u.is_active ? "ใช้งาน" : "ปิด"}</span>
+                </div>
+              </td>
+              <td className="px-4 py-3">
+                <div className="flex items-center justify-end gap-1">
                   {user?.id !== u.id && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="ml-1 h-7 w-7 text-muted-foreground hover:text-red-600"
-                      onClick={() => handleDelete(u)}
-                      title="ลบผู้ใช้"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-primary"
+                        onClick={() => handleResend(u)}
+                        disabled={isSending}
+                        title="ส่งลิงก์เชิญใหม่"
+                      >
+                        {isSending
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <Mail className="h-3.5 w-3.5" />}
+                        <span className="hidden sm:inline">ส่งลิงก์ใหม่</span>
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground hover:text-red-600"
+                        onClick={() => handleDelete(u)}
+                        title="ลบผู้ใช้"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
                   )}
                 </div>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

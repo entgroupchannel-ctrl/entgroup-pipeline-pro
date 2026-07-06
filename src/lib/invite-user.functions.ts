@@ -212,17 +212,85 @@ export const listCrmUsersWithEmail = createServerFn({ method: "GET" })
     }));
   });
 
-// ─── Resend invite ────────────────────────────────────────────────────────────
+// ─── Resend invite link ───────────────────────────────────────────────────────
 
 export const resendCrmInvite = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ email: z.string().trim().email() }).parse(input))
+  .inputValidator((input) =>
+    z.object({ user_id: z.string().uuid() }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+
+    // lookup email + profile from user_id
+    const { data: authUser, error: authErr } = await supabaseAdmin.auth.admin.getUserById(data.user_id);
+    if (authErr || !authUser?.user) throw new Error("ไม่พบผู้ใช้");
+    const email = authUser.user.email;
+    if (!email) throw new Error("ผู้ใช้นี้ไม่มี email");
+
+    const { data: profile } = await (supabaseAdmin as any)
+      .schema("crm")
+      .from("user_profiles")
+      .select("full_name, role")
+      .eq("id", data.user_id)
+      .maybeSingle();
+
+    // generate a fresh recovery link (works for both invite & existing accounts)
+    const redirectTo = "https://entgroup-crm.lovable.app/set-password";
+    const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo },
+    } as any);
+    if (linkErr) throw new Error(linkErr.message);
+    const actionLink = (linkData as any)?.properties?.action_link;
+    if (!actionLink) throw new Error("ไม่สามารถสร้างลิงก์ได้");
+
+    // send via Resend
+    const cfg = await loadEmailConfig(supabaseAdmin);
+    if (!cfg.key)       throw new Error("ยังไม่ได้ตั้งค่า Resend API Key — ไปที่ Settings > อีเมล");
+    if (!cfg.fromEmail) throw new Error("ยังไม่ได้ตั้งค่า From Email");
+    if (!cfg.isActive)  throw new Error("ระบบอีเมลยังไม่ได้เปิดใช้งาน");
+
+    const displayName = (profile as any)?.full_name ?? email;
+    const role        = (profile as any)?.role ?? "sales";
+    const html = `
+      <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
+        <h2 style="margin:0 0 12px">ลิงก์เข้าใช้งาน ${cfg.company} CRM (ส่งใหม่)</h2>
+        <p style="margin:0 0 8px">สวัสดี ${displayName}</p>
+        <p style="margin:0 0 16px">คุณได้รับสิทธิ์เข้าใช้งานระบบ CRM ในบทบาท <strong>${role}</strong></p>
+        <p style="margin:0 0 16px;color:#64748b;font-size:13px">หากคุณยังไม่ได้ตั้งรหัสผ่าน กรุณาคลิกปุ่มด้านล่าง</p>
+        <p style="margin:24px 0">
+          <a href="${actionLink}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">
+            ตั้งรหัสผ่านและเข้าสู่ระบบ
+          </a>
+        </p>
+        <p style="margin:0 0 8px;color:#64748b;font-size:13px">ลิงก์นี้มีอายุ 24 ชั่วโมง</p>
+        <p style="margin:12px 0 0;color:#94a3b8;font-size:12px">หากปุ่มไม่ทำงาน คัดลอกลิงก์นี้ไปวางในเบราว์เซอร์:<br/>${actionLink}</p>
+      </div>
+    `;
+
+    const resendResp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${cfg.key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: `${cfg.company} CRM <${cfg.fromEmail}>`,
+        to: [email],
+        subject: `ลิงก์เข้าใช้งาน ${cfg.company} CRM (ส่งใหม่)`,
+        html,
+      }),
+    });
+
+    if (!resendResp.ok) {
+      const errText = await resendResp.text();
+      throw new Error(`ส่งเมลไม่สำเร็จ: ${errText}`);
+    }
+
+    return { ok: true, email };
   });
 
 // ─── Delete / deactivate user ─────────────────────────────────────────────────
