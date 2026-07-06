@@ -60,6 +60,7 @@ export interface Account {
 export interface UserProfile {
   id: string;
   full_name: string | null;
+  email?: string | null;   // hydrated server-side via auth.users join
   role: "sales" | "manager" | "admin";
   is_active: boolean;
 }

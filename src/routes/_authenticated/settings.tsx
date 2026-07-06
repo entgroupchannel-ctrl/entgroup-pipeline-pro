@@ -23,7 +23,7 @@ import { AISettingsTab } from "@/components/settings/AISettingsTab";
 import { PermissionsTab } from "@/components/settings/PermissionsTab";
 import { EmailTemplatesTab } from "@/components/settings/EmailTemplatesTab";
 import { MediaLibraryTab } from "@/components/settings/MediaLibraryTab";
-import { deactivateCrmUser } from "@/lib/invite-user.functions";
+import { deactivateCrmUser, listCrmUsersWithEmail } from "@/lib/invite-user.functions";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -208,10 +208,17 @@ function TeamTab() {
   const { user } = useAuth();
   const confirm = useConfirm();
   const deactivate = useServerFn(deactivateCrmUser);
+  const fetchUsers = useServerFn(listCrmUsersWithEmail);
 
   const load = async () => {
-    const { data } = await crmDb().from("user_profiles").select("*").order("full_name");
-    setRows((data ?? []) as UserProfile[]);
+    try {
+      const data = await fetchUsers();
+      setRows((data ?? []) as UserProfile[]);
+    } catch {
+      // fallback: fetch without email if server fn fails
+      const { data } = await crmDb().from("user_profiles").select("*").order("full_name");
+      setRows((data ?? []) as UserProfile[]);
+    }
   };
   useEffect(() => { load(); }, []);
 
@@ -225,7 +232,7 @@ function TeamTab() {
   const handleDelete = async (u: UserProfile) => {
     if (u.id === user?.id) return;
     const confirmed = await confirm({
-      title: `ยืนยันลบ ${u.full_name ?? "ผู้ใช้"} ออกจากระบบ?`,
+      title: `ยืนยันลบ ${u.full_name ?? u.email ?? "ผู้ใช้"} ออกจากระบบ?`,
       variant: "danger",
       confirmLabel: "ลบ",
       cancelLabel: "ยกเลิก",
@@ -267,7 +274,14 @@ function TeamTab() {
           )}
           {rows.map((u) => (
             <tr key={u.id} className="border-b last:border-0">
-              <td className="px-4 py-3 font-medium">{u.full_name ?? "-"}</td>
+              <td className="px-4 py-3 font-medium">
+                {u.full_name
+                  ? u.full_name
+                  : u.email
+                    ? <span className="text-muted-foreground">{u.email}</span>
+                    : <span className="text-muted-foreground">-</span>
+                }
+              </td>
               <td className="px-4 py-3">
                 <Select value={u.role} onValueChange={(v) => updateRow(u.id, { role: v as any })}>
                   <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>

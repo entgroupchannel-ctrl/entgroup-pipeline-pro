@@ -177,6 +177,41 @@ export const listPendingInvites = createServerFn({ method: "GET" })
       }));
   });
 
+// ─── List users with email (joins auth.users) ─────────────────────────────────
+
+export const listCrmUsersWithEmail = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // fetch crm.user_profiles
+    const { data: profiles, error: profilesErr } = await (supabaseAdmin as any)
+      .schema("crm")
+      .from("user_profiles")
+      .select("*")
+      .order("full_name");
+    if (profilesErr) throw new Error(profilesErr.message);
+
+    // fetch auth users to get emails
+    const { data: authList, error: authErr } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+    if (authErr) throw new Error(authErr.message);
+
+    const emailByUserId: Record<string, string> = {};
+    for (const u of authList?.users ?? []) {
+      if (u.email) emailByUserId[u.id] = u.email;
+    }
+
+    // merge email into each profile
+    return ((profiles ?? []) as any[]).map((p) => ({
+      ...p,
+      email: emailByUserId[p.id] ?? null,
+    }));
+  });
+
 // ─── Resend invite ────────────────────────────────────────────────────────────
 
 export const resendCrmInvite = createServerFn({ method: "POST" })
