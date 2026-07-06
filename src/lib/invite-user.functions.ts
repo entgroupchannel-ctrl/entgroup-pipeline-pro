@@ -90,7 +90,7 @@ export const inviteCrmUser = createServerFn({ method: "POST" })
     if (profileErr) throw new Error(profileErr.message);
 
     // generate action link
-    const redirectTo = "https://entgroup-crm.lovable.app/";
+    const redirectTo = "https://entgroup-crm.lovable.app/set-password";
     const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
       type: mode === "invite" ? "invite" : "recovery",
       email: data.email,

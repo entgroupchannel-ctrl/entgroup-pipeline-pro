@@ -27,7 +27,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile((data as UserProfile) ?? null);
   };
 
-
   useEffect(() => {
     let mounted = true;
 
@@ -40,7 +39,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      // PASSWORD_RECOVERY fires when user clicks invite or reset-password link.
+      // Redirect to /set-password so they can choose a real password.
+      if (event === "PASSWORD_RECOVERY") {
+        if (mounted) setLoading(false);
+        window.location.href = "/set-password";
+        return;
+      }
+
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+
       const u = session?.user ?? null;
       setUser(u);
       if (u) {
