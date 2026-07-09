@@ -23,7 +23,7 @@ import { AISettingsTab } from "@/components/settings/AISettingsTab";
 import { PermissionsTab } from "@/components/settings/PermissionsTab";
 import { EmailTemplatesTab } from "@/components/settings/EmailTemplatesTab";
 import { MediaLibraryTab } from "@/components/settings/MediaLibraryTab";
-import { deactivateCrmUser, listCrmUsersWithEmail, resendCrmInvite } from "@/lib/invite-user.functions";
+import { deactivateCrmUser, listCrmUsersWithEmail, resendCrmInvite, updateCrmUserName } from "@/lib/invite-user.functions";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -212,6 +212,7 @@ function TeamTab() {
   const deactivate = useServerFn(deactivateCrmUser);
   const fetchUsers = useServerFn(listCrmUsersWithEmail);
   const resend = useServerFn(resendCrmInvite);
+  const updateName = useServerFn(updateCrmUserName);
 
   const load = async () => {
     try {
@@ -244,11 +245,14 @@ function TeamTab() {
     const draft = editingName[u.id];
     if (draft === undefined) return;
     const trimmed = (draft ?? "").trim() || null;
-    const { error } = await crmDb().from("user_profiles").update({ full_name: trimmed }).eq("id", u.id);
-    if (error) return toast.error("บันทึกชื่อไม่สำเร็จ", { description: error.message });
-    toast.success("บันทึกชื่อแล้ว");
-    cancelEditName(u.id);
-    load();
+    try {
+      await updateName({ data: { user_id: u.id, full_name: trimmed } });
+      toast.success("บันทึกชื่อแล้ว");
+      cancelEditName(u.id);
+      load();
+    } catch (err: any) {
+      toast.error("บันทึกชื่อไม่สำเร็จ", { description: err?.message ?? "ลองใหม่อีกครั้ง" });
+    }
   };
 
   const handleResend = async (u: UserProfile) => {
