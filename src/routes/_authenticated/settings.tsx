@@ -206,6 +206,7 @@ function TeamTab() {
   const [rows, setRows] = useState<UserProfile[] | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<Record<string, string | null>>({}); // userId -> draft name
   const { user } = useAuth();
   const confirm = useConfirm();
   const deactivate = useServerFn(deactivateCrmUser);
@@ -228,6 +229,25 @@ function TeamTab() {
     const { error } = await crmDb().from("user_profiles").update(patch).eq("id", id);
     if (error) return toast.error("อัปเดตไม่สำเร็จ", { description: error.message });
     toast.success("อัปเดตแล้ว");
+    load();
+  };
+
+  const startEditName = (u: UserProfile) => {
+    setEditingName((prev) => ({ ...prev, [u.id]: u.full_name ?? "" }));
+  };
+
+  const cancelEditName = (id: string) => {
+    setEditingName((prev) => { const n = { ...prev }; delete n[id]; return n; });
+  };
+
+  const saveNameFor = async (u: UserProfile) => {
+    const draft = editingName[u.id];
+    if (draft === undefined) return;
+    const trimmed = (draft ?? "").trim() || null;
+    const { error } = await crmDb().from("user_profiles").update({ full_name: trimmed }).eq("id", u.id);
+    if (error) return toast.error("บันทึกชื่อไม่สำเร็จ", { description: error.message });
+    toast.success("บันทึกชื่อแล้ว");
+    cancelEditName(u.id);
     load();
   };
 
@@ -297,17 +317,48 @@ function TeamTab() {
           )}
           {rows.map((u) => {
             const isSending = resendingId === u.id;
+            const isEditingThisName = u.id in editingName;
             return (
             <tr key={u.id} className="border-b last:border-0">
               <td className="px-4 py-3">
-                <div>
-                  <p className="font-medium leading-tight">
-                    {u.full_name ?? <span className="text-muted-foreground italic">ยังไม่ตั้งชื่อ</span>}
-                  </p>
-                  {u.email && (
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{u.email}</p>
-                  )}
-                </div>
+                {isEditingThisName ? (
+                  <div className="flex flex-col gap-1.5">
+                    <Input
+                      autoFocus
+                      className="h-8 text-sm"
+                      placeholder="ชื่อ-นามสกุลพนักงาน"
+                      value={editingName[u.id] ?? ""}
+                      onChange={(e) => setEditingName((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveNameFor(u);
+                        if (e.key === "Escape") cancelEditName(u.id);
+                      }}
+                    />
+                    <div className="flex gap-1">
+                      <Button size="sm" className="h-6 px-2 text-xs" onClick={() => saveNameFor(u)}>บันทึก</Button>
+                      <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => cancelEditName(u.id)}>ยกเลิก</Button>
+                    </div>
+                    {u.email && (
+                      <p className="text-[11px] text-muted-foreground">{u.email}</p>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <button
+                      className="group flex items-center gap-1.5 text-left"
+                      title="คลิกเพื่อแก้ไขชื่อ"
+                      onClick={() => startEditName(u)}
+                    >
+                      <p className="font-medium leading-tight group-hover:underline">
+                        {u.full_name ?? <span className="text-muted-foreground italic">ยังไม่ตั้งชื่อ — คลิกเพื่อใส่ชื่อ</span>}
+                      </p>
+                      <span className="hidden group-hover:inline text-muted-foreground opacity-50">✏️</span>
+                    </button>
+                    {u.email && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{u.email}</p>
+                    )}
+                  </div>
+                )}
               </td>
               <td className="px-4 py-3">
                 <Select value={u.role} onValueChange={(v) => updateRow(u.id, { role: v as any })}>
