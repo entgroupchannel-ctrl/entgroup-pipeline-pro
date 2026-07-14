@@ -18,7 +18,6 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { formatBaht } from "@/lib/format";
 import { crmDb } from "@/lib/crm";
@@ -351,7 +350,8 @@ function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) 
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TAB 2 & 3 — Web Chat / General Chat (chat_sessions + chat_messages)
+// TAB 2 & 3 — Web Chat / General Chat (via b2b-live-chat edge function)
+// chat_sessions อยู่ใน B2B project — ต้องผ่าน edge function เท่านั้น
 // ═══════════════════════════════════════════════════════════════════════════════
 function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: string }) {
   const [sessions,  setSessions]  = useState<WebSession[]>([]);
@@ -364,59 +364,23 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
   const [sending,   setSending]   = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const db = supabase as any;
+  const chatAction = isGuest ? "web" : "general";
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      let q = db.from("chat_sessions").select("*")
-        .order("last_message_at", { ascending: false, nullsFirst: false })
-        .limit(60);
-
-      // แยก guest vs member ด้วย user_id
-      if (isGuest) q = q.is("user_id", null);
-      else q = q.not("user_id", "is", null);
-
-      const { data, error: err } = await q;
-      if (err) throw new Error(err.message);
-
-      const sessions: WebSession[] = data ?? [];
-      // Enrich: last message + unread count per session
-      const ids = sessions.map((s:WebSession) => s.id);
-      if (ids.length) {
-        const { data: allMsgs } = await db.from("chat_messages")
-          .select("session_id, content, sender_type, sender_name, read_at, created_at")
-          .in("session_id", ids)
-          .order("created_at", { ascending: false });
-
-        const lastMsgMap: Record<string,any> = {};
-        const unreadMap: Record<string,number> = {};
-        for (const m of (allMsgs??[]) as any[]) {
-          if (!lastMsgMap[m.session_id]) {
-            lastMsgMap[m.session_id] = m;
-          }
-          if (m.sender_type === "guest" && !m.read_at) {
-            unreadMap[m.session_id] = (unreadMap[m.session_id]??0) + 1;
-          }
-        }
-        sessions.forEach((s:WebSession) => {
-          s._last_msg = lastMsgMap[s.id]?.content ?? "";
-          s._sender_type = lastMsgMap[s.id]?.sender_type ?? "";
-          s._unread = unreadMap[s.id] ?? 0;
-        });
-      }
-
-      // Filter search
-      const filtered = search
-        ? sessions.filter((s:WebSession) => {
-            const q = search.toLowerCase();
-            return [s.guest_name, s.guest_email, s.guest_phone, s._last_msg]
-              .some(v => v?.toLowerCase().includes(q));
-          })
-        : sessions;
-
-      setSessions(filtered);
-      if (filtered.length && !selected) setSelected(filtered[0]);
+      const params: Record<string,string> = { action: chatAction };
+      if (search) params.search = search;
+      const { data, error: err } = await lcFetch(params);
+      if (err) throw new Error(err);
+      const items: WebSession[] = (data ?? []).map((s: any) => ({
+        ...s,
+        _last_msg: s.last_message?.content ?? "",
+        _sender_type: s.last_message?.sender_type ?? "",
+        _unread: s.unread_count ?? 0,
+      }));
+      setSessions(items);
+      if (items.length && !selected) setSelected(items[0]);
     } catch(e:any) { setError(e.message); }
     finally { setLoading(false); }
   }, [isGuest, search]);
@@ -424,17 +388,12 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
   const loadMsgs = useCallback(async (sessionId: string) => {
     setLoadingMsgs(true);
     try {
-      const { data } = await db.from("chat_messages")
-        .select("*").eq("session_id", sessionId)
-        .order("created_at", { ascending: true });
+      const { data } = await lcFetch({ action: chatAction, session_id: sessionId });
       setMsgs(data ?? []);
-      // mark as read
-      await db.from("chat_messages")
-        .update({ read_at: new Date().toISOString() })
-        .eq("session_id", sessionId).eq("sender_type", "guest").is("read_at", null);
+      await lcPost({ action: `${chatAction}_read`, session_id: sessionId });
     } catch { toast.error("โหลดข้อความไม่สำเร็จ"); }
     finally { setLoadingMsgs(false); }
-  }, []);
+  }, [chatAction]);
 
   useEffect(() => { load(); }, [isGuest]);
   useEffect(() => { const t=setTimeout(()=>load(),400); return()=>clearTimeout(t); }, [search]);
@@ -445,10 +404,7 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
     if (!selected) return;
     setSending(true);
     try {
-      await db.from("chat_messages").insert({
-        session_id: selected.id, content: text,
-        sender_name: staffName, sender_type: "agent", message_type: "text",
-      });
+      await lcPost({ action: `${chatAction}_send`, session_id: selected.id, sender_name: staffName, content: text });
       await loadMsgs(selected.id);
       setSessions(prev => prev.map(s => s.id===selected.id ? {...s, _unread:0} : s));
     } catch(e:any) { toast.error("ส่งไม่สำเร็จ: "+e.message); }
