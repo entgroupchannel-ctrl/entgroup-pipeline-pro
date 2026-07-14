@@ -135,6 +135,7 @@ export function CreateFAQuotationDialog({ open, onOpenChange, request, leadId, o
           vat_rate: vatOn ? 7 : 0,
           lead_id: leadId,
           b2b_request_id: request?.id,
+          b2b_quote_number: request?.quote_number,
         },
       });
 
