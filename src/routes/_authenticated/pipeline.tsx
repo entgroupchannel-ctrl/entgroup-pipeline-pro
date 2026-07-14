@@ -5,6 +5,7 @@ import { ActivityLogDialog, type ActivityKind } from "@/components/activities/Ac
 import { crmDb } from "@/lib/crm";
 import { B2BRequestsTab } from "@/components/pipeline/B2BRequestsTab";
 import { LineRequestsTab } from "@/components/pipeline/LineRequestsTab";
+import { B2BConversationTab } from "@/components/pipeline/B2BConversationTab";
 import { supabase } from "@/integrations/supabase/client";
 
 
@@ -13,7 +14,8 @@ export const Route = createFileRoute("/_authenticated/pipeline")({
 });
 
 function PipelinePage() {
-  const [tab, setTab] = useState<"all" | "line" | "b2b">("all");
+  const [tab, setTab] = useState<"all" | "line" | "b2b" | "messages">("all");
+  const [b2bMsgUnread, setB2bMsgUnread] = useState(0);
   const [b2bCount, setB2bCount] = useState(0);
   const [unassignedLine, setUnassignedLine] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -86,10 +88,27 @@ function PipelinePage() {
         >
           <span>🛒 B2B</span>
         </button>
+        <button
+          onClick={() => setTab("messages")}
+          className={`relative flex items-center gap-2 rounded-t-md px-4 py-2 text-sm font-medium transition-colors ${
+            tab === "messages"
+              ? "bg-muted text-foreground border-b-2 border-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <span>📩 ข้อความ</span>
+          {b2bMsgUnread > 0 && (
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+              {b2bMsgUnread}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Content — Kanban / LINE / B2B tab */}
-      {tab === "b2b" ? (
+      {tab === "messages" ? (
+        <B2BConversationTab />
+      ) : tab === "b2b" ? (
         <B2BRequestsTab onLeadCreated={() => setRefreshKey((k) => k + 1)} />
       ) : tab === "line" ? (
         <LineRequestsTab onLeadCreated={() => setRefreshKey((k) => k + 1)} />
