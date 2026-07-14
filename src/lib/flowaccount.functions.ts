@@ -255,17 +255,28 @@ export const createFAQuotationDraft = createServerFn({ method: "POST" })
       const search = await faFetch(
         `/contacts?keyword=${encodeURIComponent(data.customer.company)}&currentPage=1&pageSize=5`,
       );
+      console.log("[FA] contact search status:", search.status);
+      console.log("[FA] contact search body:", JSON.stringify(search.body).slice(0, 600));
       if (search.status >= 200 && search.status < 300) {
         const list: any[] = Array.isArray(search.body?.data?.list)
           ? search.body.data.list
           : Array.isArray(search.body?.data) ? search.body.data
           : Array.isArray(search.body) ? search.body : [];
-        const norm = (s: string) => (s ?? "").toLowerCase().replace(/\s+/g, "");
+        const total = search.body?.data?.total ?? list.length;
+        const norm = (s: string) => (s ?? "").toLowerCase().replace(/[\s.,&]+/g, "");
         const target = norm(data.customer.company);
-        const match = list.find((c) => norm(c?.contactName ?? c?.name ?? "").includes(target) ||
-                                       target.includes(norm(c?.contactName ?? c?.name ?? "")));
-        // FA returns id (not contactId) in search list
-        contactId = match?.id ?? match?.contactId ?? null;
+        // 1. try exact fuzzy match first
+        const match = list.find((c) => {
+          const cn = norm(c?.contactName ?? c?.name ?? "");
+          return cn.includes(target) || target.includes(cn);
+        });
+        // 2. if keyword search returned exactly 1 result, use it (FA already filtered)
+        const best = match ?? (total === 1 && list.length === 1 ? list[0] : null);
+        // Log first item to see actual field names from FA
+        if (list.length > 0) console.log("[FA] contact item keys:", JSON.stringify(Object.keys(list[0])), "first item:", JSON.stringify(list[0]).slice(0, 300));
+        // FA search list returns id field (not contactId)
+        contactId = best?.id ?? best?.contactId ?? null;
+        if (contactId) console.log("[FA] found existing contact id:", contactId);
       }
     } catch (e: any) {
       console.warn("[FA] contact search failed", e?.message);
@@ -291,23 +302,26 @@ export const createFAQuotationDraft = createServerFn({ method: "POST" })
       }
       // FlowAccount create contact returns various shapes — handle all
       const cb = createRes.body;
+      console.log("[FA] createContact response:", JSON.stringify(cb).slice(0, 600));
       contactId =
+        // created contact
         cb?.data?.contactId ??
         cb?.data?.id ??
         cb?.contactId ??
         cb?.id ??
         cb?.data?.contact_id ??
         cb?.contact_id ??
-        // some versions return array
-        (Array.isArray(cb?.data) ? cb.data[0]?.contactId ?? cb.data[0]?.id : null) ??
+        // FA returns existing contact list when duplicate
+        cb?.data?.list?.[0]?.id ??
+        cb?.data?.list?.[0]?.contactId ??
+        (Array.isArray(cb?.data) ? (cb.data[0]?.id ?? cb.data[0]?.contactId) : null) ??
         null;
       if (!contactId) {
-        // log actual response to help debug
-        console.error("[FA] createContact response:", JSON.stringify(cb).slice(0, 500));
         throw new Error(
-          `ไม่พบ contactId จาก FlowAccount response: ${JSON.stringify(cb).slice(0, 200)}`
+          `ไม่พบ contactId จาก FlowAccount response: ${JSON.stringify(cb).slice(0, 300)}`
         );
       }
+      console.log("[FA] using contactId:", contactId);
     }
 
     // ── 2. Build items ──────────────────────────────────────────────────────
