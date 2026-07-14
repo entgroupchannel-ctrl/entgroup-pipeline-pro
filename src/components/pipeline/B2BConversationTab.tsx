@@ -1,17 +1,24 @@
 /**
- * B2BConversationTab — Live Chat viewer เหมือน Admin Panel /admin/live-chat
- * ดึงข้อมูลผ่าน b2b-live-chat edge function (deploy ที่ B2B Supabase project)
+ * B2BConversationTab — 3 sub-tab chat viewer
+ *
+ * Tab 1 "ใบเสนอราคา B2B"  → quote_messages (B2B project ugzd..., via b2b-live-chat edge fn)
+ * Tab 2 "Chat หน้าเว็บ"    → chat_sessions (user_id IS NULL = guest)  + chat_messages
+ * Tab 3 "General Chat"     → chat_sessions (user_id IS NOT NULL = member) + chat_messages
+ *
+ * Tab 1 ต่างกัน: ผู้ส่งคือ customer ที่กรอกใบเสนอราคา B2B
+ * Tab 2-3 ใช้ table เดียวกัน แยกด้วย user_id NULL/NOT NULL
  * Authorized by: therdpoom@entgroup.co.th
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Loader2, RefreshCw, MessageSquare, Send, Building2,
   Phone, Mail, Search, CheckCircle2, AlertTriangle,
-  Paperclip, Clock, X,
+  ShoppingCart, Globe, Users, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { formatBaht } from "@/lib/format";
 import { crmDb } from "@/lib/crm";
@@ -21,499 +28,583 @@ import { STATUS_LABEL, STATUS_COLOR } from "@/lib/b2b-client";
 const LIVE_CHAT_URL = "https://ugzdwmyylqmirrljtuej.supabase.co/functions/v1/b2b-live-chat";
 const CRM_SECRET    = "entgroup-crm-secret-2026";
 
+type ChatTab = "b2b" | "web" | "general";
+
+const TAB_CONFIG: Record<ChatTab, { label: string; icon: typeof MessageSquare; color: string; desc: string }> = {
+  b2b:     { label: "ใบเสนอราคา B2B", icon: ShoppingCart, color: "text-blue-600",   desc: "ลูกค้าที่ยื่นขอใบเสนอราคา" },
+  web:     { label: "Chat หน้าเว็บ",   icon: Globe,        color: "text-teal-600",   desc: "ผู้เยี่ยมชมกดปุ่ม chat" },
+  general: { label: "General Chat",   icon: Users,        color: "text-purple-600", desc: "สมาชิก / ผู้ใช้ที่ล็อกอิน" },
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface QMsg {
-  id: string;
-  quote_id: string;
-  sender_name: string;
-  sender_role: "customer" | "staff";
-  content: string;
-  message_type: string | null;
-  created_at: string;
-  read_by: Record<string, string> | null;
-  attachment_url?: string | null;
-  attachment_name?: string | null;
+interface B2BConvo {
+  id: string; quote_number: string; customer_name: string;
+  customer_company: string; customer_email?: string; customer_phone?: string;
+  customer_address?: string | null; grand_total: number; status: string;
+  created_at: string; sla_po_review_due?: string | null; crm_lead_id?: string | null;
+  last_message: any | null; unread_count: number; _lead_id?: string | null;
+}
+interface B2BMsg {
+  id: string; quote_id: string; sender_name: string; sender_role: string;
+  content: string; created_at: string; read_by: any;
 }
 
-interface QConvo {
-  id: string;
-  quote_number: string;
-  customer_name: string;
-  customer_company: string;
-  customer_email?: string;
-  customer_phone?: string;
-  customer_address?: string | null;
-  customer_tax_id?: string | null;
-  grand_total: number;
-  status: string;
-  created_at: string;
-  sla_po_review_due?: string | null;
-  crm_lead_id?: string | null;
-  last_message: QMsg | null;
-  unread_count: number;
-  has_messages: boolean;
-  // enriched
-  _lead_id?: string | null;
+interface WebSession {
+  id: string; guest_name: string | null; guest_email: string | null;
+  guest_phone: string | null; user_id: string | null; source: string;
+  status: string; last_message_at: string | null; created_at: string;
+  assigned_to: string | null; metadata: any | null;
+  _last_msg?: string; _unread?: number; _sender_type?: string;
+}
+interface WebMsg {
+  id: string; session_id: string; content: string; sender_name: string;
+  sender_type: string; created_at: string; read_at: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MONTHS_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
-
 function fmtDate(iso: string) {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
-  if (diffDays === 0) return d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
-  if (diffDays < 7) return `${diffDays} วันที่ผ่านมา`;
+  const d = new Date(iso), now = new Date();
+  const diff = Math.floor((now.getTime() - d.getTime()) / 86400000);
+  if (diff === 0) return d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+  if (diff < 7) return `${diff} วันที่ผ่านมา`;
   return `${d.getDate()} ${MONTHS_TH[d.getMonth()]}`;
 }
-
 function fmtFull(iso: string) {
   const d = new Date(iso);
-  return `${d.getDate()} ${MONTHS_TH[d.getMonth()]} ${d.getFullYear() + 543} ${d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}`;
+  return `${d.getDate()} ${MONTHS_TH[d.getMonth()]} ${d.getFullYear()+543} ${d.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"})}`;
 }
 
-async function lcFetch(path = "", params: Record<string, string> = {}): Promise<any> {
-  const url = new URL(LIVE_CHAT_URL + path);
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+async function lcFetch(params: Record<string,string> = {}) {
+  const url = new URL(LIVE_CHAT_URL);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k,v));
   const res = await fetch(url.toString(), { headers: { "x-crm-secret": CRM_SECRET } });
-  if (!res.ok) throw new Error(`Live chat API error: ${res.status}`);
+  if (!res.ok) throw new Error(`b2b-live-chat ${res.status}`);
   return res.json();
 }
-
-async function lcPost(body: Record<string, any>): Promise<any> {
+async function lcPost(body: Record<string,any>) {
   const res = await fetch(LIVE_CHAT_URL, {
     method: "POST",
     headers: { "x-crm-secret": CRM_SECRET, "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`Live chat POST error: ${res.status}`);
+  if (!res.ok) throw new Error(`b2b-live-chat POST ${res.status}`);
   return res.json();
 }
 
-// ─── ChatBubble ───────────────────────────────────────────────────────────────
-function Bubble({ msg, isMe }: { msg: QMsg; isMe: boolean }) {
+// ─── Chat Bubble ──────────────────────────────────────────────────────────────
+function Bubble({ content, senderName, isMe, createdAt }: {
+  content: string; senderName: string; isMe: boolean; createdAt: string;
+}) {
   return (
     <div className={`flex gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
       <div className={`size-7 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold ${
         isMe ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
       }`}>
-        {isMe ? "S" : msg.sender_name?.[0]?.toUpperCase() ?? "C"}
+        {isMe ? "S" : (senderName?.[0]?.toUpperCase() ?? "?")}
       </div>
-      <div className={`max-w-[72%] space-y-1 ${isMe ? "items-end" : ""} flex flex-col`}>
-        {!isMe && (
-          <span className="text-[11px] text-muted-foreground font-medium px-1">{msg.sender_name}</span>
-        )}
+      <div className={`max-w-[72%] flex flex-col ${isMe ? "items-end" : ""}`}>
+        {!isMe && <span className="text-[11px] text-muted-foreground font-medium mb-0.5 px-1">{senderName}</span>}
         <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-          isMe
-            ? "bg-primary text-primary-foreground rounded-tr-sm"
-            : "bg-muted text-foreground rounded-tl-sm"
+          isMe ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted text-foreground rounded-tl-sm"
         }`}>
-          <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-          {msg.attachment_url && (
-            <a href={msg.attachment_url} target="_blank" rel="noreferrer"
-              className={`flex items-center gap-1 text-xs mt-1.5 underline ${isMe ? "opacity-80" : "text-primary"}`}>
-              <Paperclip className="size-3" />{msg.attachment_name ?? "ไฟล์แนบ"}
-            </a>
-          )}
+          <p className="whitespace-pre-wrap break-words">{content}</p>
         </div>
-        <span className={`text-[10px] text-muted-foreground px-1 ${isMe ? "text-right" : ""}`}>
-          {fmtFull(msg.created_at)}
+        <span className={`text-[10px] text-muted-foreground mt-1 px-1 ${isMe ? "text-right" : ""}`}>
+          {fmtFull(createdAt)}
         </span>
       </div>
     </div>
   );
 }
 
-// ─── Thread panel (right side) ────────────────────────────────────────────────
-function ThreadPanel({
-  convo,
-  staffName,
-  staffId,
-  onClose,
-  onSent,
-}: {
-  convo: QConvo;
-  staffName: string;
-  staffId: string;
-  onClose: () => void;
-  onSent: (quoteId: string) => void;
+// ─── Shared Thread Panel ──────────────────────────────────────────────────────
+function ThreadPanel({ title, subtitle, infoRows, children, replyPlaceholder, onSend, onClose, sending }: {
+  title: string; subtitle?: string; infoRows?: React.ReactNode;
+  children: React.ReactNode; replyPlaceholder: string;
+  onSend: (text: string) => Promise<void>; onClose: () => void; sending: boolean;
 }) {
-  const [messages, setMessages] = useState<QMsg[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [reply,    setReply]    = useState("");
-  const [sending,  setSending]  = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  const loadMessages = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data } = await lcFetch("", { quote_id: convo.id });
-      setMessages(data ?? []);
-    } catch (e: any) {
-      toast.error("โหลดข้อความไม่สำเร็จ: " + e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [convo.id]);
-
-  useEffect(() => {
-    loadMessages();
-    // Mark as read
-    lcPost({ mark_read: true, quote_id: convo.id, staff_id: staffId }).catch(() => {});
-  }, [convo.id, staffId, loadMessages]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
+  const [reply, setReply] = useState("");
   const handleSend = async () => {
-    const text = reply.trim();
-    if (!text || sending) return;
-    setSending(true);
-    try {
-      await lcPost({
-        quote_id:    convo.id,
-        sender_name: staffName,
-        content:     text,
-        message_type: "text",
-      });
-      setReply("");
-      await loadMessages();
-      onSent(convo.id);
-    } catch (e: any) {
-      toast.error("ส่งไม่สำเร็จ: " + e.message);
-    } finally {
-      setSending(false);
-    }
+    const t = reply.trim(); if (!t || sending) return;
+    await onSend(t); setReply("");
   };
-
-  const slaUrgent = convo.sla_po_review_due &&
-    new Date(convo.sla_po_review_due).getTime() - Date.now() < 12 * 3600 * 1000;
-
   return (
     <div className="flex flex-col h-full border-l border-border bg-background">
-      {/* Thread header */}
-      <div className="flex items-center gap-3 px-5 py-4 border-b bg-muted/10 shrink-0">
-        <div className={`size-10 rounded-full flex items-center justify-center font-semibold text-sm ${
-          convo.unread_count > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-        }`}>
-          {convo.customer_company?.[0]?.toUpperCase() ?? convo.customer_name?.[0] ?? "?"}
-        </div>
+      <div className="flex items-start gap-3 px-5 py-4 border-b bg-muted/10 shrink-0">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm truncate">
-              {convo.customer_company || convo.customer_name}
-            </span>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0 ${STATUS_COLOR[convo.status] ?? "bg-muted"}`}>
-              {STATUS_LABEL[convo.status] ?? convo.status}
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
-            <span>{convo.quote_number}</span>
-            {convo.customer_name !== convo.customer_company && (
-              <span>{convo.customer_name}</span>
-            )}
-            {convo.grand_total > 0 && (
-              <span className="text-primary font-medium">{formatBaht(convo.grand_total)}</span>
-            )}
-          </div>
+          <p className="font-semibold text-sm">{title}</p>
+          {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
-        <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0 md:hidden">
-          <X className="size-5" />
+        <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground md:hidden shrink-0">
+          <X className="size-5"/>
         </button>
       </div>
-
-      {/* Customer info strip */}
-      <div className="flex items-center gap-4 px-5 py-2.5 border-b bg-muted/5 text-xs text-muted-foreground flex-wrap shrink-0">
-        {convo.customer_phone && (
-          <a href={`tel:${convo.customer_phone}`} className="flex items-center gap-1 hover:text-foreground">
-            <Phone className="size-3" />{convo.customer_phone}
-          </a>
-        )}
-        {convo.customer_email && (
-          <a href={`mailto:${convo.customer_email}`} className="flex items-center gap-1 hover:text-foreground">
-            <Mail className="size-3" />{convo.customer_email}
-          </a>
-        )}
-        {convo.customer_address && (
-          <span className="flex items-center gap-1">
-            <Building2 className="size-3" />{convo.customer_address}
-          </span>
-        )}
-        {convo._lead_id && (
-          <a href={`/leads/${convo._lead_id}`} className="flex items-center gap-1 text-primary hover:underline">
-            <CheckCircle2 className="size-3" /> Lead ใน CRM
-          </a>
-        )}
-        {slaUrgent && (
-          <span className="flex items-center gap-1 text-red-600 font-medium">
-            <AlertTriangle className="size-3" /> SLA ด่วน: {fmtDate(convo.sla_po_review_due!)}
-          </span>
-        )}
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 py-16">
-            <MessageSquare className="size-10 opacity-20" />
-            <div className="text-center">
-              <p className="text-sm font-medium">ยังไม่มีการสนทนา</p>
-              <p className="text-xs opacity-60 mt-1">พิมพ์ด้านล่างเพื่อเริ่มบทสนทนากับลูกค้า</p>
-            </div>
-          </div>
-        ) : (
-          messages.map((m) => (
-            <Bubble key={m.id} msg={m} isMe={m.sender_role === "staff"} />
-          ))
-        )}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Reply bar */}
+      {infoRows && (
+        <div className="flex flex-wrap gap-3 px-5 py-2 border-b text-xs text-muted-foreground bg-muted/5 shrink-0">
+          {infoRows}
+        </div>
+      )}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">{children}</div>
       <div className="flex items-end gap-2.5 px-4 py-3 border-t bg-background shrink-0">
-        <textarea
-          value={reply}
-          onChange={(e) => setReply(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-          }}
-          placeholder={`ตอบกลับ ${convo.customer_company || convo.customer_name}... (Enter ส่ง)`}
-          rows={2}
-          className="flex-1 resize-none rounded-xl border border-border bg-muted/30 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
-        />
-        <Button
-          onClick={handleSend}
-          disabled={sending || !reply.trim()}
-          size="icon"
-          className="size-10 rounded-xl shrink-0"
-        >
-          {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+        <textarea value={reply} onChange={e=>setReply(e.target.value)}
+          onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleSend();} }}
+          placeholder={replyPlaceholder} rows={2}
+          className="flex-1 resize-none rounded-xl border border-border bg-muted/30 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition"/>
+        <Button onClick={handleSend} disabled={sending||!reply.trim()} size="icon" className="size-10 rounded-xl shrink-0">
+          {sending ? <Loader2 className="size-4 animate-spin"/> : <Send className="size-4"/>}
         </Button>
       </div>
     </div>
   );
 }
 
-// ─── Main Tab ─────────────────────────────────────────────────────────────────
-export function B2BConversationTab() {
-  const { user } = useAuth();
-  const staffName = (user as any)?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Sales";
-  const staffId   = user?.id ?? "staff";
+// ─── Shared Conversation List ─────────────────────────────────────────────────
+function ConvoList<T>({ items, selectedId, loading, error, search, onSelect, onRetry, renderItem }: {
+  items: T[]; selectedId?: string; loading: boolean; error: string|null;
+  search: string; onSelect: (item: T) => void; onRetry: () => void;
+  renderItem: (item: T, isActive: boolean) => React.ReactNode;
+}) {
+  return (
+    <div className="flex-1 overflow-y-auto">
+      {loading && items.length === 0 ? (
+        <div className="flex justify-center py-12"><Loader2 className="size-5 animate-spin text-muted-foreground"/></div>
+      ) : error ? (
+        <div className="p-4">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center dark:border-amber-900/40 dark:bg-amber-950/20">
+            <AlertTriangle className="mx-auto mb-2 size-5 text-amber-600"/>
+            <p className="text-xs font-medium text-amber-800 dark:text-amber-300">{error}</p>
+            <Button size="sm" variant="outline" className="mt-3 h-7 text-xs" onClick={onRetry}>
+              <RefreshCw className="mr-1 size-3"/> ลองใหม่
+            </Button>
+          </div>
+        </div>
+      ) : items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+          <MessageSquare className="size-8 opacity-20 mb-2"/>
+          <p className="text-sm">{search ? "ไม่พบรายการที่ค้นหา" : "ยังไม่มีการสนทนา"}</p>
+        </div>
+      ) : items.map((item: any) => (
+        <button key={item.id} type="button" onClick={() => onSelect(item)}
+          className={`w-full text-left border-b border-border/50 transition-colors ${
+            selectedId === item.id ? "bg-primary/8 border-l-2 border-l-primary" : "hover:bg-muted/30"
+          }`}>
+          {renderItem(item, selectedId === item.id)}
+        </button>
+      ))}
+    </div>
+  );
+}
 
-  const [convos,   setConvos]   = useState<QConvo[]>([]);
+// ═══════════════════════════════════════════════════════════════════════════════
+// TAB 1 — B2B Quote Chat
+// ═══════════════════════════════════════════════════════════════════════════════
+function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) {
+  const [convos,   setConvos]   = useState<B2BConvo[]>([]);
   const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState<string | null>(null);
+  const [error,    setError]    = useState<string|null>(null);
   const [search,   setSearch]   = useState("");
-  const [selected, setSelected] = useState<QConvo | null>(null);
+  const [selected, setSelected] = useState<B2BConvo|null>(null);
+  const [msgs,     setMsgs]     = useState<B2BMsg[]>([]);
+  const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [sending,  setSending]  = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const { data } = await lcFetch("", search ? { search } : {});
-      const items: QConvo[] = data ?? [];
-
-      // Enrich with CRM lead_id
-      const b2bIds = items.map((r) => r.id).filter(Boolean);
-      if (b2bIds.length) {
-        const { data: leads } = await crmDb()
-          .from("leads")
-          .select("id, b2b_request_id")
-          .in("b2b_request_id", b2bIds);
-        const leadMap: Record<string, string> = {};
-        for (const l of (leads ?? []) as any[]) {
-          if (l.b2b_request_id) leadMap[l.b2b_request_id] = l.id;
-        }
-        items.forEach((c) => { c._lead_id = leadMap[c.id] ?? null; });
+      const { data } = await lcFetch(search ? { search } : {});
+      const items: B2BConvo[] = data ?? [];
+      const ids = items.map(r=>r.id).filter(Boolean);
+      if (ids.length) {
+        const { data: leads } = await crmDb().from("leads").select("id,b2b_request_id").in("b2b_request_id", ids);
+        const lm: Record<string,string> = {};
+        for (const l of (leads??[]) as any[]) if (l.b2b_request_id) lm[l.b2b_request_id]=l.id;
+        items.forEach(c => { c._lead_id = lm[c.id]??null; });
       }
-
       setConvos(items);
-      // Auto-select first if none
       if (items.length && !selected) setSelected(items[0]);
-    } catch (e: any) {
-      setError(e.message ?? "โหลดไม่สำเร็จ");
-    } finally {
-      setLoading(false);
-    }
+    } catch(e:any) { setError(e.message); }
+    finally { setLoading(false); }
   }, [search]);
+
+  const loadMsgs = useCallback(async (id: string) => {
+    setLoadingMsgs(true);
+    try {
+      const { data } = await lcFetch({ quote_id: id });
+      setMsgs(data ?? []);
+      lcPost({ mark_read: true, quote_id: id, staff_id: staffId }).catch(()=>{});
+    } catch(e:any) { toast.error("โหลดข้อความไม่สำเร็จ"); }
+    finally { setLoadingMsgs(false); }
+  }, [staffId]);
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { const t=setTimeout(()=>load(),400); return()=>clearTimeout(t); }, [search]);
+  useEffect(() => { if (selected) loadMsgs(selected.id); }, [selected?.id]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({behavior:"smooth"}); }, [msgs]);
 
-  // Search with debounce
-  useEffect(() => {
-    const t = setTimeout(() => load(), 400);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  // When message sent: refresh unread count
-  const handleSent = (quoteId: string) => {
-    setConvos((prev) =>
-      prev.map((c) => c.id === quoteId ? { ...c, unread_count: 0 } : c)
-    );
+  const handleSend = async (text: string) => {
+    if (!selected) return;
+    setSending(true);
+    try {
+      await lcPost({ quote_id: selected.id, sender_name: staffName, content: text });
+      await loadMsgs(selected.id);
+      setConvos(prev => prev.map(c => c.id===selected.id ? {...c, unread_count:0} : c));
+    } catch(e:any) { toast.error("ส่งไม่สำเร็จ: "+e.message); }
+    finally { setSending(false); }
   };
 
-  const totalUnread = convos.reduce((s, c) => s + c.unread_count, 0);
+  const totalUnread = convos.reduce((s,c)=>s+c.unread_count,0);
 
   return (
     <div className="flex h-full overflow-hidden">
-
-      {/* ── Left panel: conversation list ── */}
-      <div className={`flex flex-col border-r border-border bg-background ${selected ? "hidden md:flex w-[400px] shrink-0" : "flex flex-1"}`}>
-
-        {/* List header */}
-        <div className="flex items-center gap-2 px-5 py-4 border-b shrink-0">
-          <div className="flex-1">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <MessageSquare className="size-4 text-primary" />
-              Live Chat B2B
-              {totalUnread > 0 && (
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
-                  {totalUnread}
-                </span>
-              )}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">สนทนากับลูกค้า B2B แบบ Real-time</p>
-          </div>
-          <Button variant="ghost" size="icon" className="size-8" onClick={load} disabled={loading}>
-            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+      {/* List */}
+      <div className={`flex flex-col border-r border-border bg-background ${selected?"hidden md:flex w-[380px] shrink-0":"flex flex-1"}`}>
+        <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
+          <span className="text-xs text-muted-foreground flex-1">
+            {convos.length} รายการ {totalUnread>0 && <span className="text-red-500 font-medium">· {totalUnread} ใหม่</span>}
+          </span>
+          <Button variant="ghost" size="icon" className="size-7" onClick={load} disabled={loading}>
+            <RefreshCw className={`size-3.5 ${loading?"animate-spin":""}`}/>
           </Button>
         </div>
-
-        {/* Search */}
-        <div className="px-4 py-2.5 border-b shrink-0">
+        <div className="px-3 py-2 border-b shrink-0">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหาลูกค้า, เลข Quote..."
-              className="pl-8 h-8 text-xs"
-            />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none"/>
+            <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ค้นหา..." className="pl-7 h-7 text-xs"/>
           </div>
         </div>
-
-        {/* List */}
-        <div className="flex-1 overflow-y-auto">
-          {loading && convos.length === 0 ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="size-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : error ? (
-            <div className="p-5">
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center dark:border-amber-900/40 dark:bg-amber-950/20">
-                <AlertTriangle className="mx-auto mb-2 size-5 text-amber-600" />
-                <p className="text-xs font-medium text-amber-800 dark:text-amber-300">{error}</p>
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  ต้อง deploy edge function <code className="bg-muted px-1 rounded">b2b-live-chat</code> ก่อน
-                </p>
-                <Button size="sm" variant="outline" className="mt-3 h-7 text-xs" onClick={load}>
-                  <RefreshCw className="mr-1 size-3" /> ลองใหม่
-                </Button>
+        <ConvoList items={convos} selectedId={selected?.id} loading={loading} error={error}
+          search={search} onSelect={setSelected} onRetry={load}
+          renderItem={(c: B2BConvo, isActive) => (
+            <div className="flex items-start gap-3 px-4 py-3.5">
+              <div className={`size-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 ${
+                c.unread_count>0?"bg-blue-600 text-white":"bg-muted text-muted-foreground"}`}>
+                {c.customer_company?.[0]?.toUpperCase()??c.customer_name?.[0]??"?"}
               </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-1">
+                  <span className={`text-sm truncate ${c.unread_count>0?"font-bold":"font-medium"}`}>
+                    {c.customer_company||c.customer_name}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground shrink-0">
+                    {c.last_message?fmtDate(c.last_message.created_at):fmtDate(c.created_at)}
+                  </span>
+                </div>
+                <p className={`text-xs truncate mt-0.5 ${c.unread_count>0?"text-foreground":"text-muted-foreground"}`}>
+                  {c.last_message?.content??(c.quote_number+" · "+formatBaht(c.grand_total))}
+                </p>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <span className="text-[10px] font-mono text-muted-foreground">{c.quote_number}</span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLOR[c.status]??"bg-muted text-muted-foreground"}`}>
+                    {STATUS_LABEL[c.status]??c.status}
+                  </span>
+                  {c._lead_id && <CheckCircle2 className="size-3 text-emerald-500"/>}
+                </div>
+              </div>
+              {c.unread_count>0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white shrink-0">
+                  {c.unread_count}
+                </span>
+              )}
             </div>
-          ) : convos.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <MessageSquare className="size-8 opacity-20 mb-2" />
-              <p className="text-sm">{search ? "ไม่พบรายการที่ค้นหา" : "ยังไม่มีการสนทนา"}</p>
-            </div>
-          ) : (
-            convos.map((c) => {
-              const isActive = selected?.id === c.id;
-              const hasUnread = c.unread_count > 0;
-              const preview = c.last_message?.content ?? (c.has_messages ? "" : "ยังไม่มีข้อความ");
-              const previewPrefix = c.last_message?.sender_role === "staff" ? "คุณ: " : "";
-
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setSelected(c)}
-                  className={`w-full text-left flex items-start gap-3 px-5 py-4 border-b border-border/50 transition-colors ${
-                    isActive
-                      ? "bg-primary/8 border-l-2 border-l-primary"
-                      : "hover:bg-muted/30"
-                  }`}
-                >
-                  {/* Avatar */}
-                  <div className={`size-10 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 mt-0.5 ${
-                    hasUnread ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                  }`}>
-                    {c.customer_company?.[0]?.toUpperCase() ?? c.customer_name?.[0] ?? "?"}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0 space-y-0.5">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className={`text-sm truncate ${hasUnread ? "font-bold" : "font-medium"}`}>
-                        {c.customer_company || c.customer_name}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground shrink-0">
-                        {c.last_message ? fmtDate(c.last_message.created_at) : fmtDate(c.created_at)}
-                      </span>
-                    </div>
-
-                    {c.customer_company && c.customer_name !== c.customer_company && (
-                      <p className="text-xs text-muted-foreground truncate">{c.customer_name}</p>
-                    )}
-
-                    <p className={`text-xs truncate ${hasUnread ? "text-foreground" : "text-muted-foreground"}`}>
-                      {previewPrefix}{preview}
-                    </p>
-
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className="text-[10px] text-muted-foreground font-mono">{c.quote_number}</span>
-                      {c.grand_total > 0 && (
-                        <span className="text-[10px] text-muted-foreground">{formatBaht(c.grand_total)}</span>
-                      )}
-                      <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${STATUS_COLOR[c.status] ?? "bg-muted text-muted-foreground"}`}>
-                        {STATUS_LABEL[c.status] ?? c.status}
-                      </span>
-                      {c._lead_id && (
-                        <span title="มี Lead แล้ว" className="inline-flex">
-                          <CheckCircle2 className="size-3 text-emerald-500" />
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Unread badge */}
-                  {hasUnread && (
-                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white shrink-0 mt-2">
-                      {c.unread_count}
-                    </span>
-                  )}
-                </button>
-              );
-            })
           )}
-        </div>
+        />
       </div>
 
-      {/* ── Right panel: thread ── */}
+      {/* Thread */}
       {selected ? (
         <div className="flex-1 min-w-0">
           <ThreadPanel
-            convo={selected}
-            staffName={staffName}
-            staffId={staffId}
-            onClose={() => setSelected(null)}
-            onSent={handleSent}
-          />
+            title={selected.customer_company||selected.customer_name}
+            subtitle={`${selected.quote_number} · ${formatBaht(selected.grand_total)}`}
+            infoRows={<>
+              {selected.customer_phone && <a href={`tel:${selected.customer_phone}`} className="flex items-center gap-1 hover:text-foreground"><Phone className="size-3"/>{selected.customer_phone}</a>}
+              {selected.customer_email && <a href={`mailto:${selected.customer_email}`} className="flex items-center gap-1 hover:text-foreground"><Mail className="size-3"/>{selected.customer_email}</a>}
+              {selected._lead_id && <a href={`/leads/${selected._lead_id}`} className="flex items-center gap-1 text-primary hover:underline"><CheckCircle2 className="size-3"/> Lead ใน CRM</a>}
+            </>}
+            replyPlaceholder={`ตอบกลับ ${selected.customer_company||selected.customer_name}...`}
+            onSend={handleSend} onClose={()=>setSelected(null)} sending={sending}
+          >
+            {loadingMsgs ? (
+              <div className="flex justify-center py-12"><Loader2 className="size-5 animate-spin text-muted-foreground"/></div>
+            ) : msgs.length===0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground gap-2">
+                <MessageSquare className="size-10 opacity-20"/>
+                <p className="text-sm">ยังไม่มีข้อความ</p>
+              </div>
+            ) : msgs.map(m => (
+              <Bubble key={m.id} content={m.content} senderName={m.sender_name}
+                isMe={m.sender_role==="staff"} createdAt={m.created_at}/>
+            ))}
+            <div ref={bottomRef}/>
+          </ThreadPanel>
         </div>
       ) : (
-        <div className="hidden md:flex flex-1 items-center justify-center text-muted-foreground flex-col gap-3">
-          <MessageSquare className="size-12 opacity-20" />
-          <div className="text-center">
-            <p className="font-medium">เลือกการสนทนาจากรายการด้านซ้าย</p>
-            <p className="text-sm opacity-60 mt-1">หรือรอข้อความใหม่จากลูกค้า</p>
-          </div>
+        <div className="hidden md:flex flex-1 items-center justify-center text-muted-foreground flex-col gap-2">
+          <ShoppingCart className="size-10 opacity-20"/>
+          <p className="text-sm">เลือกการสนทนาจากรายการ</p>
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TAB 2 & 3 — Web Chat / General Chat (chat_sessions + chat_messages)
+// ═══════════════════════════════════════════════════════════════════════════════
+function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: string }) {
+  const [sessions,  setSessions]  = useState<WebSession[]>([]);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState<string|null>(null);
+  const [search,    setSearch]    = useState("");
+  const [selected,  setSelected]  = useState<WebSession|null>(null);
+  const [msgs,      setMsgs]      = useState<WebMsg[]>([]);
+  const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [sending,   setSending]   = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  const db = supabase as any;
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      let q = db.from("chat_sessions").select("*")
+        .order("last_message_at", { ascending: false, nullsFirst: false })
+        .limit(60);
+
+      // แยก guest vs member ด้วย user_id
+      if (isGuest) q = q.is("user_id", null);
+      else q = q.not("user_id", "is", null);
+
+      const { data, error: err } = await q;
+      if (err) throw new Error(err.message);
+
+      const sessions: WebSession[] = data ?? [];
+      // Enrich: last message + unread count per session
+      const ids = sessions.map((s:WebSession) => s.id);
+      if (ids.length) {
+        const { data: allMsgs } = await db.from("chat_messages")
+          .select("session_id, content, sender_type, sender_name, read_at, created_at")
+          .in("session_id", ids)
+          .order("created_at", { ascending: false });
+
+        const lastMsgMap: Record<string,any> = {};
+        const unreadMap: Record<string,number> = {};
+        for (const m of (allMsgs??[]) as any[]) {
+          if (!lastMsgMap[m.session_id]) {
+            lastMsgMap[m.session_id] = m;
+          }
+          if (m.sender_type === "guest" && !m.read_at) {
+            unreadMap[m.session_id] = (unreadMap[m.session_id]??0) + 1;
+          }
+        }
+        sessions.forEach((s:WebSession) => {
+          s._last_msg = lastMsgMap[s.id]?.content ?? "";
+          s._sender_type = lastMsgMap[s.id]?.sender_type ?? "";
+          s._unread = unreadMap[s.id] ?? 0;
+        });
+      }
+
+      // Filter search
+      const filtered = search
+        ? sessions.filter((s:WebSession) => {
+            const q = search.toLowerCase();
+            return [s.guest_name, s.guest_email, s.guest_phone, s._last_msg]
+              .some(v => v?.toLowerCase().includes(q));
+          })
+        : sessions;
+
+      setSessions(filtered);
+      if (filtered.length && !selected) setSelected(filtered[0]);
+    } catch(e:any) { setError(e.message); }
+    finally { setLoading(false); }
+  }, [isGuest, search]);
+
+  const loadMsgs = useCallback(async (sessionId: string) => {
+    setLoadingMsgs(true);
+    try {
+      const { data } = await db.from("chat_messages")
+        .select("*").eq("session_id", sessionId)
+        .order("created_at", { ascending: true });
+      setMsgs(data ?? []);
+      // mark as read
+      await db.from("chat_messages")
+        .update({ read_at: new Date().toISOString() })
+        .eq("session_id", sessionId).eq("sender_type", "guest").is("read_at", null);
+    } catch { toast.error("โหลดข้อความไม่สำเร็จ"); }
+    finally { setLoadingMsgs(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [isGuest]);
+  useEffect(() => { const t=setTimeout(()=>load(),400); return()=>clearTimeout(t); }, [search]);
+  useEffect(() => { if (selected) loadMsgs(selected.id); }, [selected?.id]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({behavior:"smooth"}); }, [msgs]);
+
+  const handleSend = async (text: string) => {
+    if (!selected) return;
+    setSending(true);
+    try {
+      await db.from("chat_messages").insert({
+        session_id: selected.id, content: text,
+        sender_name: staffName, sender_type: "agent", message_type: "text",
+      });
+      await loadMsgs(selected.id);
+      setSessions(prev => prev.map(s => s.id===selected.id ? {...s, _unread:0} : s));
+    } catch(e:any) { toast.error("ส่งไม่สำเร็จ: "+e.message); }
+    finally { setSending(false); }
+  };
+
+  const totalUnread = sessions.reduce((s,c)=>s+(c._unread??0), 0);
+  const displayName = (s: WebSession) =>
+    s.guest_name ?? s.guest_email ?? (s.user_id ? "สมาชิก" : "ผู้เยี่ยมชม");
+
+  return (
+    <div className="flex h-full overflow-hidden">
+      {/* List */}
+      <div className={`flex flex-col border-r border-border bg-background ${selected?"hidden md:flex w-[380px] shrink-0":"flex flex-1"}`}>
+        <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
+          <span className="text-xs text-muted-foreground flex-1">
+            {sessions.length} รายการ {totalUnread>0 && <span className="text-red-500 font-medium">· {totalUnread} ใหม่</span>}
+          </span>
+          <Button variant="ghost" size="icon" className="size-7" onClick={load} disabled={loading}>
+            <RefreshCw className={`size-3.5 ${loading?"animate-spin":""}`}/>
+          </Button>
+        </div>
+        <div className="px-3 py-2 border-b shrink-0">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none"/>
+            <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ค้นหา..." className="pl-7 h-7 text-xs"/>
+          </div>
+        </div>
+        <ConvoList items={sessions} selectedId={selected?.id} loading={loading} error={error}
+          search={search} onSelect={setSelected} onRetry={load}
+          renderItem={(s: WebSession) => {
+            const name = displayName(s);
+            const hasUnread = (s._unread??0) > 0;
+            const prefix = s._sender_type==="agent" ? "คุณ: " : "";
+            return (
+              <div className="flex items-start gap-3 px-4 py-3.5">
+                <div className={`size-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 ${
+                  hasUnread
+                    ? isGuest ? "bg-teal-600 text-white" : "bg-purple-600 text-white"
+                    : "bg-muted text-muted-foreground"}`}>
+                  {name[0]?.toUpperCase()??"?"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className={`text-sm truncate ${hasUnread?"font-bold":"font-medium"}`}>{name}</span>
+                    <span className="text-[11px] text-muted-foreground shrink-0">
+                      {fmtDate(s.last_message_at??s.created_at)}
+                    </span>
+                  </div>
+                  {s.guest_email && <p className="text-xs text-muted-foreground truncate">{s.guest_email}</p>}
+                  <p className={`text-xs truncate mt-0.5 ${hasUnread?"text-foreground":"text-muted-foreground"}`}>
+                    {prefix}{s._last_msg||"ยังไม่มีข้อความ"}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                      s.status==="open" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                      : "bg-muted text-muted-foreground"}`}>
+                      {s.status}
+                    </span>
+                    {s.assigned_to && <span title="มีคนรับแล้ว"><CheckCircle2 className="size-3 text-emerald-500"/></span>}
+                  </div>
+                </div>
+                {hasUnread && (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white shrink-0">
+                    {s._unread}
+                  </span>
+                )}
+              </div>
+            );
+          }}
+        />
+      </div>
+
+      {/* Thread */}
+      {selected ? (
+        <div className="flex-1 min-w-0">
+          <ThreadPanel
+            title={displayName(selected)}
+            subtitle={isGuest ? "ผู้เยี่ยมชมหน้าเว็บ" : "สมาชิก / ผู้ใช้ที่ล็อกอิน"}
+            infoRows={<>
+              {selected.guest_phone && <a href={`tel:${selected.guest_phone}`} className="flex items-center gap-1 hover:text-foreground"><Phone className="size-3"/>{selected.guest_phone}</a>}
+              {selected.guest_email && <a href={`mailto:${selected.guest_email}`} className="flex items-center gap-1 hover:text-foreground"><Mail className="size-3"/>{selected.guest_email}</a>}
+              <span className="flex items-center gap-1 text-muted-foreground">
+                {isGuest ? <Globe className="size-3"/> : <Users className="size-3"/>}
+                {isGuest ? "Guest" : "Member"}
+              </span>
+            </>}
+            replyPlaceholder={`ตอบกลับ ${displayName(selected)}...`}
+            onSend={handleSend} onClose={()=>setSelected(null)} sending={sending}
+          >
+            {loadingMsgs ? (
+              <div className="flex justify-center py-12"><Loader2 className="size-5 animate-spin text-muted-foreground"/></div>
+            ) : msgs.length===0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground gap-2">
+                <MessageSquare className="size-10 opacity-20"/>
+                <p className="text-sm">ยังไม่มีข้อความ</p>
+              </div>
+            ) : msgs.map(m => (
+              <Bubble key={m.id} content={m.content} senderName={m.sender_name}
+                isMe={m.sender_type==="agent"} createdAt={m.created_at}/>
+            ))}
+            <div ref={bottomRef}/>
+          </ThreadPanel>
+        </div>
+      ) : (
+        <div className="hidden md:flex flex-1 items-center justify-center text-muted-foreground flex-col gap-2">
+          {isGuest ? <Globe className="size-10 opacity-20"/> : <Users className="size-10 opacity-20"/>}
+          <p className="text-sm">เลือกการสนทนาจากรายการ</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
+export function B2BConversationTab() {
+  const { user } = useAuth();
+  const staffName = (user as any)?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Sales";
+  const staffId   = user?.id ?? "staff";
+  const [chatTab, setChatTab] = useState<ChatTab>("b2b");
+
+  const tabOrder: ChatTab[] = ["b2b", "web", "general"];
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* Sub-tab bar */}
+      <div className="flex items-center gap-1 px-4 py-2 border-b bg-background/80 shrink-0 overflow-x-auto">
+        {tabOrder.map(t => {
+          const cfg = TAB_CONFIG[t];
+          const Icon = cfg.icon;
+          const isActive = chatTab === t;
+          return (
+            <button key={t} type="button" onClick={() => setChatTab(t)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                isActive
+                  ? `bg-muted ${cfg.color}`
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}>
+              <Icon className="size-3.5"/>
+              {cfg.label}
+              {isActive && (
+                <span className="text-[10px] font-normal opacity-70 hidden sm:inline">· {cfg.desc}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab content */}
+      <div className="flex-1 min-h-0">
+        {chatTab === "b2b"     && <B2BTab staffName={staffName} staffId={staffId}/>}
+        {chatTab === "web"     && <WebChatTab isGuest={true}  staffName={staffName}/>}
+        {chatTab === "general" && <WebChatTab isGuest={false} staffName={staffName}/>}
+      </div>
     </div>
   );
 }
