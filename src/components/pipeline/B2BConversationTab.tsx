@@ -9,12 +9,13 @@
  * Tab 2-3 ใช้ table เดียวกัน แยกด้วย user_id NULL/NOT NULL
  * Authorized by: therdpoom@entgroup.co.th
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Loader2, RefreshCw, MessageSquare, Send, Building2,
   Phone, Mail, Search, CheckCircle2, AlertTriangle,
-  ShoppingCart, Globe, Users, X,
+  ShoppingCart, Globe, Users, X, Paperclip, Image as ImageIcon, FileText, CornerDownLeft,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,10 +92,27 @@ async function lcPost(body: Record<string,any>) {
   return res.json();
 }
 
+// ─── Attachment helpers ──────────────────────────────────────────────────────
+const ATTACH_BUCKET = "email-attachments";
+const MAX_ATTACH_MB = 10;
+const IMG_RE = /(https?:\/\/[^\s)]+\.(?:png|jpe?g|gif|webp|svg))(?:\?[^\s)]*)?/gi;
+const URL_RE = /(https?:\/\/[^\s)]+)/gi;
+
+type Attachment = { url: string; name: string; mime: string; size: number };
+
+function isImageUrl(u: string) { return /\.(png|jpe?g|gif|webp|svg)(\?|$)/i.test(u); }
+
 // ─── Chat Bubble ──────────────────────────────────────────────────────────────
 function Bubble({ content, senderName, isMe, createdAt }: {
   content: string; senderName: string; isMe: boolean; createdAt: string;
 }) {
+  const imgs = useMemo(() => Array.from(content.matchAll(IMG_RE)).map(m => m[0]), [content]);
+  const textOnly = content.replace(IMG_RE, "").trim();
+  const linkified = textOnly.split(URL_RE).map((part, i) =>
+    URL_RE.test(part)
+      ? <a key={i} href={part} target="_blank" rel="noreferrer" className="underline break-all">{part}</a>
+      : <span key={i}>{part}</span>
+  );
   return (
     <div className={`flex gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
       <div className={`size-7 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold ${
@@ -104,11 +122,22 @@ function Bubble({ content, senderName, isMe, createdAt }: {
       </div>
       <div className={`max-w-[72%] flex flex-col ${isMe ? "items-end" : ""}`}>
         {!isMe && <span className="text-[11px] text-muted-foreground font-medium mb-0.5 px-1">{senderName}</span>}
-        <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-          isMe ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted text-foreground rounded-tl-sm"
-        }`}>
-          <p className="whitespace-pre-wrap break-words">{content}</p>
-        </div>
+        {textOnly && (
+          <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+            isMe ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted text-foreground rounded-tl-sm"
+          }`}>
+            <p className="whitespace-pre-wrap break-words">{linkified}</p>
+          </div>
+        )}
+        {imgs.length > 0 && (
+          <div className={`mt-1 grid gap-1 ${imgs.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+            {imgs.map((u, i) => (
+              <a key={i} href={u} target="_blank" rel="noreferrer" className="block">
+                <img src={u} alt="attachment" className="max-h-56 rounded-lg border object-cover"/>
+              </a>
+            ))}
+          </div>
+        )}
         <span className={`text-[10px] text-muted-foreground mt-1 px-1 ${isMe ? "text-right" : ""}`}>
           {fmtFull(createdAt)}
         </span>
@@ -118,16 +147,110 @@ function Bubble({ content, senderName, isMe, createdAt }: {
 }
 
 // ─── Shared Thread Panel ──────────────────────────────────────────────────────
-function ThreadPanel({ title, subtitle, infoRows, children, replyPlaceholder, onSend, onClose, sending }: {
+function ThreadPanel({ title, subtitle, infoRows, children, replyPlaceholder, onSend, onClose, sending, draftKey }: {
   title: string; subtitle?: string; infoRows?: React.ReactNode;
   children: React.ReactNode; replyPlaceholder: string;
   onSend: (text: string) => Promise<void>; onClose: () => void; sending: boolean;
+  draftKey: string;
 }) {
+  const storageKey = `chat-draft:${draftKey}`;
+  const attachKey  = `chat-attach:${draftKey}`;
   const [reply, setReply] = useState("");
-  const handleSend = async () => {
-    const t = reply.trim(); if (!t || sending) return;
-    await onSend(t); setReply("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load draft when conversation changes
+  useEffect(() => {
+    try {
+      setReply(localStorage.getItem(storageKey) ?? "");
+      const a = localStorage.getItem(attachKey);
+      setAttachments(a ? JSON.parse(a) : []);
+    } catch { setReply(""); setAttachments([]); }
+  }, [storageKey, attachKey]);
+
+  // Persist draft
+  useEffect(() => {
+    try {
+      if (reply) localStorage.setItem(storageKey, reply);
+      else localStorage.removeItem(storageKey);
+    } catch {}
+  }, [reply, storageKey]);
+  useEffect(() => {
+    try {
+      if (attachments.length) localStorage.setItem(attachKey, JSON.stringify(attachments));
+      else localStorage.removeItem(attachKey);
+    } catch {}
+  }, [attachments, attachKey]);
+
+  // Autosize
+  useLayoutEffect(() => {
+    const el = taRef.current; if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+  }, [reply]);
+
+  // Focus on conversation switch
+  useEffect(() => { taRef.current?.focus(); }, [draftKey]);
+
+  const handlePickFiles = () => fileRef.current?.click();
+
+  const handleUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      const uploaded: Attachment[] = [];
+      for (const file of Array.from(files)) {
+        if (file.size > MAX_ATTACH_MB * 1024 * 1024) {
+          toast.error(`${file.name} ใหญ่เกิน ${MAX_ATTACH_MB}MB`);
+          continue;
+        }
+        const ext = file.name.split(".").pop() ?? "bin";
+        const path = `chat/${Date.now()}-${crypto.randomUUID().slice(0,8)}.${ext}`;
+        const { error: upErr } = await supabase.storage.from(ATTACH_BUCKET).upload(path, file, {
+          contentType: file.type || "application/octet-stream",
+        });
+        if (upErr) { toast.error(`อัปโหลด ${file.name} ไม่สำเร็จ`); continue; }
+        const { data } = supabase.storage.from(ATTACH_BUCKET).getPublicUrl(path);
+        uploaded.push({ url: data.publicUrl, name: file.name, mime: file.type, size: file.size });
+      }
+      if (uploaded.length) setAttachments(prev => [...prev, ...uploaded]);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   };
+
+  const removeAttach = (idx: number) =>
+    setAttachments(prev => prev.filter((_, i) => i !== idx));
+
+  const handleSend = async () => {
+    const t = reply.trim();
+    if ((!t && attachments.length === 0) || sending) return;
+    // Compose: text + newline + attachment URLs
+    const attachLines = attachments.map(a => a.url).join("\n");
+    const body = [t, attachLines].filter(Boolean).join("\n\n");
+    await onSend(body);
+    setReply("");
+    setAttachments([]);
+    try {
+      localStorage.removeItem(storageKey);
+      localStorage.removeItem(attachKey);
+    } catch {}
+    requestAnimationFrame(() => taRef.current?.focus());
+  };
+
+  const onPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData.files ?? []);
+    if (files.length) {
+      e.preventDefault();
+      const dt = new DataTransfer();
+      files.forEach(f => dt.items.add(f));
+      handleUpload(dt.files);
+    }
+  };
+
   return (
     <div className="flex flex-col border-l border-border bg-background" style={{height:"100%",overflow:"hidden"}}>
       <div className="flex items-start gap-3 px-5 py-4 border-b bg-muted/10 shrink-0">
@@ -145,14 +268,57 @@ function ThreadPanel({ title, subtitle, infoRows, children, replyPlaceholder, on
         </div>
       )}
       <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">{children}</div>
-      <div className="flex items-end gap-2.5 px-4 py-3 border-t bg-background shrink-0 mt-auto">
-        <textarea value={reply} onChange={e=>setReply(e.target.value)}
-          onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleSend();} }}
-          placeholder={replyPlaceholder} rows={2}
-          className="flex-1 resize-none rounded-xl border border-border bg-muted/30 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition"/>
-        <Button onClick={handleSend} disabled={sending||!reply.trim()} size="icon" className="size-10 rounded-xl shrink-0">
-          {sending ? <Loader2 className="size-4 animate-spin"/> : <Send className="size-4"/>}
-        </Button>
+
+      {/* Composer */}
+      <div className="border-t bg-background shrink-0 mt-auto">
+        {/* Attachment previews */}
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-4 pt-3">
+            {attachments.map((a, i) => (
+              <div key={i} className="relative group flex items-center gap-2 rounded-lg border bg-muted/40 pl-2 pr-7 py-1.5 text-xs max-w-[220px]">
+                {isImageUrl(a.url) ? (
+                  <img src={a.url} alt="" className="size-8 rounded object-cover shrink-0"/>
+                ) : a.mime.startsWith("image/") ? (
+                  <ImageIcon className="size-4 text-blue-500 shrink-0"/>
+                ) : (
+                  <FileText className="size-4 text-muted-foreground shrink-0"/>
+                )}
+                <span className="truncate">{a.name}</span>
+                <button type="button" onClick={()=>removeAttach(i)}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full p-0.5 hover:bg-background">
+                  <X className="size-3"/>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex items-end gap-2 px-4 py-3">
+          <input ref={fileRef} type="file" multiple className="hidden"
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+            onChange={e => handleUpload(e.target.files)}/>
+          <Button type="button" variant="ghost" size="icon" className="size-9 shrink-0"
+            onClick={handlePickFiles} disabled={uploading || sending} title="แนบไฟล์">
+            {uploading ? <Loader2 className="size-4 animate-spin"/> : <Paperclip className="size-4"/>}
+          </Button>
+          <div className="flex-1 flex flex-col">
+            <textarea ref={taRef} value={reply} onChange={e=>setReply(e.target.value)}
+              onPaste={onPaste}
+              onKeyDown={e=>{
+                if (e.key==="Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault(); handleSend();
+                }
+              }}
+              placeholder={replyPlaceholder} rows={1}
+              className="w-full resize-none rounded-xl border border-border bg-muted/30 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition min-h-[42px] max-h-[200px]"/>
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-1 px-1">
+              <CornerDownLeft className="size-3"/> Enter ส่ง · Shift+Enter ขึ้นบรรทัดใหม่ · วางรูปได้
+            </div>
+          </div>
+          <Button onClick={handleSend} disabled={sending||(!reply.trim() && attachments.length===0)}
+            size="icon" className="size-10 rounded-xl shrink-0">
+            {sending ? <Loader2 className="size-4 animate-spin"/> : <Send className="size-4"/>}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -325,6 +491,7 @@ function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) 
       {selected ? (
         <div className="flex-1 min-w-0">
           <ThreadPanel
+            draftKey={`b2b:${selected.id}`}
             title={selected.customer_company||selected.customer_name}
             subtitle={`${selected.quote_number} · ${formatBaht(selected.grand_total)}`}
             infoRows={<>
@@ -492,6 +659,7 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
       {selected ? (
         <div className="flex-1 min-w-0">
           <ThreadPanel
+            draftKey={`${chatAction}:${selected.id}`}
             title={displayName(selected)}
             subtitle={isGuest ? "ผู้เยี่ยมชมหน้าเว็บ" : "สมาชิก / ผู้ใช้ที่ล็อกอิน"}
             infoRows={<>
