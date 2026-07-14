@@ -425,6 +425,3 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
     </div>
   );
 }
-    </div>
-  );
-}
