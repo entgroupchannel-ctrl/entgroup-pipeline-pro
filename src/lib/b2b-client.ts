@@ -7,6 +7,18 @@
 const B2B_EDGE_URL = "https://ugzdwmyylqmirrljtuej.supabase.co/functions/v1/b2b-quotes";
 const B2B_SECRET = "entgroup-crm-secret-2026";
 
+export interface B2BProductItem {
+  model?: string;
+  name?: string;
+  sku?: string;
+  description?: string;
+  quantity?: number;
+  unit_price?: number;
+  price?: number;
+  total?: number;
+  [k: string]: any;
+}
+
 export interface B2BQuoteItem {
   id: string;
   product_name: string;
@@ -23,7 +35,21 @@ export interface B2BQuoteRequest {
   customer_company: string;
   customer_email?: string;
   customer_phone?: string;
+  customer_address?: string | null;
+  customer_tax_id?: string | null;
+  customer_line?: string | null;
   grand_total: number;
+  subtotal?: number | null;
+  discount_percent?: number | null;
+  discount_amount?: number | null;
+  vat_percent?: number | null;
+  vat_amount?: number | null;
+  payment_terms?: string | null;
+  delivery_terms?: string | null;
+  warranty_terms?: string | null;
+  valid_until?: string | null;
+  notes?: string | null;
+  products?: B2BProductItem[] | null;
   status: "pending" | "quote_sent" | "po_uploaded" | "completed";
   created_at: string;
   sla_po_review_due?: string;
@@ -61,6 +87,12 @@ async function b2bFetch(params: Record<string, string>): Promise<B2BQuoteRequest
 /** ดึง quote_requests ที่ยังไม่ได้ match กับ lead ใดเลย */
 export async function fetchUnmatchedQuotes(limit = 50): Promise<B2BQuoteRequest[]> {
   return b2bFetch({ limit: String(limit) });
+}
+
+/** ดึงรายละเอียดเต็ม (address, tax_id, products, terms) — ต้อง edge function รองรับ ?detail=1 */
+export async function fetchQuoteDetail(id: string): Promise<B2BQuoteRequest | null> {
+  const res = await b2bFetch({ b2b_ids: id, detail: "1" });
+  return res[0] ?? null;
 }
 
 /** ดึง quote_requests ตาม b2b_request_id หลายๆ id */

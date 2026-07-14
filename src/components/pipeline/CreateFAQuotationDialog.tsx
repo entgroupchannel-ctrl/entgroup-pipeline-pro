@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { formatBaht } from "@/lib/format";
 import { createFAQuotationDraft } from "@/lib/flowaccount.functions";
-import type { B2BQuoteRequest } from "@/lib/b2b-client";
+import { fetchQuoteDetail, type B2BQuoteRequest } from "@/lib/b2b-client";
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function plusDaysISO(days: number) {
@@ -50,26 +50,48 @@ export function CreateFAQuotationDialog({ open, onOpenChange, request, leadId, o
   const [note, setNote] = useState("");
   const [vatOn, setVatOn] = useState(true);
 
+  const applyRequest = (r: B2BQuoteRequest) => {
+    setCompany(r.customer_company ?? "");
+    setContactName(r.customer_name ?? "");
+    setEmail(r.customer_email ?? "");
+    setPhone(r.customer_phone ?? "");
+    setAddress(r.customer_address ?? "");
+    setTaxId(r.customer_tax_id ?? "");
+    setNote(
+      [`อ้างอิงจาก B2B Request: ${r.quote_number}`, r.notes || ""]
+        .filter(Boolean).join("\n"),
+    );
+    if (r.vat_percent != null) setVatOn(Number(r.vat_percent) > 0);
+    if (r.valid_until) setValidUntil(String(r.valid_until).slice(0, 10));
+
+    // Prefer explicit items[] if present, otherwise map from products JSONB
+    const rows: Row[] = (r.items && r.items.length)
+      ? r.items.map((it) => ({
+          name: it.product_name || "-",
+          description: it.description || "",
+          quantity: Number(it.quantity) || 1,
+          unit_price: Number(it.unit_price) || 0,
+        }))
+      : (r.products ?? []).map((p) => ({
+          name: p.model || p.name || p.sku || "-",
+          description: p.description || "",
+          quantity: Number(p.quantity) || 1,
+          unit_price: Number(p.unit_price ?? p.price) || 0,
+        }));
+    setItems(rows);
+  };
+
   useEffect(() => {
     if (!open || !request) return;
-    setCompany(request.customer_company ?? "");
-    setContactName(request.customer_name ?? "");
-    setEmail(request.customer_email ?? "");
-    setPhone(request.customer_phone ?? "");
-    setAddress("");
-    setTaxId("");
     setIssuedDate(todayISO());
     setValidUntil(plusDaysISO(30));
-    setNote(`อ้างอิงจาก B2B Request: ${request.quote_number}`);
     setVatOn(true);
-    setItems(
-      (request.items ?? []).map((it) => ({
-        name: it.product_name || "-",
-        description: it.description || "",
-        quantity: Number(it.quantity) || 1,
-        unit_price: Number(it.unit_price) || 0,
-      })),
-    );
+    applyRequest(request);
+    // Enrich with full detail (address, tax_id, products) from edge function
+    fetchQuoteDetail(request.id)
+      .then((full) => { if (full) applyRequest(full); })
+      .catch(() => { /* fallback to basic fields */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, request]);
 
   const subTotal = useMemo(
