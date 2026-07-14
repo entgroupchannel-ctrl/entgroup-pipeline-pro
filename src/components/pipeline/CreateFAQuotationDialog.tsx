@@ -75,7 +75,7 @@ export function CreateFAQuotationDialog({ open, onOpenChange, request, leadId, o
       : (r.products ?? []).map((p) => ({
           name: p.model || p.name || p.sku || "-",
           description: p.description || "",
-          quantity: Number(p.quantity) || 1,
+          quantity: Number(p.qty ?? p.quantity) || 1,      // qty คือ field จริงใน B2B
           unit_price: Number(p.unit_price ?? p.price) || 0,
         }));
     setItems(rows);
