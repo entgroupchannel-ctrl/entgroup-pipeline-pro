@@ -538,7 +538,11 @@ function WebTab({ isGuest, sName, sId, draft, setDraft }: {
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
-export function B2BConversationTab() {
+export function B2BConversationTab({
+  unreadCounts = { b2b: 0, web: 0, general: 0 },
+}: {
+  unreadCounts?: Record<ChatTab, number>;
+}) {
   const { user } = useAuth();
   const sName = (user as any)?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Sales";
   const sId   = user?.id ?? "staff";
@@ -557,7 +561,8 @@ export function B2BConversationTab() {
       {/* sub-tab strip */}
       <div className="flex items-center gap-1 px-4 py-1.5 border-b bg-muted/20 shrink-0">
         {TABS.map(({ key, label, Icon }) => {
-          const active = tab === key;
+          const active  = tab === key;
+          const uCount  = unreadCounts[key] ?? 0;
           const colors: Record<ChatTab,string> = {
             b2b:     "text-blue-600 bg-blue-50 dark:bg-blue-950/40",
             web:     "text-teal-600 bg-teal-50 dark:bg-teal-950/40",
@@ -570,7 +575,16 @@ export function B2BConversationTab() {
               }`}>
               <Icon className="size-3.5"/>
               {label}
-              {!active && drafts[key] && <span className="size-1.5 rounded-full bg-amber-400"/>}
+              {/* unread badge — แสดงทุก tab ไม่ว่า active หรือไม่ */}
+              {uCount > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                  {uCount > 99 ? "99+" : uCount}
+                </span>
+              )}
+              {/* draft dot */}
+              {!active && drafts[key] && uCount === 0 && (
+                <span className="size-1.5 rounded-full bg-amber-400"/>
+              )}
             </button>
           );
         })}

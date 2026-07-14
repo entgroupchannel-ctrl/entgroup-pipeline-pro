@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { KanbanBoard } from "@/components/pipeline/KanbanBoard";
 import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
 import { crmDb } from "@/lib/crm";
+import { fetchUnmatchedQuotes } from "@/lib/b2b-client";
 import { B2BRequestsTab } from "@/components/pipeline/B2BRequestsTab";
 import { LineRequestsTab } from "@/components/pipeline/LineRequestsTab";
 import { B2BConversationTab } from "@/components/pipeline/B2BConversationTab";
@@ -15,7 +16,8 @@ export const Route = createFileRoute("/_authenticated/pipeline")({
 
 function PipelinePage() {
   const [tab, setTab] = useState<"all" | "line" | "b2b" | "messages">("all");
-  const [b2bMsgUnread, setB2bMsgUnread] = useState(0);
+  const [msgUnread, setMsgUnread] = useState({ b2b: 0, web: 0, general: 0 });
+  const totalMsgUnread = msgUnread.b2b + msgUnread.web + msgUnread.general;
   const [b2bCount, setB2bCount] = useState(0);
   const [unassignedLine, setUnassignedLine] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -41,6 +43,30 @@ function PipelinePage() {
       .on("postgres_changes", { event: "*", schema: "crm", table: "leads" }, () => loadCount())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
+  }, []);
+
+  // Poll unread counts every 30s — b2b-live-chat returns unread_count per session
+  useEffect(() => {
+    const LC = "https://ugzdwmyylqmirrljtuej.supabase.co/functions/v1/b2b-live-chat";
+    const SK = "entgroup-crm-secret-2026";
+    const poll = async () => {
+      try {
+        const [wb, ww, wg] = await Promise.all([
+          fetch(`${LC}?action=b2b`, { headers: { "x-crm-secret": SK } }).then(r=>r.json()),
+          fetch(`${LC}?action=web`, { headers: { "x-crm-secret": SK } }).then(r=>r.json()),
+          fetch(`${LC}?action=general`, { headers: { "x-crm-secret": SK } }).then(r=>r.json()),
+        ]);
+        const sumUnread = (d: any[]) => d.reduce((s: number, c: any) => s + (c.unread_count ?? 0), 0);
+        setMsgUnread({
+          b2b:     sumUnread(wb?.data  ?? []),
+          web:     sumUnread(ww?.data  ?? []),
+          general: sumUnread(wg?.data  ?? []),
+        });
+      } catch { /* silent */ }
+    };
+    poll();
+    const t = setInterval(poll, 30_000);
+    return () => clearInterval(t);
   }, []);
 
   const handleQuickLog = (leadId: string, type: ActivityKind) => {
@@ -97,9 +123,9 @@ function PipelinePage() {
           }`}
         >
           <span>📩 ข้อความ</span>
-          {b2bMsgUnread > 0 && (
+          {totalMsgUnread > 0 && (
             <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
-              {b2bMsgUnread}
+              {totalMsgUnread}
             </span>
           )}
         </button>
@@ -107,7 +133,7 @@ function PipelinePage() {
 
       {/* Content — Kanban / LINE / B2B tab */}
       {tab === "messages" ? (
-        <B2BConversationTab />
+        <B2BConversationTab unreadCounts={msgUnread} />
       ) : tab === "b2b" ? (
         <B2BRequestsTab onLeadCreated={() => setRefreshKey((k) => k + 1)} />
       ) : tab === "line" ? (
