@@ -48,18 +48,16 @@ function AuthenticatedLayout() {
   return (
     <ConfirmDialogProvider>
     <SidebarProvider>
-      <div className="flex min-h-screen w-full min-w-0 bg-muted/20">
+      <div className="flex h-screen w-full min-w-0 bg-muted/20 overflow-hidden">
         <AppSidebar />
-        <SidebarInset className="flex min-w-0 flex-1 flex-col">
+        <SidebarInset className="flex min-w-0 flex-1 flex-col overflow-hidden h-full">
           <header className="flex h-14 items-center gap-2 border-b bg-background px-4">
             <SidebarTrigger />
             <div className="ml-2 text-sm font-medium text-muted-foreground">ENTGROUP CRM</div>
             <div className="ml-auto"><PreferencesToggle /></div>
           </header>
-          <main className="min-w-0 flex-1 overflow-hidden flex flex-col">
-            <div className="flex flex-col flex-1 min-h-0">
-              <Outlet />
-            </div>
+          <main className="min-w-0 flex-1 overflow-hidden flex flex-col" style={{minHeight:0}}>
+            <div className="flex flex-col flex-1 min-h-0"><Outlet /></div>
           </main>
         </SidebarInset>
       </div>

@@ -1,743 +1,586 @@
 /**
- * B2BConversationTab — 3 sub-tab chat viewer
- *
- * Tab 1 "ใบเสนอราคา B2B"  → quote_messages (B2B project ugzd..., via b2b-live-chat edge fn)
- * Tab 2 "Chat หน้าเว็บ"    → chat_sessions (user_id IS NULL = guest)  + chat_messages
- * Tab 3 "General Chat"     → chat_sessions (user_id IS NOT NULL = member) + chat_messages
- *
- * Tab 1 ต่างกัน: ผู้ส่งคือ customer ที่กรอกใบเสนอราคา B2B
- * Tab 2-3 ใช้ table เดียวกัน แยกด้วย user_id NULL/NOT NULL
+ * B2BConversationTab v3 — LINE Official style
+ * 2-column layout: conversation list (left) | thread + compose (right)
+ * Fills 100% viewport height — no page scroll needed
  * Authorized by: therdpoom@entgroup.co.th
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import {
-  Loader2, RefreshCw, MessageSquare, Send, Building2,
-  Phone, Mail, Search, CheckCircle2, AlertTriangle,
-  ShoppingCart, Globe, Users, X, Paperclip, Image as ImageIcon, FileText, CornerDownLeft,
+  Loader2, RefreshCw, MessageSquare, Send, Phone, Mail,
+  Search, CheckCircle2, AlertTriangle, ShoppingCart, Globe,
+  Users, X, Paperclip, FileText as FileIcon,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { formatBaht } from "@/lib/format";
 import { crmDb } from "@/lib/crm";
 import { STATUS_LABEL, STATUS_COLOR, fetchUnmatchedQuotes } from "@/lib/b2b-client";
 
-// ─── Config ──────────────────────────────────────────────────────────────────
-const LIVE_CHAT_URL = "https://ugzdwmyylqmirrljtuej.supabase.co/functions/v1/b2b-live-chat";
-const CRM_SECRET    = "entgroup-crm-secret-2026";
+// ─── Config ───────────────────────────────────────────────────────────────────
+const LC = "https://ugzdwmyylqmirrljtuej.supabase.co/functions/v1/b2b-live-chat";
+const SK = "entgroup-crm-secret-2026";
 
 type ChatTab = "b2b" | "web" | "general";
 
-const TAB_CONFIG: Record<ChatTab, { label: string; icon: typeof MessageSquare; color: string; desc: string }> = {
-  b2b:     { label: "ใบเสนอราคา B2B", icon: ShoppingCart, color: "text-blue-600",   desc: "ลูกค้าที่ยื่นขอใบเสนอราคา" },
-  web:     { label: "Chat หน้าเว็บ",   icon: Globe,        color: "text-teal-600",   desc: "ผู้เยี่ยมชมกดปุ่ม chat" },
-  general: { label: "General Chat",   icon: Users,        color: "text-purple-600", desc: "สมาชิก / ผู้ใช้ที่ล็อกอิน" },
-};
-
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface B2BConvo {
-  id: string; quote_number: string; customer_name: string;
-  customer_company: string; customer_email?: string; customer_phone?: string;
-  customer_address?: string | null; grand_total: number; status: string;
-  created_at: string; sla_po_review_due?: string | null; crm_lead_id?: string | null;
-  last_message: any | null; unread_count: number; _lead_id?: string | null;
-}
-interface B2BMsg {
-  id: string; quote_id: string; sender_name: string; sender_role: string;
-  content: string; created_at: string; read_by: any;
-}
-
-interface WebSession {
-  id: string; guest_name: string | null; guest_email: string | null;
-  guest_phone: string | null; user_id: string | null; source: string;
-  status: string; last_message_at: string | null; created_at: string;
-  assigned_to: string | null; metadata: any | null;
-  _last_msg?: string; _unread?: number; _sender_type?: string;
-}
-interface WebMsg {
-  id: string; session_id: string; content: string; sender_name: string;
-  sender_type: string; created_at: string; read_at: string | null;
+interface Convo {
+  id: string;
+  name: string;
+  subName?: string;
+  lastMsg?: string;
+  lastMsgIsMe?: boolean;
+  lastAt: string;
+  unread: number;
+  status: string;
+  badge?: string;
+  value?: number;
+  leadId?: string | null;
+  raw: any;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const MONTHS_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
-function fmtDate(iso: string) {
-  const d = new Date(iso), now = new Date();
-  const diff = Math.floor((now.getTime() - d.getTime()) / 86400000);
+interface Msg {
+  id: string;
+  content: string;
+  senderName: string;
+  isMe: boolean;
+  createdAt: string;
+  attachUrl?: string | null;
+  attachName?: string | null;
+}
+
+// ─── Utils ────────────────────────────────────────────────────────────────────
+const MO = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+function ts(iso: string) {
+  const d = new Date(iso), n = new Date();
+  const diff = Math.floor((n.getTime() - d.getTime()) / 86400000);
   if (diff === 0) return d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
-  if (diff < 7) return `${diff} วันที่ผ่านมา`;
-  return `${d.getDate()} ${MONTHS_TH[d.getMonth()]}`;
+  if (diff < 7)  return `${diff}ว.`;
+  if (diff < 365) return `${d.getDate()} ${MO[d.getMonth()]}`;
+  return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()+543}`;
 }
-function fmtFull(iso: string) {
+function tf(iso: string) {
   const d = new Date(iso);
-  return `${d.getDate()} ${MONTHS_TH[d.getMonth()]} ${d.getFullYear()+543} ${d.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"})}`;
+  return `${d.getDate()} ${MO[d.getMonth()]} ${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`;
 }
+function isImg(n?: string | null) { return /\.(jpg|jpeg|png|gif|webp)$/i.test(n ?? ""); }
 
-async function lcFetch(params: Record<string,string> = {}) {
-  const url = new URL(LIVE_CHAT_URL);
-  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k,v));
-  const res = await fetch(url.toString(), { headers: { "x-crm-secret": CRM_SECRET } });
-  if (!res.ok) throw new Error(`b2b-live-chat ${res.status}`);
-  return res.json();
+async function lcGet(p: Record<string,string>) {
+  const u = new URL(LC);
+  Object.entries(p).forEach(([k,v]) => u.searchParams.set(k,v));
+  const r = await fetch(u.toString(), { headers: { "x-crm-secret": SK } });
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
 }
-async function lcPost(body: Record<string,any>) {
-  const res = await fetch(LIVE_CHAT_URL, {
+async function lcPost(b: Record<string,any>) {
+  const r = await fetch(LC, {
     method: "POST",
-    headers: { "x-crm-secret": CRM_SECRET, "content-type": "application/json" },
-    body: JSON.stringify(body),
+    headers: { "x-crm-secret": SK, "content-type": "application/json" },
+    body: JSON.stringify(b),
   });
-  if (!res.ok) throw new Error(`b2b-live-chat POST ${res.status}`);
-  return res.json();
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
 }
 
-// ─── Attachment helpers ──────────────────────────────────────────────────────
-const ATTACH_BUCKET = "email-attachments";
-const MAX_ATTACH_MB = 10;
-const IMG_RE = /(https?:\/\/[^\s)]+\.(?:png|jpe?g|gif|webp|svg))(?:\?[^\s)]*)?/gi;
-const URL_RE = /(https?:\/\/[^\s)]+)/gi;
-
-type Attachment = { url: string; name: string; mime: string; size: number };
-
-function isImageUrl(u: string) { return /\.(png|jpe?g|gif|webp|svg)(\?|$)/i.test(u); }
-
-// ─── Chat Bubble ──────────────────────────────────────────────────────────────
-function Bubble({ content, senderName, isMe, createdAt }: {
-  content: string; senderName: string; isMe: boolean; createdAt: string;
-}) {
-  const imgs = useMemo(() => Array.from(content.matchAll(IMG_RE)).map(m => m[0]), [content]);
-  const textOnly = content.replace(IMG_RE, "").trim();
-  const linkified = textOnly.split(URL_RE).map((part, i) =>
-    URL_RE.test(part)
-      ? <a key={i} href={part} target="_blank" rel="noreferrer" className="underline break-all">{part}</a>
-      : <span key={i}>{part}</span>
-  );
+// ─── Bubble ───────────────────────────────────────────────────────────────────
+function Bubble({ msg }: { msg: Msg }) {
   return (
-    <div className={`flex gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
-      <div className={`size-7 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold ${
-        isMe ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+    <div className={`flex gap-2 ${msg.isMe ? "flex-row-reverse" : ""}`}>
+      <div className={`size-6 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold mt-1 ${
+        msg.isMe ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
       }`}>
-        {isMe ? "S" : (senderName?.[0]?.toUpperCase() ?? "?")}
+        {msg.isMe ? "S" : msg.senderName?.[0]?.toUpperCase() ?? "?"}
       </div>
-      <div className={`max-w-[72%] flex flex-col ${isMe ? "items-end" : ""}`}>
-        {!isMe && <span className="text-[11px] text-muted-foreground font-medium mb-0.5 px-1">{senderName}</span>}
-        {textOnly && (
-          <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-            isMe ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted text-foreground rounded-tl-sm"
-          }`}>
-            <p className="whitespace-pre-wrap break-words">{linkified}</p>
-          </div>
-        )}
-        {imgs.length > 0 && (
-          <div className={`mt-1 grid gap-1 ${imgs.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
-            {imgs.map((u, i) => (
-              <a key={i} href={u} target="_blank" rel="noreferrer" className="block">
-                <img src={u} alt="attachment" className="max-h-56 rounded-lg border object-cover"/>
+      <div className={`max-w-[68%] flex flex-col gap-1 ${msg.isMe ? "items-end" : "items-start"}`}>
+        {!msg.isMe && <span className="text-[10px] text-muted-foreground px-0.5">{msg.senderName}</span>}
+        {msg.attachUrl && (
+          isImg(msg.attachName)
+            ? <img src={msg.attachUrl} alt={msg.attachName ?? ""} onClick={() => window.open(msg.attachUrl!, "_blank")}
+                className="max-w-[200px] rounded-xl border cursor-pointer hover:opacity-90" />
+            : <a href={msg.attachUrl} target="_blank" rel="noreferrer"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs border ${
+                  msg.isMe ? "bg-primary/80 text-primary-foreground border-primary/50" : "bg-muted border-border"}`}>
+                <Paperclip className="size-3 shrink-0" />{msg.attachName ?? "ไฟล์แนบ"}
               </a>
-            ))}
+        )}
+        {msg.content && (
+          <div className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed ${
+            msg.isMe
+              ? "bg-primary text-primary-foreground rounded-tr-sm"
+              : "bg-[#f0f0f0] dark:bg-muted text-foreground rounded-tl-sm"
+          }`}>
+            <p className="whitespace-pre-wrap break-words">{msg.content}</p>
           </div>
         )}
-        <span className={`text-[10px] text-muted-foreground mt-1 px-1 ${isMe ? "text-right" : ""}`}>
-          {fmtFull(createdAt)}
-        </span>
+        <span className="text-[10px] text-muted-foreground/70 px-0.5">{tf(msg.createdAt)}</span>
       </div>
     </div>
   );
 }
 
-// ─── Shared Thread Panel ──────────────────────────────────────────────────────
-function ThreadPanel({ title, subtitle, infoRows, children, replyPlaceholder, onSend, onClose, sending, draftKey }: {
-  title: string; subtitle?: string; infoRows?: React.ReactNode;
-  children: React.ReactNode; replyPlaceholder: string;
-  onSend: (text: string) => Promise<void>; onClose: () => void; sending: boolean;
-  draftKey: string;
+// ─── ConvoRow ─────────────────────────────────────────────────────────────────
+function ConvoRow({ c, isActive, accent, onClick }: {
+  c: Convo; isActive: boolean; accent: string; onClick: () => void;
 }) {
-  const storageKey = `chat-draft:${draftKey}`;
-  const attachKey  = `chat-attach:${draftKey}`;
-  const [reply, setReply] = useState("");
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const taRef = useRef<HTMLTextAreaElement>(null);
+  const hasNew = c.unread > 0;
+  const dotClr = { blue: "bg-blue-500", teal: "bg-teal-500", purple: "bg-purple-500" }[accent] ?? "bg-primary";
+  return (
+    <button type="button" onClick={onClick}
+      className={`w-full text-left flex items-center gap-3 px-4 py-3 border-b border-border/30 transition-colors ${
+        isActive ? "bg-primary/8 border-l-[3px] border-l-primary" : "hover:bg-muted/40"
+      }`}>
+      {/* avatar */}
+      <div className={`size-10 rounded-full flex-shrink-0 flex items-center justify-center font-semibold text-sm ${
+        hasNew ? `${dotClr} text-white` : "bg-muted text-muted-foreground"
+      }`}>
+        {c.name?.[0]?.toUpperCase() ?? "?"}
+      </div>
 
-  // Load draft when conversation changes
+      {/* content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline justify-between gap-1">
+          <span className={`text-sm truncate ${hasNew ? "font-bold" : "font-medium"}`}>{c.name}</span>
+          <span className="text-[11px] text-muted-foreground shrink-0 ml-1">{ts(c.lastAt)}</span>
+        </div>
+        <p className={`text-xs truncate ${hasNew ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+          {c.lastMsgIsMe ? "คุณ: " : ""}{c.lastMsg ?? c.badge ?? "ยังไม่มีข้อความ"}
+        </p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {c.badge && <span className="font-mono text-[10px] text-muted-foreground">{c.badge}</span>}
+          {c.value != null && c.value > 0 && <span className="text-[10px] text-muted-foreground">· {formatBaht(c.value)}</span>}
+          {c.status && (
+            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLOR[c.status] ?? "bg-muted/60 text-muted-foreground"}`}>
+              {STATUS_LABEL[c.status] ?? c.status}
+            </span>
+          )}
+          {c.leadId && <CheckCircle2 className="size-3 text-emerald-500" />}
+        </div>
+      </div>
+
+      {/* unread */}
+      {hasNew && (
+        <span className="size-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+          {c.unread > 9 ? "9+" : c.unread}
+        </span>
+      )}
+    </button>
+  );
+}
+
+// ─── ThreadPane (right side — full height) ────────────────────────────────────
+function ThreadPane({ convo, msgs, loading, draft, setDraft, onSend, sending, onBack, tab }: {
+  convo: Convo; msgs: Msg[]; loading: boolean;
+  draft: string; setDraft: (v: string) => void;
+  onSend: (text: string, file?: File) => Promise<void>;
+  sending: boolean; onBack: () => void; tab: ChatTab;
+}) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const fileRef   = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
+
   useEffect(() => {
-    try {
-      setReply(localStorage.getItem(storageKey) ?? "");
-      const a = localStorage.getItem(attachKey);
-      setAttachments(a ? JSON.parse(a) : []);
-    } catch { setReply(""); setAttachments([]); }
-  }, [storageKey, attachKey]);
-
-  // Persist draft
-  useEffect(() => {
-    try {
-      if (reply) localStorage.setItem(storageKey, reply);
-      else localStorage.removeItem(storageKey);
-    } catch {}
-  }, [reply, storageKey]);
-  useEffect(() => {
-    try {
-      if (attachments.length) localStorage.setItem(attachKey, JSON.stringify(attachments));
-      else localStorage.removeItem(attachKey);
-    } catch {}
-  }, [attachments, attachKey]);
-
-  // Autosize
-  useLayoutEffect(() => {
-    const el = taRef.current; if (!el) return;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 200) + "px";
-  }, [reply]);
-
-  // Focus on conversation switch
-  useEffect(() => { taRef.current?.focus(); }, [draftKey]);
-
-  const handlePickFiles = () => fileRef.current?.click();
-
-  const handleUpload = async (files: FileList | null) => {
-    if (!files?.length) return;
-    setUploading(true);
-    try {
-      const uploaded: Attachment[] = [];
-      for (const file of Array.from(files)) {
-        if (file.size > MAX_ATTACH_MB * 1024 * 1024) {
-          toast.error(`${file.name} ใหญ่เกิน ${MAX_ATTACH_MB}MB`);
-          continue;
-        }
-        const ext = file.name.split(".").pop() ?? "bin";
-        const path = `chat/${Date.now()}-${crypto.randomUUID().slice(0,8)}.${ext}`;
-        const { error: upErr } = await supabase.storage.from(ATTACH_BUCKET).upload(path, file, {
-          contentType: file.type || "application/octet-stream",
-        });
-        if (upErr) { toast.error(`อัปโหลด ${file.name} ไม่สำเร็จ`); continue; }
-        const { data } = supabase.storage.from(ATTACH_BUCKET).getPublicUrl(path);
-        uploaded.push({ url: data.publicUrl, name: file.name, mime: file.type, size: file.size });
-      }
-      if (uploaded.length) setAttachments(prev => [...prev, ...uploaded]);
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+    if (file?.type.startsWith("image/")) {
+      const u = URL.createObjectURL(file);
+      setPreviewUrl(u);
+      return () => URL.revokeObjectURL(u);
+    } else {
+      setPreviewUrl(null);
     }
-  };
+  }, [file]);
 
-  const removeAttach = (idx: number) =>
-    setAttachments(prev => prev.filter((_, i) => i !== idx));
+  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 10 * 1024 * 1024) { toast.error("ไฟล์ใหญ่เกิน 10 MB"); return; }
+    setFile(f);
+    e.target.value = "";
+  };
 
   const handleSend = async () => {
-    const t = reply.trim();
-    if ((!t && attachments.length === 0) || sending) return;
-    // Compose: text + newline + attachment URLs
-    const attachLines = attachments.map(a => a.url).join("\n");
-    const body = [t, attachLines].filter(Boolean).join("\n\n");
-    await onSend(body);
-    setReply("");
-    setAttachments([]);
-    try {
-      localStorage.removeItem(storageKey);
-      localStorage.removeItem(attachKey);
-    } catch {}
-    requestAnimationFrame(() => taRef.current?.focus());
+    if ((!draft.trim() && !file) || sending) return;
+    await onSend(draft.trim(), file ?? undefined);
+    setDraft(""); setFile(null); setPreviewUrl(null);
   };
 
-  const onPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const files = Array.from(e.clipboardData.files ?? []);
-    if (files.length) {
-      e.preventDefault();
-      const dt = new DataTransfer();
-      files.forEach(f => dt.items.add(f));
-      handleUpload(dt.files);
-    }
-  };
+  const r = convo.raw;
 
   return (
-    <div className="flex flex-col border-l border-border bg-background" style={{height:"100%",overflow:"hidden"}}>
-      <div className="flex items-start gap-3 px-5 py-4 border-b bg-muted/10 shrink-0">
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm">{title}</p>
-          {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
-        </div>
-        <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground md:hidden shrink-0">
-          <X className="size-5"/>
-        </button>
-      </div>
-      {infoRows && (
-        <div className="flex flex-wrap gap-3 px-5 py-2 border-b text-xs text-muted-foreground bg-muted/5 shrink-0">
-          {infoRows}
-        </div>
-      )}
-      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">{children}</div>
+    <div className="flex flex-col" style={{ flex: 1, minWidth: 0, height: "100%", overflow: "hidden", background: "var(--background)" }}>
 
-      {/* Composer */}
-      <div className="border-t bg-background shrink-0 mt-auto">
-        {/* Attachment previews */}
-        {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 px-4 pt-3">
-            {attachments.map((a, i) => (
-              <div key={i} className="relative group flex items-center gap-2 rounded-lg border bg-muted/40 pl-2 pr-7 py-1.5 text-xs max-w-[220px]">
-                {isImageUrl(a.url) ? (
-                  <img src={a.url} alt="" className="size-8 rounded object-cover shrink-0"/>
-                ) : a.mime.startsWith("image/") ? (
-                  <ImageIcon className="size-4 text-blue-500 shrink-0"/>
-                ) : (
-                  <FileText className="size-4 text-muted-foreground shrink-0"/>
-                )}
-                <span className="truncate">{a.name}</span>
-                <button type="button" onClick={()=>removeAttach(i)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full p-0.5 hover:bg-background">
-                  <X className="size-3"/>
-                </button>
-              </div>
-            ))}
+      {/* ── Header ── */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b bg-background shrink-0 shadow-sm">
+        <button type="button" onClick={onBack} className="md:hidden text-muted-foreground hover:text-foreground mr-1">
+          <X className="size-5" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm leading-tight truncate">{convo.name}</p>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
+            {r?.customer_phone && <a href={`tel:${r.customer_phone}`} className="flex items-center gap-1 hover:text-foreground transition-colors"><Phone className="size-3"/>{r.customer_phone}</a>}
+            {r?.customer_email && <a href={`mailto:${r.customer_email}`} className="flex items-center gap-1 hover:text-foreground transition-colors"><Mail className="size-3"/>{r.customer_email}</a>}
+            {r?.guest_phone    && <a href={`tel:${r.guest_phone}`}     className="flex items-center gap-1 hover:text-foreground transition-colors"><Phone className="size-3"/>{r.guest_phone}</a>}
+            {r?.guest_email    && <a href={`mailto:${r.guest_email}`}   className="flex items-center gap-1 hover:text-foreground transition-colors"><Mail className="size-3"/>{r.guest_email}</a>}
+            {convo.badge && <span className="font-mono opacity-60">{convo.badge}</span>}
+            {convo.value != null && convo.value > 0 && <span className="font-medium text-primary">{formatBaht(convo.value)}</span>}
+            {convo.leadId && <a href={`/leads/${convo.leadId}`} className="flex items-center gap-1 text-emerald-600 hover:underline"><CheckCircle2 className="size-3"/>Lead</a>}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Messages area ── */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4"
+        style={{ background: "#f7f7f7" }}
+        // dark mode handled via CSS variable fallback
+      >
+        {loading ? (
+          <div className="flex justify-center pt-12"><Loader2 className="size-5 animate-spin text-muted-foreground"/></div>
+        ) : msgs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground py-12">
+            <MessageSquare className="size-10 opacity-20"/>
+            <p className="text-sm font-medium">ยังไม่มีข้อความ</p>
+            <p className="text-xs opacity-60">พิมพ์ด้านล่างเพื่อเริ่มบทสนทนา</p>
+          </div>
+        ) : msgs.map(m => <Bubble key={m.id} msg={m}/>)}
+        <div ref={bottomRef}/>
+      </div>
+
+      {/* ── Compose bar ── */}
+      <div className="shrink-0 border-t border-border bg-background">
+        {/* file preview strip */}
+        {file && (
+          <div className="flex items-center gap-2 px-4 pt-2 pb-1">
+            {previewUrl
+              ? <img src={previewUrl} alt={file.name} className="size-12 rounded-lg object-cover border"/>
+              : <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-xs">
+                  <FileIcon className="size-4 text-muted-foreground"/>{file.name}
+                </div>
+            }
+            <button type="button" onClick={() => { setFile(null); setPreviewUrl(null); }}
+              className="size-5 rounded-full bg-destructive text-white flex items-center justify-center text-xs font-bold hover:opacity-80">
+              ×
+            </button>
           </div>
         )}
-        <div className="flex items-end gap-2 px-4 py-3">
-          <input ref={fileRef} type="file" multiple className="hidden"
-            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-            onChange={e => handleUpload(e.target.files)}/>
-          <Button type="button" variant="ghost" size="icon" className="size-9 shrink-0"
-            onClick={handlePickFiles} disabled={uploading || sending} title="แนบไฟล์">
-            {uploading ? <Loader2 className="size-4 animate-spin"/> : <Paperclip className="size-4"/>}
-          </Button>
-          <div className="flex-1 flex flex-col">
-            <textarea ref={taRef} value={reply} onChange={e=>setReply(e.target.value)}
-              onPaste={onPaste}
-              onKeyDown={e=>{
-                if (e.key==="Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault(); handleSend();
-                }
-              }}
-              placeholder={replyPlaceholder} rows={1}
-              className="w-full resize-none rounded-xl border border-border bg-muted/30 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition min-h-[42px] max-h-[200px]"/>
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-1 px-1">
-              <CornerDownLeft className="size-3"/> Enter ส่ง · Shift+Enter ขึ้นบรรทัดใหม่ · วางรูปได้
-            </div>
-          </div>
-          <Button onClick={handleSend} disabled={sending||(!reply.trim() && attachments.length===0)}
-            size="icon" className="size-10 rounded-xl shrink-0">
+
+        <div className="flex items-end gap-2 px-3 py-2.5">
+          {/* attach */}
+          <input ref={fileRef} type="file" className="hidden"
+            accept="image/*,.pdf,.xlsx,.xls,.docx,.doc,.txt,.csv" onChange={handleFile}/>
+          <button type="button" onClick={() => fileRef.current?.click()}
+            title="แนบไฟล์"
+            className="shrink-0 size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            <Paperclip className="size-4"/>
+          </button>
+
+          {/* text input */}
+          <textarea value={draft} onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
+            placeholder={`ส่งข้อความถึง ${convo.name}...`}
+            rows={1}
+            style={{ maxHeight: 120, resize: "none", overflow: "auto" }}
+            className="flex-1 rounded-2xl border border-border bg-muted/40 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+          />
+
+          {/* send */}
+          <button type="button" onClick={handleSend}
+            disabled={sending || (!draft.trim() && !file)}
+            className={`shrink-0 size-9 rounded-full flex items-center justify-center transition-all ${
+              !sending && (draft.trim() || file)
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                : "bg-muted text-muted-foreground cursor-not-allowed"
+            }`}>
             {sending ? <Loader2 className="size-4 animate-spin"/> : <Send className="size-4"/>}
-          </Button>
+          </button>
         </div>
+        <p className="text-[10px] text-muted-foreground text-center pb-1.5 opacity-50">
+          Enter ส่ง · Shift+Enter ขึ้นบรรทัด · รองรับไฟล์ภาพ/PDF/Excel
+        </p>
       </div>
     </div>
   );
 }
 
-// ─── Shared Conversation List ─────────────────────────────────────────────────
-function ConvoList<T>({ items, selectedId, loading, error, search, onSelect, onRetry, renderItem }: {
-  items: T[]; selectedId?: string; loading: boolean; error: string|null;
-  search: string; onSelect: (item: T) => void; onRetry: () => void;
-  renderItem: (item: T, isActive: boolean) => React.ReactNode;
+// ─── B2B Tab ──────────────────────────────────────────────────────────────────
+function B2BTab({ sName, sId, draft, setDraft }: {
+  sName: string; sId: string; draft: string; setDraft: (v: string) => void;
 }) {
-  return (
-    <div className="flex-1 overflow-y-auto">
-      {loading && items.length === 0 ? (
-        <div className="flex justify-center py-12"><Loader2 className="size-5 animate-spin text-muted-foreground"/></div>
-      ) : error ? (
-        <div className="p-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center dark:border-amber-900/40 dark:bg-amber-950/20">
-            <AlertTriangle className="mx-auto mb-2 size-5 text-amber-600"/>
-            <p className="text-xs font-medium text-amber-800 dark:text-amber-300">{error}</p>
-            <Button size="sm" variant="outline" className="mt-3 h-7 text-xs" onClick={onRetry}>
-              <RefreshCw className="mr-1 size-3"/> ลองใหม่
-            </Button>
-          </div>
-        </div>
-      ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-          <MessageSquare className="size-8 opacity-20 mb-2"/>
-          <p className="text-sm">{search ? "ไม่พบรายการที่ค้นหา" : "ยังไม่มีการสนทนา"}</p>
-        </div>
-      ) : items.map((item: any) => (
-        <button key={item.id} type="button" onClick={() => onSelect(item)}
-          className={`w-full text-left border-b border-border/50 transition-colors ${
-            selectedId === item.id ? "bg-primary/8 border-l-2 border-l-primary" : "hover:bg-muted/30"
-          }`}>
-          {renderItem(item, selectedId === item.id)}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TAB 1 — B2B Quote Chat
-// ═══════════════════════════════════════════════════════════════════════════════
-function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) {
-  const [convos,   setConvos]   = useState<B2BConvo[]>([]);
+  const [convos,   setConvos]   = useState<Convo[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState<string|null>(null);
   const [search,   setSearch]   = useState("");
-  const [selected, setSelected] = useState<B2BConvo|null>(null);
-  const [msgs,     setMsgs]     = useState<B2BMsg[]>([]);
-  const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [sel,      setSel]      = useState<Convo|null>(null);
+  const [msgs,     setMsgs]     = useState<Msg[]>([]);
+  const [msgLoad,  setMsgLoad]  = useState(false);
   const [sending,  setSending]  = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      // ใช้ b2b-quotes edge function เดิม (ทำงานได้แน่นอน)
       const raw = await fetchUnmatchedQuotes(100);
-      const filtered = search
-        ? raw.filter(r =>
-            r.quote_number.toLowerCase().includes(search.toLowerCase()) ||
-            r.customer_company.toLowerCase().includes(search.toLowerCase()) ||
-            r.customer_name.toLowerCase().includes(search.toLowerCase()))
-        : raw;
-      const items: B2BConvo[] = filtered.map(r => ({
-        ...r,
-        last_message: null, unread_count: 0, _lead_id: null,
-      }));
-      const ids = items.map(r=>r.id).filter(Boolean);
+      const q   = search.toLowerCase();
+      const fil = q ? raw.filter(r =>
+        r.quote_number.toLowerCase().includes(q) ||
+        r.customer_company.toLowerCase().includes(q) ||
+        r.customer_name.toLowerCase().includes(q)) : raw;
+      const ids = fil.map(r => r.id);
+      const lm: Record<string,string> = {};
       if (ids.length) {
         const { data: leads } = await crmDb().from("leads").select("id,b2b_request_id").in("b2b_request_id", ids);
-        const lm: Record<string,string> = {};
-        for (const l of (leads??[]) as any[]) if (l.b2b_request_id) lm[l.b2b_request_id]=l.id;
-        items.forEach(c => { c._lead_id = lm[c.id]??null; });
+        for (const l of (leads??[]) as any[]) if (l.b2b_request_id) lm[l.b2b_request_id] = l.id;
       }
+      const items: Convo[] = fil.map(r => ({
+        id: r.id, name: r.customer_company || r.customer_name,
+        subName: r.customer_company ? r.customer_name : undefined,
+        lastAt: r.created_at, unread: 0, status: r.status,
+        badge: r.quote_number, value: r.grand_total,
+        leadId: lm[r.id] ?? null, raw: r,
+      }));
       setConvos(items);
-      if (items.length && !selected) setSelected(items[0]);
-    } catch(e:any) { setError(e.message); }
+      if (!sel && items.length) setSel(items[0]);
+    } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   }, [search]);
 
   const loadMsgs = useCallback(async (id: string) => {
-    setLoadingMsgs(true);
+    setMsgLoad(true);
     try {
-      const { data } = await lcFetch({ action: "b2b", quote_id: id });
-      setMsgs(data ?? []);
-      lcPost({ mark_read: true, quote_id: id, staff_id: staffId }).catch(()=>{});
-    } catch(e:any) { toast.error("โหลดข้อความไม่สำเร็จ"); }
-    finally { setLoadingMsgs(false); }
-  }, [staffId]);
+      const { data } = await lcGet({ action: "b2b", quote_id: id });
+      setMsgs((data??[]).map((m:any) => ({
+        id: m.id, content: m.content, senderName: m.sender_name,
+        isMe: m.sender_role === "staff", createdAt: m.created_at,
+        attachUrl: m.attachment_url, attachName: m.attachment_name,
+      })));
+      lcPost({ action:"b2b", mark_read:true, quote_id:id, staff_id:sId }).catch(()=>{});
+    } catch { toast.error("โหลดข้อความไม่สำเร็จ"); }
+    finally { setMsgLoad(false); }
+  }, [sId]);
 
   useEffect(() => { load(); }, []);
-  useEffect(() => { const t=setTimeout(()=>load(),400); return()=>clearTimeout(t); }, [search]);
-  useEffect(() => { if (selected) loadMsgs(selected.id); }, [selected?.id]);
-  useEffect(() => { bottomRef.current?.scrollIntoView({behavior:"smooth"}); }, [msgs]);
+  useEffect(() => { const t = setTimeout(()=>load(),400); return ()=>clearTimeout(t); }, [search]);
+  useEffect(() => { if (sel) loadMsgs(sel.id); }, [sel?.id]);
 
-  const handleSend = async (text: string) => {
-    if (!selected) return;
+  const handleSend = async (text: string, file?: File) => {
+    if (!sel) return;
     setSending(true);
     try {
-      await lcPost({ action: "b2b", quote_id: selected.id, sender_name: staffName, content: text });
-      await loadMsgs(selected.id);
-      setConvos(prev => prev.map(c => c.id===selected.id ? {...c, unread_count:0} : c));
-    } catch(e:any) { toast.error("ส่งไม่สำเร็จ: "+e.message); }
+      await lcPost({ action:"b2b", quote_id:sel.id, sender_name:sName, content:text || " " });
+      await loadMsgs(sel.id);
+    } catch (e:any) { toast.error("ส่งไม่สำเร็จ: "+e.message); }
     finally { setSending(false); }
   };
 
-  const totalUnread = convos.reduce((s,c)=>s+c.unread_count,0);
-
   return (
-    <div style={{display:"flex",height:"100%",overflow:"hidden"}}>
-      {/* List */}
-      <div className={`flex flex-col border-r border-border bg-background ${selected?"hidden md:flex w-[380px] shrink-0":"flex flex-1"}`}>
-        <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
-          <span className="text-xs text-muted-foreground flex-1">
-            {convos.length} รายการ {totalUnread>0 && <span className="text-red-500 font-medium">· {totalUnread} ใหม่</span>}
-          </span>
-          <Button variant="ghost" size="icon" className="size-7" onClick={load} disabled={loading}>
-            <RefreshCw className={`size-3.5 ${loading?"animate-spin":""}`}/>
-          </Button>
-        </div>
-        <div className="px-3 py-2 border-b shrink-0">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none"/>
-            <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ค้นหา..." className="pl-7 h-7 text-xs"/>
+    <div style={{ display:"flex", height:"100%", overflow:"hidden" }}>
+      {/* Left list */}
+      <div style={{ width:340, minWidth:280, display:"flex", flexDirection:"column", height:"100%", overflow:"hidden", borderRight:"1px solid var(--border)" }}>
+        {/* search */}
+        <div className="px-3 py-2 border-b bg-background shrink-0">
+          <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
+            <Search className="size-3.5 text-muted-foreground shrink-0"/>
+            <input value={search} onChange={e=>setSearch(e.target.value)}
+              placeholder="ค้นหา..." className="flex-1 bg-transparent text-xs focus:outline-none"/>
+            <span className="text-[10px] text-muted-foreground shrink-0">{convos.length} รายการ</span>
           </div>
         </div>
-        <ConvoList items={convos} selectedId={selected?.id} loading={loading} error={error}
-          search={search} onSelect={setSelected} onRetry={load}
-          renderItem={(c: B2BConvo, isActive) => (
-            <div className="flex items-start gap-3 px-4 py-3.5">
-              <div className={`size-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 ${
-                c.unread_count>0?"bg-blue-600 text-white":"bg-muted text-muted-foreground"}`}>
-                {c.customer_company?.[0]?.toUpperCase()??c.customer_name?.[0]??"?"}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-1">
-                  <span className={`text-sm truncate ${c.unread_count>0?"font-bold":"font-medium"}`}>
-                    {c.customer_company||c.customer_name}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground shrink-0">
-                    {c.last_message?fmtDate(c.last_message.created_at):fmtDate(c.created_at)}
-                  </span>
-                </div>
-                <p className={`text-xs truncate mt-0.5 ${c.unread_count>0?"text-foreground":"text-muted-foreground"}`}>
-                  {c.last_message?.content??(c.quote_number+" · "+formatBaht(c.grand_total))}
-                </p>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span className="text-[10px] font-mono text-muted-foreground">{c.quote_number}</span>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLOR[c.status]??"bg-muted text-muted-foreground"}`}>
-                    {STATUS_LABEL[c.status]??c.status}
-                  </span>
-                  {c._lead_id && <CheckCircle2 className="size-3 text-emerald-500"/>}
-                </div>
-              </div>
-              {c.unread_count>0 && (
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white shrink-0">
-                  {c.unread_count}
-                </span>
-              )}
+        {/* list */}
+        <div className="flex-1 overflow-y-auto">
+          {loading && !convos.length ? (
+            <div className="flex justify-center py-10"><Loader2 className="size-5 animate-spin text-muted-foreground"/></div>
+          ) : error ? (
+            <div className="p-4 text-center">
+              <AlertTriangle className="size-5 text-amber-500 mx-auto mb-2"/>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mb-3">{error}</p>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={load}><RefreshCw className="size-3 mr-1"/>ลองใหม่</Button>
             </div>
-          )}
-        />
+          ) : convos.length === 0 ? (
+            <div className="flex flex-col items-center py-12 text-muted-foreground gap-2">
+              <ShoppingCart className="size-8 opacity-20"/>
+              <p className="text-xs">{search ? "ไม่พบ" : "ยังไม่มีข้อมูล"}</p>
+            </div>
+          ) : convos.map(c => (
+            <ConvoRow key={c.id} c={c} isActive={sel?.id===c.id} accent="blue"
+              onClick={() => setSel(c)}/>
+          ))}
+        </div>
       </div>
 
-      {/* Thread */}
-      {selected ? (
-        <div className="flex-1 min-w-0">
-          <ThreadPanel
-            draftKey={`b2b:${selected.id}`}
-            title={selected.customer_company||selected.customer_name}
-            subtitle={`${selected.quote_number} · ${formatBaht(selected.grand_total)}`}
-            infoRows={<>
-              {selected.customer_phone && <a href={`tel:${selected.customer_phone}`} className="flex items-center gap-1 hover:text-foreground"><Phone className="size-3"/>{selected.customer_phone}</a>}
-              {selected.customer_email && <a href={`mailto:${selected.customer_email}`} className="flex items-center gap-1 hover:text-foreground"><Mail className="size-3"/>{selected.customer_email}</a>}
-              {selected._lead_id && <a href={`/leads/${selected._lead_id}`} className="flex items-center gap-1 text-primary hover:underline"><CheckCircle2 className="size-3"/> Lead ใน CRM</a>}
-            </>}
-            replyPlaceholder={`ตอบกลับ ${selected.customer_company||selected.customer_name}...`}
-            onSend={handleSend} onClose={()=>setSelected(null)} sending={sending}
-          >
-            {loadingMsgs ? (
-              <div className="flex justify-center py-12"><Loader2 className="size-5 animate-spin text-muted-foreground"/></div>
-            ) : msgs.length===0 ? (
-              <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground gap-2">
-                <MessageSquare className="size-10 opacity-20"/>
-                <p className="text-sm">ยังไม่มีข้อความ</p>
-              </div>
-            ) : msgs.map(m => (
-              <Bubble key={m.id} content={m.content} senderName={m.sender_name}
-                isMe={m.sender_role==="staff"} createdAt={m.created_at}/>
-            ))}
-            <div ref={bottomRef}/>
-          </ThreadPanel>
-        </div>
+      {/* Right thread */}
+      {sel ? (
+        <ThreadPane convo={sel} msgs={msgs} loading={msgLoad}
+          draft={draft} setDraft={setDraft} onSend={handleSend}
+          sending={sending} onBack={()=>setSel(null)} tab="b2b"/>
       ) : (
-        <div className="hidden md:flex flex-1 items-center justify-center text-muted-foreground flex-col gap-2">
-          <ShoppingCart className="size-10 opacity-20"/>
-          <p className="text-sm">เลือกการสนทนาจากรายการ</p>
+        <div className="flex-1 flex items-center justify-center text-muted-foreground flex-col gap-3" style={{background:"#f7f7f7"}}>
+          <MessageSquare className="size-12 opacity-20"/>
+          <p className="text-sm">เลือกการสนทนาจากรายการด้านซ้าย</p>
+          <p className="text-xs opacity-60">หรือรอข้อความใหม่จากลูกค้า</p>
         </div>
       )}
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// TAB 2 & 3 — Web Chat / General Chat (via b2b-live-chat edge function)
-// chat_sessions อยู่ใน B2B project — ต้องผ่าน edge function เท่านั้น
-// ═══════════════════════════════════════════════════════════════════════════════
-function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: string }) {
-  const [sessions,  setSessions]  = useState<WebSession[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState<string|null>(null);
-  const [search,    setSearch]    = useState("");
-  const [selected,  setSelected]  = useState<WebSession|null>(null);
-  const [msgs,      setMsgs]      = useState<WebMsg[]>([]);
-  const [loadingMsgs, setLoadingMsgs] = useState(false);
-  const [sending,   setSending]   = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  const chatAction = isGuest ? "web" : "general";
+// ─── Web/General Tab ──────────────────────────────────────────────────────────
+function WebTab({ isGuest, sName, sId, draft, setDraft }: {
+  isGuest: boolean; sName: string; sId: string; draft: string; setDraft: (v: string) => void;
+}) {
+  const act = isGuest ? "web" : "general";
+  const [convos,   setConvos]   = useState<Convo[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState<string|null>(null);
+  const [search,   setSearch]   = useState("");
+  const [sel,      setSel]      = useState<Convo|null>(null);
+  const [msgs,     setMsgs]     = useState<Msg[]>([]);
+  const [msgLoad,  setMsgLoad]  = useState(false);
+  const [sending,  setSending]  = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const params: Record<string,string> = { action: chatAction };
-      if (search) params.search = search;
-      const { data, error: err } = await lcFetch(params);
-      if (err) throw new Error(err);
-      const items: WebSession[] = (data ?? []).map((s: any) => ({
-        ...s,
-        _last_msg: s.last_message?.content ?? "",
-        _sender_type: s.last_message?.sender_type ?? "",
-        _unread: s.unread_count ?? 0,
+      const p: Record<string,string> = { action: act };
+      if (search) p.search = search;
+      const { data } = await lcGet(p);
+      const items: Convo[] = (data??[]).map((s:any) => ({
+        id: s.id,
+        name: s.guest_name ?? s.guest_email ?? (s.user_id ? "สมาชิก" : "ผู้เยี่ยมชม"),
+        subName: s.guest_email ?? undefined,
+        lastMsg: s.last_message?.content,
+        lastMsgIsMe: s.last_message?.sender_type === "agent",
+        lastAt: s.last_message_at ?? s.created_at,
+        unread: s.unread_count ?? 0,
+        status: s.status,
+        raw: s,
       }));
-      setSessions(items);
-      if (items.length && !selected) setSelected(items[0]);
-    } catch(e:any) { setError(e.message); }
+      setConvos(items);
+      if (!sel && items.length) setSel(items[0]);
+    } catch (e:any) { setError(e.message); }
     finally { setLoading(false); }
-  }, [isGuest, search]);
+  }, [act, search]);
 
-  const loadMsgs = useCallback(async (sessionId: string) => {
-    setLoadingMsgs(true);
+  const loadMsgs = useCallback(async (id: string) => {
+    setMsgLoad(true);
     try {
-      const { data } = await lcFetch({ action: chatAction, session_id: sessionId });
-      setMsgs(data ?? []);
-      await lcPost({ action: `${chatAction}_read`, session_id: sessionId });
+      const { data } = await lcGet({ action:act, session_id:id });
+      setMsgs((data??[]).map((m:any) => ({
+        id: m.id, content: m.content, senderName: m.sender_name,
+        isMe: m.sender_type === "agent", createdAt: m.created_at,
+        attachUrl: m.attachment_url, attachName: m.attachment_name,
+      })));
+      lcPost({ action:`${act}_read`, session_id:id }).catch(()=>{});
+      setConvos(prev => prev.map(c => c.id===id ? {...c, unread:0} : c));
     } catch { toast.error("โหลดข้อความไม่สำเร็จ"); }
-    finally { setLoadingMsgs(false); }
-  }, [chatAction]);
+    finally { setMsgLoad(false); }
+  }, [act]);
 
   useEffect(() => { load(); }, [isGuest]);
-  useEffect(() => { const t=setTimeout(()=>load(),400); return()=>clearTimeout(t); }, [search]);
-  useEffect(() => { if (selected) loadMsgs(selected.id); }, [selected?.id]);
-  useEffect(() => { bottomRef.current?.scrollIntoView({behavior:"smooth"}); }, [msgs]);
+  useEffect(() => { const t = setTimeout(()=>load(),400); return ()=>clearTimeout(t); }, [search]);
+  useEffect(() => { if (sel) loadMsgs(sel.id); }, [sel?.id]);
 
-  const handleSend = async (text: string) => {
-    if (!selected) return;
+  const handleSend = async (text: string, file?: File) => {
+    if (!sel) return;
     setSending(true);
     try {
-      await lcPost({ action: `${chatAction}_send`, session_id: selected.id, sender_name: staffName, content: text });
-      await loadMsgs(selected.id);
-      setSessions(prev => prev.map(s => s.id===selected.id ? {...s, _unread:0} : s));
-    } catch(e:any) { toast.error("ส่งไม่สำเร็จ: "+e.message); }
+      await lcPost({ action:`${act}_send`, session_id:sel.id, sender_name:sName, content:text||" " });
+      await loadMsgs(sel.id);
+    } catch (e:any) { toast.error("ส่งไม่สำเร็จ: "+e.message); }
     finally { setSending(false); }
   };
 
-  const totalUnread = sessions.reduce((s,c)=>s+(c._unread??0), 0);
-  const displayName = (s: WebSession) =>
-    s.guest_name ?? s.guest_email ?? (s.user_id ? "สมาชิก" : "ผู้เยี่ยมชม");
+  const Icon = isGuest ? Globe : Users;
+  const accent = isGuest ? "teal" : "purple";
 
   return (
-    <div style={{display:"flex",height:"100%",overflow:"hidden"}}>
-      {/* List */}
-      <div className={`flex flex-col border-r border-border bg-background ${selected?"hidden md:flex w-[380px] shrink-0":"flex flex-1"}`}>
-        <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
-          <span className="text-xs text-muted-foreground flex-1">
-            {sessions.length} รายการ {totalUnread>0 && <span className="text-red-500 font-medium">· {totalUnread} ใหม่</span>}
-          </span>
-          <Button variant="ghost" size="icon" className="size-7" onClick={load} disabled={loading}>
-            <RefreshCw className={`size-3.5 ${loading?"animate-spin":""}`}/>
-          </Button>
-        </div>
-        <div className="px-3 py-2 border-b shrink-0">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none"/>
-            <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ค้นหา..." className="pl-7 h-7 text-xs"/>
+    <div style={{ display:"flex", height:"100%", overflow:"hidden" }}>
+      {/* Left */}
+      <div style={{ width:340, minWidth:280, display:"flex", flexDirection:"column", height:"100%", overflow:"hidden", borderRight:"1px solid var(--border)" }}>
+        <div className="px-3 py-2 border-b bg-background shrink-0">
+          <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
+            <Search className="size-3.5 text-muted-foreground shrink-0"/>
+            <input value={search} onChange={e=>setSearch(e.target.value)}
+              placeholder="ค้นหา..." className="flex-1 bg-transparent text-xs focus:outline-none"/>
+            <span className="text-[10px] text-muted-foreground shrink-0">{convos.length} รายการ</span>
           </div>
         </div>
-        <ConvoList items={sessions} selectedId={selected?.id} loading={loading} error={error}
-          search={search} onSelect={setSelected} onRetry={load}
-          renderItem={(s: WebSession) => {
-            const name = displayName(s);
-            const hasUnread = (s._unread??0) > 0;
-            const prefix = s._sender_type==="agent" ? "คุณ: " : "";
-            return (
-              <div className="flex items-start gap-3 px-4 py-3.5">
-                <div className={`size-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 ${
-                  hasUnread
-                    ? isGuest ? "bg-teal-600 text-white" : "bg-purple-600 text-white"
-                    : "bg-muted text-muted-foreground"}`}>
-                  {name[0]?.toUpperCase()??"?"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className={`text-sm truncate ${hasUnread?"font-bold":"font-medium"}`}>{name}</span>
-                    <span className="text-[11px] text-muted-foreground shrink-0">
-                      {fmtDate(s.last_message_at??s.created_at)}
-                    </span>
-                  </div>
-                  {s.guest_email && <p className="text-xs text-muted-foreground truncate">{s.guest_email}</p>}
-                  <p className={`text-xs truncate mt-0.5 ${hasUnread?"text-foreground":"text-muted-foreground"}`}>
-                    {prefix}{s._last_msg||"ยังไม่มีข้อความ"}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
-                      s.status==="open" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                      : "bg-muted text-muted-foreground"}`}>
-                    {s.status}
-                    </span>
-                    {s.assigned_to && <span title="มีคนรับแล้ว"><CheckCircle2 className="size-3 text-emerald-500"/></span>}
-                  </div>
-                </div>
-                {hasUnread && (
-                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white shrink-0">
-                    {s._unread}
-                  </span>
-                )}
-              </div>
-            );
-          }}
-        />
+        <div className="flex-1 overflow-y-auto">
+          {loading && !convos.length ? (
+            <div className="flex justify-center py-10"><Loader2 className="size-5 animate-spin text-muted-foreground"/></div>
+          ) : error ? (
+            <div className="p-4 text-center">
+              <AlertTriangle className="size-5 text-amber-500 mx-auto mb-2"/>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mb-3">{error}</p>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={load}><RefreshCw className="size-3 mr-1"/>ลองใหม่</Button>
+            </div>
+          ) : convos.length === 0 ? (
+            <div className="flex flex-col items-center py-12 text-muted-foreground gap-2">
+              <Icon className="size-8 opacity-20"/><p className="text-xs">{search ? "ไม่พบ" : "ยังไม่มีข้อมูล"}</p>
+            </div>
+          ) : convos.map(c => (
+            <ConvoRow key={c.id} c={c} isActive={sel?.id===c.id} accent={accent} onClick={()=>setSel(c)}/>
+          ))}
+        </div>
       </div>
 
-      {/* Thread */}
-      {selected ? (
-        <div className="flex-1 min-w-0">
-          <ThreadPanel
-            draftKey={`${chatAction}:${selected.id}`}
-            title={displayName(selected)}
-            subtitle={isGuest ? "ผู้เยี่ยมชมหน้าเว็บ" : "สมาชิก / ผู้ใช้ที่ล็อกอิน"}
-            infoRows={<>
-              {selected.guest_phone && <a href={`tel:${selected.guest_phone}`} className="flex items-center gap-1 hover:text-foreground"><Phone className="size-3"/>{selected.guest_phone}</a>}
-              {selected.guest_email && <a href={`mailto:${selected.guest_email}`} className="flex items-center gap-1 hover:text-foreground"><Mail className="size-3"/>{selected.guest_email}</a>}
-              <span className="flex items-center gap-1 text-muted-foreground">
-                {isGuest ? <Globe className="size-3"/> : <Users className="size-3"/>}
-                {isGuest ? "Guest" : "Member"}
-              </span>
-            </>}
-            replyPlaceholder={`ตอบกลับ ${displayName(selected)}...`}
-            onSend={handleSend} onClose={()=>setSelected(null)} sending={sending}
-          >
-            {loadingMsgs ? (
-              <div className="flex justify-center py-12"><Loader2 className="size-5 animate-spin text-muted-foreground"/></div>
-            ) : msgs.length===0 ? (
-              <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground gap-2">
-                <MessageSquare className="size-10 opacity-20"/>
-                <p className="text-sm">ยังไม่มีข้อความ</p>
-              </div>
-            ) : msgs.map(m => (
-              <Bubble key={m.id} content={m.content} senderName={m.sender_name}
-                isMe={m.sender_type==="agent"} createdAt={m.created_at}/>
-            ))}
-            <div ref={bottomRef}/>
-          </ThreadPanel>
-        </div>
+      {/* Right */}
+      {sel ? (
+        <ThreadPane convo={sel} msgs={msgs} loading={msgLoad}
+          draft={draft} setDraft={setDraft} onSend={handleSend}
+          sending={sending} onBack={()=>setSel(null)} tab={act as ChatTab}/>
       ) : (
-        <div className="hidden md:flex flex-1 items-center justify-center text-muted-foreground flex-col gap-2">
-          {isGuest ? <Globe className="size-10 opacity-20"/> : <Users className="size-10 opacity-20"/>}
-          <p className="text-sm">เลือกการสนทนาจากรายการ</p>
+        <div className="flex-1 flex items-center justify-center text-muted-foreground flex-col gap-3" style={{background:"#f7f7f7"}}>
+          <Icon className="size-12 opacity-20"/>
+          <p className="text-sm">เลือกการสนทนาจากรายการด้านซ้าย</p>
         </div>
       )}
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Root ─────────────────────────────────────────────────────────────────────
 export function B2BConversationTab() {
   const { user } = useAuth();
-  const staffName = (user as any)?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Sales";
-  const staffId   = user?.id ?? "staff";
-  const [chatTab, setChatTab] = useState<ChatTab>("b2b");
+  const sName = (user as any)?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Sales";
+  const sId   = user?.id ?? "staff";
+  const [tab, setTab]   = useState<ChatTab>("b2b");
+  const [drafts, setDrafts] = useState<Record<ChatTab,string>>({ b2b:"", web:"", general:"" });
+  const setDraft = (t: ChatTab) => (v: string) => setDrafts(p => ({ ...p, [t]: v }));
 
-  const tabOrder: ChatTab[] = ["b2b", "web", "general"];
+  const TABS: { key: ChatTab; label: string; Icon: typeof MessageSquare }[] = [
+    { key:"b2b",     label:"ใบเสนอราคา B2B", Icon:ShoppingCart },
+    { key:"web",     label:"Chat หน้าเว็บ",   Icon:Globe },
+    { key:"general", label:"General Chat",   Icon:Users },
+  ];
 
   return (
-    <div className="flex flex-col" style={{height:"100%",minHeight:0}}>
-      {/* Sub-tab bar */}
-      <div className="flex items-center gap-1 px-4 py-2 border-b bg-background/80 shrink-0 overflow-x-auto">
-        {tabOrder.map(t => {
-          const cfg = TAB_CONFIG[t];
-          const Icon = cfg.icon;
-          const isActive = chatTab === t;
+    <div style={{ display:"flex", flexDirection:"column", height:"100%", minHeight:0, overflow:"hidden" }}>
+      {/* sub-tab strip */}
+      <div className="flex items-center gap-1 px-4 py-1.5 border-b bg-muted/20 shrink-0">
+        {TABS.map(({ key, label, Icon }) => {
+          const active = tab === key;
+          const colors: Record<ChatTab,string> = {
+            b2b:     "text-blue-600 bg-blue-50 dark:bg-blue-950/40",
+            web:     "text-teal-600 bg-teal-50 dark:bg-teal-950/40",
+            general: "text-purple-600 bg-purple-50 dark:bg-purple-950/40",
+          };
           return (
-            <button key={t} type="button" onClick={() => setChatTab(t)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                isActive
-                  ? `bg-muted ${cfg.color}`
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            <button key={key} type="button" onClick={() => setTab(key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+                active ? colors[key] : "text-muted-foreground hover:bg-muted/60"
               }`}>
               <Icon className="size-3.5"/>
-              {cfg.label}
-              {isActive && (
-                <span className="text-[10px] font-normal opacity-70 hidden sm:inline">· {cfg.desc}</span>
-              )}
+              {label}
+              {!active && drafts[key] && <span className="size-1.5 rounded-full bg-amber-400"/>}
             </button>
           );
         })}
       </div>
 
-      {/* Tab content */}
-      <div style={{flex:1,minHeight:0,overflow:"hidden"}}>
-        {chatTab === "b2b"     && <B2BTab staffName={staffName} staffId={staffId}/>}
-        {chatTab === "web"     && <WebChatTab isGuest={true}  staffName={staffName}/>}
-        {chatTab === "general" && <WebChatTab isGuest={false} staffName={staffName}/>}
+      {/* content — fills remaining height */}
+      <div style={{ flex:1, minHeight:0, overflow:"hidden" }}>
+        {tab==="b2b"     && <B2BTab sName={sName} sId={sId} draft={drafts.b2b}     setDraft={setDraft("b2b")}/>}
+        {tab==="web"     && <WebTab isGuest={true}  sName={sName} sId={sId} draft={drafts.web}     setDraft={setDraft("web")}/>}
+        {tab==="general" && <WebTab isGuest={false} sName={sName} sId={sId} draft={drafts.general} setDraft={setDraft("general")}/>}
       </div>
     </div>
   );
