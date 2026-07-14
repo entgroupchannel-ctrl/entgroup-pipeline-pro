@@ -264,7 +264,8 @@ export const createFAQuotationDraft = createServerFn({ method: "POST" })
         const target = norm(data.customer.company);
         const match = list.find((c) => norm(c?.contactName ?? c?.name ?? "").includes(target) ||
                                        target.includes(norm(c?.contactName ?? c?.name ?? "")));
-        contactId = match?.contactId ?? match?.id ?? null;
+        // FA returns id (not contactId) in search list
+        contactId = match?.id ?? match?.contactId ?? null;
       }
     } catch (e: any) {
       console.warn("[FA] contact search failed", e?.message);
