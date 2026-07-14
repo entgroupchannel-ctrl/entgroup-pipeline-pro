@@ -659,6 +659,7 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
       {selected ? (
         <div className="flex-1 min-w-0">
           <ThreadPanel
+            draftKey={`${chatAction}:${selected.id}`}
             title={displayName(selected)}
             subtitle={isGuest ? "ผู้เยี่ยมชมหน้าเว็บ" : "สมาชิก / ผู้ใช้ที่ล็อกอิน"}
             infoRows={<>
