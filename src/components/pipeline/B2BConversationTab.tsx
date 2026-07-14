@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { formatBaht } from "@/lib/format";
 import { crmDb } from "@/lib/crm";
-import { STATUS_LABEL, STATUS_COLOR } from "@/lib/b2b-client";
+import { STATUS_LABEL, STATUS_COLOR, fetchUnmatchedQuotes } from "@/lib/b2b-client";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 const LIVE_CHAT_URL = "https://ugzdwmyylqmirrljtuej.supabase.co/functions/v1/b2b-live-chat";
@@ -129,7 +129,7 @@ function ThreadPanel({ title, subtitle, infoRows, children, replyPlaceholder, on
     await onSend(t); setReply("");
   };
   return (
-    <div className="flex flex-col h-full min-h-0 border-l border-border bg-background">
+    <div className="flex flex-col border-l border-border bg-background" style={{height:"100%",overflow:"hidden"}}>
       <div className="flex items-start gap-3 px-5 py-4 border-b bg-muted/10 shrink-0">
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm">{title}</p>
@@ -144,7 +144,7 @@ function ThreadPanel({ title, subtitle, infoRows, children, replyPlaceholder, on
           {infoRows}
         </div>
       )}
-      <div className="flex-1 overflow-y-auto min-h-0 px-5 py-4 space-y-4">{children}</div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">{children}</div>
       <div className="flex items-end gap-2.5 px-4 py-3 border-t bg-background shrink-0 mt-auto">
         <textarea value={reply} onChange={e=>setReply(e.target.value)}
           onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleSend();} }}
@@ -165,7 +165,7 @@ function ConvoList<T>({ items, selectedId, loading, error, search, onSelect, onR
   renderItem: (item: T, isActive: boolean) => React.ReactNode;
 }) {
   return (
-    <div className="flex-1 overflow-y-auto min-h-0">
+    <div className="flex-1 overflow-y-auto">
       {loading && items.length === 0 ? (
         <div className="flex justify-center py-12"><Loader2 className="size-5 animate-spin text-muted-foreground"/></div>
       ) : error ? (
@@ -212,8 +212,18 @@ function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const { data } = await lcFetch(search ? { search } : {});
-      const items: B2BConvo[] = data ?? [];
+      // ใช้ b2b-quotes edge function เดิม (ทำงานได้แน่นอน)
+      const raw = await fetchUnmatchedQuotes(100);
+      const filtered = search
+        ? raw.filter(r =>
+            r.quote_number.toLowerCase().includes(search.toLowerCase()) ||
+            r.customer_company.toLowerCase().includes(search.toLowerCase()) ||
+            r.customer_name.toLowerCase().includes(search.toLowerCase()))
+        : raw;
+      const items: B2BConvo[] = filtered.map(r => ({
+        ...r,
+        last_message: null, unread_count: 0, _lead_id: null,
+      }));
       const ids = items.map(r=>r.id).filter(Boolean);
       if (ids.length) {
         const { data: leads } = await crmDb().from("leads").select("id,b2b_request_id").in("b2b_request_id", ids);
@@ -230,7 +240,7 @@ function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) 
   const loadMsgs = useCallback(async (id: string) => {
     setLoadingMsgs(true);
     try {
-      const { data } = await lcFetch({ quote_id: id });
+      const { data } = await lcFetch({ action: "b2b", quote_id: id });
       setMsgs(data ?? []);
       lcPost({ mark_read: true, quote_id: id, staff_id: staffId }).catch(()=>{});
     } catch(e:any) { toast.error("โหลดข้อความไม่สำเร็จ"); }
@@ -246,7 +256,7 @@ function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) 
     if (!selected) return;
     setSending(true);
     try {
-      await lcPost({ quote_id: selected.id, sender_name: staffName, content: text });
+      await lcPost({ action: "b2b", quote_id: selected.id, sender_name: staffName, content: text });
       await loadMsgs(selected.id);
       setConvos(prev => prev.map(c => c.id===selected.id ? {...c, unread_count:0} : c));
     } catch(e:any) { toast.error("ส่งไม่สำเร็จ: "+e.message); }
@@ -256,9 +266,9 @@ function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) 
   const totalUnread = convos.reduce((s,c)=>s+c.unread_count,0);
 
   return (
-    <div className="flex h-full overflow-hidden min-h-0">
+    <div style={{display:"flex",height:"100%",overflow:"hidden"}}>
       {/* List */}
-      <div className={`flex flex-col min-h-0 border-r border-border bg-background ${selected?"hidden md:flex w-[380px] shrink-0":"flex flex-1"}`}>
+      <div className={`flex flex-col border-r border-border bg-background ${selected?"hidden md:flex w-[380px] shrink-0":"flex flex-1"}`}>
         <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
           <span className="text-xs text-muted-foreground flex-1">
             {convos.length} รายการ {totalUnread>0 && <span className="text-red-500 font-medium">· {totalUnread} ใหม่</span>}
@@ -313,7 +323,7 @@ function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) 
 
       {/* Thread */}
       {selected ? (
-        <div className="flex-1 min-w-0 min-h-0">
+        <div className="flex-1 min-w-0">
           <ThreadPanel
             title={selected.customer_company||selected.customer_name}
             subtitle={`${selected.quote_number} · ${formatBaht(selected.grand_total)}`}
@@ -340,7 +350,7 @@ function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) 
           </ThreadPanel>
         </div>
       ) : (
-        <div className="hidden md:flex flex-1 min-h-0 items-center justify-center text-muted-foreground flex-col gap-2">
+        <div className="hidden md:flex flex-1 items-center justify-center text-muted-foreground flex-col gap-2">
           <ShoppingCart className="size-10 opacity-20"/>
           <p className="text-sm">เลือกการสนทนาจากรายการ</p>
         </div>
@@ -416,9 +426,9 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
     s.guest_name ?? s.guest_email ?? (s.user_id ? "สมาชิก" : "ผู้เยี่ยมชม");
 
   return (
-    <div className="flex h-full overflow-hidden min-h-0">
+    <div style={{display:"flex",height:"100%",overflow:"hidden"}}>
       {/* List */}
-      <div className={`flex flex-col min-h-0 border-r border-border bg-background ${selected?"hidden md:flex w-[380px] shrink-0":"flex flex-1"}`}>
+      <div className={`flex flex-col border-r border-border bg-background ${selected?"hidden md:flex w-[380px] shrink-0":"flex flex-1"}`}>
         <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
           <span className="text-xs text-muted-foreground flex-1">
             {sessions.length} รายการ {totalUnread>0 && <span className="text-red-500 font-medium">· {totalUnread} ใหม่</span>}
@@ -462,7 +472,7 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
                     <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
                       s.status==="open" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
                       : "bg-muted text-muted-foreground"}`}>
-                      {s.status}
+                    {s.status}
                     </span>
                     {s.assigned_to && <span title="มีคนรับแล้ว"><CheckCircle2 className="size-3 text-emerald-500"/></span>}
                   </div>
@@ -480,7 +490,7 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
 
       {/* Thread */}
       {selected ? (
-        <div className="flex-1 min-w-0 min-h-0">
+        <div className="flex-1 min-w-0">
           <ThreadPanel
             title={displayName(selected)}
             subtitle={isGuest ? "ผู้เยี่ยมชมหน้าเว็บ" : "สมาชิก / ผู้ใช้ที่ล็อกอิน"}
@@ -510,7 +520,7 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
           </ThreadPanel>
         </div>
       ) : (
-        <div className="hidden md:flex flex-1 min-h-0 items-center justify-center text-muted-foreground flex-col gap-2">
+        <div className="hidden md:flex flex-1 items-center justify-center text-muted-foreground flex-col gap-2">
           {isGuest ? <Globe className="size-10 opacity-20"/> : <Users className="size-10 opacity-20"/>}
           <p className="text-sm">เลือกการสนทนาจากรายการ</p>
         </div>
@@ -531,7 +541,7 @@ export function B2BConversationTab() {
   const tabOrder: ChatTab[] = ["b2b", "web", "general"];
 
   return (
-    <div className="flex h-full flex-col min-h-0">
+    <div className="flex flex-col" style={{height:"100%",minHeight:0}}>
       {/* Sub-tab bar */}
       <div className="flex items-center gap-1 px-4 py-2 border-b bg-background/80 shrink-0 overflow-x-auto">
         {tabOrder.map(t => {
@@ -556,7 +566,7 @@ export function B2BConversationTab() {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 min-h-0">
+      <div style={{flex:1,minHeight:0,overflow:"hidden"}}>
         {chatTab === "b2b"     && <B2BTab staffName={staffName} staffId={staffId}/>}
         {chatTab === "web"     && <WebChatTab isGuest={true}  staffName={staffName}/>}
         {chatTab === "general" && <WebChatTab isGuest={false} staffName={staffName}/>}
