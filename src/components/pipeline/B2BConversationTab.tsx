@@ -1,159 +1,167 @@
 /**
- * B2BConversationTab — แสดงการสนทนา (quote_messages) จาก B2B Platform
- * ดึงข้อมูลผ่าน b2b-quotes edge function เดิม
- * Pattern เดียวกับ B2BRequestsTab + LineRequestsTab
+ * B2BConversationTab — Live Chat viewer เหมือน Admin Panel /admin/live-chat
+ * ดึงข้อมูลผ่าน b2b-live-chat edge function (deploy ที่ B2B Supabase project)
+ * Authorized by: therdpoom@entgroup.co.th
  */
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Loader2, RefreshCw, MessageSquare, Send, Building2,
-  Phone, Mail, ChevronDown, ChevronUp, AlertTriangle,
-  CheckCircle2, Clock, ExternalLink,
+  Phone, Mail, Search, CheckCircle2, AlertTriangle,
+  Paperclip, Clock, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { crmDb } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
 import { formatBaht } from "@/lib/format";
-import {
-  fetchUnmatchedQuotes, fetchQuoteById,
-  STATUS_LABEL, STATUS_COLOR, type B2BQuoteRequest,
-} from "@/lib/b2b-client";
-import { Pagination } from "./LineRequestsTab";
+import { crmDb } from "@/lib/crm";
+import { STATUS_LABEL, STATUS_COLOR } from "@/lib/b2b-client";
 
-// ─── Types ─────────────────────────────────────────────────────────────────
-interface B2BMessage {
+// ─── Config ──────────────────────────────────────────────────────────────────
+const LIVE_CHAT_URL = "https://ugzdwmyylqmirrljtuej.supabase.co/functions/v1/b2b-live-chat";
+const CRM_SECRET    = "entgroup-crm-secret-2026";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface QMsg {
   id: string;
-  quote_request_id: string;
-  sender_type: "customer" | "staff";
+  quote_id: string;
   sender_name: string;
+  sender_role: "customer" | "staff";
   content: string;
+  message_type: string | null;
   created_at: string;
-  read_at: string | null;
+  read_by: Record<string, string> | null;
   attachment_url?: string | null;
   attachment_name?: string | null;
 }
 
-interface ConversationEntry {
-  req: B2BQuoteRequest;
-  messages: B2BMessage[];
-  unread: number;
-  lead_id?: string | null;
+interface QConvo {
+  id: string;
+  quote_number: string;
+  customer_name: string;
+  customer_company: string;
+  customer_email?: string;
+  customer_phone?: string;
+  customer_address?: string | null;
+  customer_tax_id?: string | null;
+  grand_total: number;
+  status: string;
+  created_at: string;
+  sla_po_review_due?: string | null;
+  crm_lead_id?: string | null;
+  last_message: QMsg | null;
+  unread_count: number;
+  has_messages: boolean;
+  // enriched
+  _lead_id?: string | null;
 }
 
-// ─── Config ─────────────────────────────────────────────────────────────────
-const B2B_EDGE_URL = "https://ugzdwmyylqmirrljtuej.supabase.co/functions/v1/b2b-quotes";
-const B2B_SECRET   = "entgroup-crm-secret-2026";
-const PAGE_SIZE    = 10;
-
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 const MONTHS_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+
 function fmtDate(iso: string) {
   const d = new Date(iso);
-  return `${d.getDate()} ${MONTHS_TH[d.getMonth()]} ${String(d.getFullYear() + 543).slice(-2)}`;
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+  if (diffDays === 0) return d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+  if (diffDays < 7) return `${diffDays} วันที่ผ่านมา`;
+  return `${d.getDate()} ${MONTHS_TH[d.getMonth()]}`;
 }
-function fmtTime(iso: string) {
+
+function fmtFull(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+  return `${d.getDate()} ${MONTHS_TH[d.getMonth()]} ${d.getFullYear() + 543} ${d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-// ─── Fetch messages from B2B edge function ──────────────────────────────────
-async function fetchB2BMessages(quoteRequestId: string): Promise<B2BMessage[]> {
-  try {
-    const url = `${B2B_EDGE_URL}?messages=1&quote_request_id=${quoteRequestId}`;
-    const res = await fetch(url, { headers: { "x-crm-secret": B2B_SECRET } });
-    if (!res.ok) return [];
-    const { data } = await res.json();
-    return (data ?? []) as B2BMessage[];
-  } catch {
-    return [];
-  }
+async function lcFetch(path = "", params: Record<string, string> = {}): Promise<any> {
+  const url = new URL(LIVE_CHAT_URL + path);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString(), { headers: { "x-crm-secret": CRM_SECRET } });
+  if (!res.ok) throw new Error(`Live chat API error: ${res.status}`);
+  return res.json();
 }
 
-// ─── Send reply back to B2B via edge function ───────────────────────────────
-async function sendB2BReply(
-  quoteRequestId: string,
-  senderName: string,
-  content: string
-): Promise<boolean> {
-  try {
-    const res = await fetch(`${B2B_EDGE_URL}/messages`, {
-      method: "POST",
-      headers: {
-        "x-crm-secret": B2B_SECRET,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        quote_request_id: quoteRequestId,
-        sender_type: "staff",
-        sender_name: senderName,
-        content,
-      }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-// ─── Also log reply as activity in CRM ─────────────────────────────────────
-async function logReplyActivity(
-  leadId: string,
-  userId: string,
-  senderName: string,
-  content: string
-) {
-  await crmDb().from("activities").insert({
-    lead_id: leadId,
-    type: "note",
-    subject: "ตอบกลับลูกค้า B2B",
-    body: content,
-    done: true,
-    done_at: new Date().toISOString(),
-    owner_id: userId,
+async function lcPost(body: Record<string, any>): Promise<any> {
+  const res = await fetch(LIVE_CHAT_URL, {
+    method: "POST",
+    headers: { "x-crm-secret": CRM_SECRET, "content-type": "application/json" },
+    body: JSON.stringify(body),
   });
+  if (!res.ok) throw new Error(`Live chat POST error: ${res.status}`);
+  return res.json();
 }
 
-// ─── ChatBubble ─────────────────────────────────────────────────────────────
-function ChatBubble({ msg }: { msg: B2BMessage }) {
-  const isStaff = msg.sender_type === "staff";
+// ─── ChatBubble ───────────────────────────────────────────────────────────────
+function Bubble({ msg, isMe }: { msg: QMsg; isMe: boolean }) {
   return (
-    <div className={`flex ${isStaff ? "justify-end" : "justify-start"} mb-2`}>
-      <div className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-sm ${
-        isStaff
-          ? "bg-primary text-primary-foreground rounded-br-sm"
-          : "bg-muted text-foreground rounded-bl-sm"
+    <div className={`flex gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
+      <div className={`size-7 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold ${
+        isMe ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
       }`}>
-        {!isStaff && (
-          <p className="text-[11px] font-medium mb-0.5 opacity-60">{msg.sender_name}</p>
+        {isMe ? "S" : msg.sender_name?.[0]?.toUpperCase() ?? "C"}
+      </div>
+      <div className={`max-w-[72%] space-y-1 ${isMe ? "items-end" : ""} flex flex-col`}>
+        {!isMe && (
+          <span className="text-[11px] text-muted-foreground font-medium px-1">{msg.sender_name}</span>
         )}
-        <p className="leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
-        <p className={`text-[10px] mt-1 opacity-50 ${isStaff ? "text-right" : ""}`}>
-          {fmtTime(msg.created_at)}
-          {!isStaff && !msg.read_at && (
-            <span className="ml-1 inline-block size-1.5 rounded-full bg-primary align-middle" />
+        <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+          isMe
+            ? "bg-primary text-primary-foreground rounded-tr-sm"
+            : "bg-muted text-foreground rounded-tl-sm"
+        }`}>
+          <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+          {msg.attachment_url && (
+            <a href={msg.attachment_url} target="_blank" rel="noreferrer"
+              className={`flex items-center gap-1 text-xs mt-1.5 underline ${isMe ? "opacity-80" : "text-primary"}`}>
+              <Paperclip className="size-3" />{msg.attachment_name ?? "ไฟล์แนบ"}
+            </a>
           )}
-        </p>
+        </div>
+        <span className={`text-[10px] text-muted-foreground px-1 ${isMe ? "text-right" : ""}`}>
+          {fmtFull(msg.created_at)}
+        </span>
       </div>
     </div>
   );
 }
 
-// ─── ConversationPanel ──────────────────────────────────────────────────────
-function ConversationPanel({
-  entry,
+// ─── Thread panel (right side) ────────────────────────────────────────────────
+function ThreadPanel({
+  convo,
+  staffName,
+  staffId,
   onClose,
   onSent,
 }: {
-  entry: ConversationEntry;
+  convo: QConvo;
+  staffName: string;
+  staffId: string;
   onClose: () => void;
-  onSent: () => void;
+  onSent: (quoteId: string) => void;
 }) {
-  const { user } = useAuth();
-  const [reply, setReply]   = useState("");
-  const [sending, setSending] = useState(false);
+  const [messages, setMessages] = useState<QMsg[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [reply,    setReply]    = useState("");
+  const [sending,  setSending]  = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const { req, messages, lead_id } = entry;
+  const loadMessages = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await lcFetch("", { quote_id: convo.id });
+      setMessages(data ?? []);
+    } catch (e: any) {
+      toast.error("โหลดข้อความไม่สำเร็จ: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [convo.id]);
+
+  useEffect(() => {
+    loadMessages();
+    // Mark as read
+    lcPost({ mark_read: true, quote_id: convo.id, staff_id: staffId }).catch(() => {});
+  }, [convo.id, staffId, loadMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -163,432 +171,347 @@ function ConversationPanel({
     const text = reply.trim();
     if (!text || sending) return;
     setSending(true);
-
-    // User display name — fallback to email prefix
-    const senderName =
-      (user as any)?.user_metadata?.full_name ??
-      (user?.email?.split("@")[0] ?? "Sales");
-
-    const ok = await sendB2BReply(req.id, senderName, text);
-    if (!ok) {
-      toast.error("ส่งข้อความไม่สำเร็จ — edge function ยังไม่รองรับ POST /messages");
-      // Still log in CRM if lead exists
-    }
-
-    // Log activity in CRM regardless (so team has record even if edge not deployed)
-    if (lead_id && user?.id) {
-      await logReplyActivity(lead_id, user.id, senderName, text);
-    }
-
-    if (ok) {
-      toast.success("ส่งข้อความแล้ว");
+    try {
+      await lcPost({
+        quote_id:    convo.id,
+        sender_name: staffName,
+        content:     text,
+        message_type: "text",
+      });
       setReply("");
-      onSent();
-    } else {
-      // Save draft locally so work isn't lost
-      toast.warning("บันทึกใน CRM แล้ว แต่ยังส่งไม่ถึงลูกค้า — กรุณา deploy edge function");
-      setReply("");
+      await loadMessages();
+      onSent(convo.id);
+    } catch (e: any) {
+      toast.error("ส่งไม่สำเร็จ: " + e.message);
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   };
 
-  const slaUrgent = req.sla_po_review_due &&
-    new Date(req.sla_po_review_due).getTime() - Date.now() < 12 * 3600 * 1000;
+  const slaUrgent = convo.sla_po_review_due &&
+    new Date(convo.sla_po_review_due).getTime() - Date.now() < 12 * 3600 * 1000;
 
   return (
-    <div className="flex flex-col border border-border rounded-xl overflow-hidden bg-card" style={{ height: 520 }}>
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b bg-muted/20 shrink-0">
+    <div className="flex flex-col h-full border-l border-border bg-background">
+      {/* Thread header */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b bg-muted/10 shrink-0">
+        <div className={`size-10 rounded-full flex items-center justify-center font-semibold text-sm ${
+          convo.unread_count > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+        }`}>
+          {convo.customer_company?.[0]?.toUpperCase() ?? convo.customer_name?.[0] ?? "?"}
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm">{req.customer_company || req.customer_name}</span>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_COLOR[req.status] ?? "bg-muted text-muted-foreground"}`}>
-              {STATUS_LABEL[req.status] ?? req.status}
+            <span className="font-semibold text-sm truncate">
+              {convo.customer_company || convo.customer_name}
             </span>
-            {slaUrgent && (
-              <span className="flex items-center gap-1 text-[10px] text-red-600 font-medium">
-                <AlertTriangle className="size-3" /> SLA ด่วน
-              </span>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0 ${STATUS_COLOR[convo.status] ?? "bg-muted"}`}>
+              {STATUS_LABEL[convo.status] ?? convo.status}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
+            <span>{convo.quote_number}</span>
+            {convo.customer_name !== convo.customer_company && (
+              <span>{convo.customer_name}</span>
+            )}
+            {convo.grand_total > 0 && (
+              <span className="text-primary font-medium">{formatBaht(convo.grand_total)}</span>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {req.quote_number} · {req.customer_name}
-            {req.customer_phone && ` · ${req.customer_phone}`}
-          </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-sm font-semibold text-primary">{formatBaht(req.grand_total)}</span>
-          {lead_id && (
-            <a
-              href={`/leads/${lead_id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="ดู Lead ใน CRM"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <ExternalLink className="size-3.5" />
-            </a>
-          )}
-          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground text-lg leading-none">×</button>
-        </div>
+        <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0 md:hidden">
+          <X className="size-5" />
+        </button>
+      </div>
+
+      {/* Customer info strip */}
+      <div className="flex items-center gap-4 px-5 py-2.5 border-b bg-muted/5 text-xs text-muted-foreground flex-wrap shrink-0">
+        {convo.customer_phone && (
+          <a href={`tel:${convo.customer_phone}`} className="flex items-center gap-1 hover:text-foreground">
+            <Phone className="size-3" />{convo.customer_phone}
+          </a>
+        )}
+        {convo.customer_email && (
+          <a href={`mailto:${convo.customer_email}`} className="flex items-center gap-1 hover:text-foreground">
+            <Mail className="size-3" />{convo.customer_email}
+          </a>
+        )}
+        {convo.customer_address && (
+          <span className="flex items-center gap-1">
+            <Building2 className="size-3" />{convo.customer_address}
+          </span>
+        )}
+        {convo._lead_id && (
+          <a href={`/leads/${convo._lead_id}`} className="flex items-center gap-1 text-primary hover:underline">
+            <CheckCircle2 className="size-3" /> Lead ใน CRM
+          </a>
+        )}
+        {slaUrgent && (
+          <span className="flex items-center gap-1 text-red-600 font-medium">
+            <AlertTriangle className="size-3" /> SLA ด่วน: {fmtDate(convo.sla_po_review_due!)}
+          </span>
+        )}
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
-            <MessageSquare className="size-8 opacity-30" />
-            <p className="text-sm">ยังไม่มีการสนทนา</p>
-            <p className="text-xs opacity-60">พิมพ์เพื่อเริ่มบทสนทนากับลูกค้า</p>
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 py-16">
+            <MessageSquare className="size-10 opacity-20" />
+            <div className="text-center">
+              <p className="text-sm font-medium">ยังไม่มีการสนทนา</p>
+              <p className="text-xs opacity-60 mt-1">พิมพ์ด้านล่างเพื่อเริ่มบทสนทนากับลูกค้า</p>
+            </div>
           </div>
         ) : (
-          <>
-            {messages.map((m) => <ChatBubble key={m.id} msg={m} />)}
-          </>
+          messages.map((m) => (
+            <Bubble key={m.id} msg={m} isMe={m.sender_role === "staff"} />
+          ))
         )}
         <div ref={bottomRef} />
       </div>
 
       {/* Reply bar */}
-      <div className="flex items-end gap-2 px-3 py-3 border-t shrink-0">
+      <div className="flex items-end gap-2.5 px-4 py-3 border-t bg-background shrink-0">
         <textarea
           value={reply}
           onChange={(e) => setReply(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
           }}
-          placeholder="พิมพ์ข้อความตอบกลับลูกค้า... (Enter ส่ง, Shift+Enter ขึ้นบรรทัด)"
+          placeholder={`ตอบกลับ ${convo.customer_company || convo.customer_name}... (Enter ส่ง)`}
           rows={2}
-          className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
+          className="flex-1 resize-none rounded-xl border border-border bg-muted/30 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
         />
         <Button
           onClick={handleSend}
           disabled={sending || !reply.trim()}
           size="icon"
-          className="shrink-0"
+          className="size-10 rounded-xl shrink-0"
         >
-          {sending
-            ? <Loader2 className="size-4 animate-spin" />
-            : <Send className="size-4" />
-          }
+          {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
         </Button>
       </div>
     </div>
   );
 }
 
-// ─── Main Tab ───────────────────────────────────────────────────────────────
+// ─── Main Tab ─────────────────────────────────────────────────────────────────
 export function B2BConversationTab() {
-  const [entries, setEntries]   = useState<ConversationEntry[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
-  const [search, setSearch]     = useState("");
-  const [page, setPage]         = useState(0);
-  const [openEntry, setOpenEntry] = useState<ConversationEntry | null>(null);
-  // collapsed rows in list (show only first row)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const { user } = useAuth();
+  const staffName = (user as any)?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Sales";
+  const staffId   = user?.id ?? "staff";
 
-  const load = async () => {
+  const [convos,   setConvos]   = useState<QConvo[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState<string | null>(null);
+  const [search,   setSearch]   = useState("");
+  const [selected, setSelected] = useState<QConvo | null>(null);
+
+  const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      // 1. Fetch all quote requests (same as B2BRequestsTab but include claimed ones)
-      const url = `${B2B_EDGE_URL}?limit=100&include_claimed=1`;
-      const res = await fetch(url, { headers: { "x-crm-secret": B2B_SECRET } });
-      if (!res.ok) throw new Error(`B2B API error: ${res.status}`);
-      const { data: allRequests, error: apiErr } = await res.json();
-      if (apiErr) throw new Error(apiErr);
+      const { data } = await lcFetch("", search ? { search } : {});
+      const items: QConvo[] = data ?? [];
 
-      const reqs: B2BQuoteRequest[] = allRequests ?? [];
-
-      // 2. For each request, fetch quote_messages
-      //    (batch: fetch in parallel, cap at 20 to avoid timeout)
-      const top20 = reqs.slice(0, 20);
-      const withMessages = await Promise.all(
-        top20.map(async (req) => {
-          const messages = await fetchB2BMessages(req.id);
-          const unread = messages.filter(
-            (m) => m.sender_type === "customer" && !m.read_at
-          ).length;
-          return { req, messages, unread };
-        })
-      );
-
-      // 3. Enrich with lead_id from CRM
-      const b2bIds = top20.map((r) => r.id);
-      let leadMap: Record<string, string> = {};
+      // Enrich with CRM lead_id
+      const b2bIds = items.map((r) => r.id).filter(Boolean);
       if (b2bIds.length) {
         const { data: leads } = await crmDb()
           .from("leads")
           .select("id, b2b_request_id")
           .in("b2b_request_id", b2bIds);
+        const leadMap: Record<string, string> = {};
         for (const l of (leads ?? []) as any[]) {
           if (l.b2b_request_id) leadMap[l.b2b_request_id] = l.id;
         }
+        items.forEach((c) => { c._lead_id = leadMap[c.id] ?? null; });
       }
 
-      const enriched: ConversationEntry[] = withMessages.map((w) => ({
-        ...w,
-        lead_id: leadMap[w.req.id] ?? null,
-      }));
-
-      // Sort: unread first, then by latest message
-      enriched.sort((a, b) => {
-        if (b.unread !== a.unread) return b.unread - a.unread;
-        const aTime = a.messages.at(-1)?.created_at ?? a.req.created_at;
-        const bTime = b.messages.at(-1)?.created_at ?? b.req.created_at;
-        return bTime.localeCompare(aTime);
-      });
-
-      setEntries(enriched);
+      setConvos(items);
+      // Auto-select first if none
+      if (items.length && !selected) setSelected(items[0]);
     } catch (e: any) {
-      setError(e.message ?? "โหลดข้อมูลไม่สำเร็จ");
+      setError(e.message ?? "โหลดไม่สำเร็จ");
     } finally {
       setLoading(false);
     }
-  };
+  }, [search]);
 
   useEffect(() => { load(); }, []);
 
-  const filtered = entries.filter((e) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return (
-      e.req.quote_number.toLowerCase().includes(q) ||
-      e.req.customer_company.toLowerCase().includes(q) ||
-      e.req.customer_name.toLowerCase().includes(q) ||
-      e.messages.some((m) => m.content.toLowerCase().includes(q))
-    );
-  });
+  // Search with debounce
+  useEffect(() => {
+    const t = setTimeout(() => load(), 400);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  useEffect(() => { setPage(0); }, [search]);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageItems  = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
-  const totalUnread = entries.reduce((s, e) => s + e.unread, 0);
-
-  const toggleExpand = (id: string) =>
-    setExpanded((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
-
-  const openConversation = (entry: ConversationEntry) => {
-    setOpenEntry(entry);
-    // optimistically clear unread
-    setEntries((prev) =>
-      prev.map((e) => e.req.id === entry.req.id ? { ...e, unread: 0 } : e)
+  // When message sent: refresh unread count
+  const handleSent = (quoteId: string) => {
+    setConvos((prev) =>
+      prev.map((c) => c.id === quoteId ? { ...c, unread_count: 0 } : c)
     );
   };
 
+  const totalUnread = convos.reduce((s, c) => s + c.unread_count, 0);
+
   return (
-    <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b bg-background">
-        <div>
-          <h2 className="text-sm font-semibold flex items-center gap-2">
-            <MessageSquare className="size-4 text-primary" />
-            การสนทนา B2B
-            {totalUnread > 0 && (
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
-                {totalUnread}
-              </span>
-            )}
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            ข้อความจากลูกค้า B2B Platform — ตอบกลับได้จากหน้านี้โดยตรง
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <div className="relative">
-            <Input
-              placeholder="ค้นหาบริษัท / ข้อความ..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-56 pl-3 text-xs"
-            />
+    <div className="flex h-full overflow-hidden">
+
+      {/* ── Left panel: conversation list ── */}
+      <div className={`flex flex-col border-r border-border bg-background ${selected ? "hidden md:flex w-[400px] shrink-0" : "flex flex-1"}`}>
+
+        {/* List header */}
+        <div className="flex items-center gap-2 px-5 py-4 border-b shrink-0">
+          <div className="flex-1">
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <MessageSquare className="size-4 text-primary" />
+              Live Chat B2B
+              {totalUnread > 0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                  {totalUnread}
+                </span>
+              )}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">สนทนากับลูกค้า B2B แบบ Real-time</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={load} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          <Button variant="ghost" size="icon" className="size-8" onClick={load} disabled={loading}>
+            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-6 space-y-4">
-
-        {/* Open conversation panel */}
-        {openEntry && (
-          <ConversationPanel
-            entry={openEntry}
-            onClose={() => setOpenEntry(null)}
-            onSent={load}
-          />
-        )}
-
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        {/* Search */}
+        <div className="px-4 py-2.5 border-b shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหาลูกค้า, เลข Quote..."
+              className="pl-8 h-8 text-xs"
+            />
           </div>
-        ) : error ? (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center dark:border-amber-900/40 dark:bg-amber-950/20">
-            <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-amber-600" />
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">{error}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              หมายเหตุ: ฟีเจอร์นี้ต้องการ edge function รองรับ <code>?messages=1</code>
-            </p>
-            <Button size="sm" variant="outline" className="mt-3" onClick={load}>
-              <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> ลองใหม่
-            </Button>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-            <MessageSquare className="h-10 w-10 mb-3 opacity-20" />
-            <p className="text-sm font-medium">{search ? "ไม่พบรายการที่ค้นหา" : "ยังไม่มีการสนทนา"}</p>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="divide-y divide-border">
-              {pageItems.map((entry) => {
-                const { req, messages, unread, lead_id } = entry;
-                const lastMsg = messages.at(-1);
-                const isExpanded = expanded.has(req.id);
-                const isOpen = openEntry?.req.id === req.id;
+        </div>
 
-                return (
-                  <div
-                    key={req.id}
-                    className={`transition-colors ${isOpen ? "bg-primary/5" : "hover:bg-muted/20"}`}
-                  >
-                    {/* Main row */}
-                    <div className="flex items-start gap-3 px-5 py-4">
-                      {/* Avatar */}
-                      <div className={`size-9 rounded-full flex items-center justify-center shrink-0 text-sm font-semibold ${
-                        unread > 0
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
-                      }`}>
-                        {req.customer_company?.[0]?.toUpperCase() ?? req.customer_name?.[0]?.toUpperCase() ?? "?"}
-                      </div>
+        {/* List */}
+        <div className="flex-1 overflow-y-auto">
+          {loading && convos.length === 0 ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : error ? (
+            <div className="p-5">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center dark:border-amber-900/40 dark:bg-amber-950/20">
+                <AlertTriangle className="mx-auto mb-2 size-5 text-amber-600" />
+                <p className="text-xs font-medium text-amber-800 dark:text-amber-300">{error}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  ต้อง deploy edge function <code className="bg-muted px-1 rounded">b2b-live-chat</code> ก่อน
+                </p>
+                <Button size="sm" variant="outline" className="mt-3 h-7 text-xs" onClick={load}>
+                  <RefreshCw className="mr-1 size-3" /> ลองใหม่
+                </Button>
+              </div>
+            </div>
+          ) : convos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <MessageSquare className="size-8 opacity-20 mb-2" />
+              <p className="text-sm">{search ? "ไม่พบรายการที่ค้นหา" : "ยังไม่มีการสนทนา"}</p>
+            </div>
+          ) : (
+            convos.map((c) => {
+              const isActive = selected?.id === c.id;
+              const hasUnread = c.unread_count > 0;
+              const preview = c.last_message?.content ?? (c.has_messages ? "" : "ยังไม่มีข้อความ");
+              const previewPrefix = c.last_message?.sender_role === "staff" ? "คุณ: " : "";
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 justify-between">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className={`text-sm truncate ${unread > 0 ? "font-semibold" : "font-medium"}`}>
-                              {req.customer_company || req.customer_name}
-                            </span>
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0 ${STATUS_COLOR[req.status] ?? "bg-muted"}`}>
-                              {STATUS_LABEL[req.status] ?? req.status}
-                            </span>
-                            {lead_id && (
-                              <span title="มี Lead ใน CRM แล้ว" className="inline-flex">
-                                <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {unread > 0 && (
-                              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
-                                {unread}
-                              </span>
-                            )}
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              {lastMsg ? fmtDate(lastMsg.created_at) : fmtDate(req.created_at)}
-                            </span>
-                          </div>
-                        </div>
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setSelected(c)}
+                  className={`w-full text-left flex items-start gap-3 px-5 py-4 border-b border-border/50 transition-colors ${
+                    isActive
+                      ? "bg-primary/8 border-l-2 border-l-primary"
+                      : "hover:bg-muted/30"
+                  }`}
+                >
+                  {/* Avatar */}
+                  <div className={`size-10 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 mt-0.5 ${
+                    hasUnread ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                  }`}>
+                    {c.customer_company?.[0]?.toUpperCase() ?? c.customer_name?.[0] ?? "?"}
+                  </div>
 
-                        {/* Last message preview */}
-                        <p className={`text-xs mt-0.5 truncate ${
-                          unread > 0 ? "text-foreground" : "text-muted-foreground"
-                        }`}>
-                          {lastMsg
-                            ? `${lastMsg.sender_type === "staff" ? "คุณ: " : ""}${lastMsg.content}`
-                            : `${req.quote_number} · ${formatBaht(req.grand_total)}`
-                          }
-                        </p>
-
-                        {/* Sub info */}
-                        <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground flex-wrap">
-                          <span>{req.quote_number}</span>
-                          <span className="font-medium text-primary">{formatBaht(req.grand_total)}</span>
-                          {req.customer_phone && (
-                            <span className="flex items-center gap-1">
-                              <Phone className="size-3" />{req.customer_phone}
-                            </span>
-                          )}
-                          {messages.length > 0 && (
-                            <span className="flex items-center gap-1">
-                              <MessageSquare className="size-3" />{messages.length} ข้อความ
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                        {messages.length > 0 && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => toggleExpand(req.id)}
-                            title={isExpanded ? "ซ่อน" : "ดูข้อความล่าสุด"}
-                          >
-                            {isExpanded
-                              ? <ChevronUp className="h-4 w-4" />
-                              : <ChevronDown className="h-4 w-4" />
-                            }
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant={isOpen ? "default" : "outline"}
-                          className="h-7 px-2.5 text-xs gap-1"
-                          onClick={() => isOpen ? setOpenEntry(null) : openConversation(entry)}
-                        >
-                          <MessageSquare className="h-3 w-3" />
-                          {isOpen ? "ปิด" : "ตอบกลับ"}
-                        </Button>
-                      </div>
+                  {/* Content */}
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className={`text-sm truncate ${hasUnread ? "font-bold" : "font-medium"}`}>
+                        {c.customer_company || c.customer_name}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground shrink-0">
+                        {c.last_message ? fmtDate(c.last_message.created_at) : fmtDate(c.created_at)}
+                      </span>
                     </div>
 
-                    {/* Expanded: recent messages preview */}
-                    {isExpanded && messages.length > 0 && (
-                      <div className="px-5 pb-4 border-t border-border/50 bg-muted/10">
-                        <div className="pt-3 space-y-2 max-h-48 overflow-y-auto">
-                          {messages.slice(-4).map((m) => (
-                            <div key={m.id} className={`flex ${m.sender_type === "staff" ? "justify-end" : "justify-start"}`}>
-                              <div className={`max-w-[80%] rounded-lg px-3 py-1.5 text-xs ${
-                                m.sender_type === "staff"
-                                  ? "bg-primary/10 text-primary"
-                                  : "bg-muted"
-                              }`}>
-                                {m.sender_type === "customer" && (
-                                  <span className="font-medium mr-1 opacity-60">{m.sender_name}:</span>
-                                )}
-                                {m.content}
-                                <span className="ml-2 opacity-40">{fmtTime(m.created_at)}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                    {c.customer_company && c.customer_name !== c.customer_company && (
+                      <p className="text-xs text-muted-foreground truncate">{c.customer_name}</p>
                     )}
-                  </div>
-                );
-              })}
-            </div>
 
-            {totalPages > 1 && (
-              <Pagination
-                page={page}
-                totalPages={totalPages}
-                total={filtered.length}
-                pageSize={PAGE_SIZE}
-                onChange={setPage}
-              />
-            )}
-          </div>
-        )}
+                    <p className={`text-xs truncate ${hasUnread ? "text-foreground" : "text-muted-foreground"}`}>
+                      {previewPrefix}{preview}
+                    </p>
+
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-[10px] text-muted-foreground font-mono">{c.quote_number}</span>
+                      {c.grand_total > 0 && (
+                        <span className="text-[10px] text-muted-foreground">{formatBaht(c.grand_total)}</span>
+                      )}
+                      <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${STATUS_COLOR[c.status] ?? "bg-muted text-muted-foreground"}`}>
+                        {STATUS_LABEL[c.status] ?? c.status}
+                      </span>
+                      {c._lead_id && (
+                        <CheckCircle2 className="size-3 text-emerald-500" title="มี Lead แล้ว" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Unread badge */}
+                  {hasUnread && (
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white shrink-0 mt-2">
+                      {c.unread_count}
+                    </span>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
       </div>
+
+      {/* ── Right panel: thread ── */}
+      {selected ? (
+        <div className="flex-1 min-w-0">
+          <ThreadPanel
+            convo={selected}
+            staffName={staffName}
+            staffId={staffId}
+            onClose={() => setSelected(null)}
+            onSent={handleSent}
+          />
+        </div>
+      ) : (
+        <div className="hidden md:flex flex-1 items-center justify-center text-muted-foreground flex-col gap-3">
+          <MessageSquare className="size-12 opacity-20" />
+          <div className="text-center">
+            <p className="font-medium">เลือกการสนทนาจากรายการด้านซ้าย</p>
+            <p className="text-sm opacity-60 mt-1">หรือรอข้อความใหม่จากลูกค้า</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
