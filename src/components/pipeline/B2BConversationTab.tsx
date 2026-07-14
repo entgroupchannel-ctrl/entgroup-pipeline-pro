@@ -472,9 +472,9 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
                     <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
                       s.status==="open" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
                       : "bg-muted text-muted-foreground"}`}>
-                      {s.status}
+                    {s.status}
                     </span>
-                    {s.assigned_to && <CheckCircle2 className="size-3 text-emerald-500" title="มีคนรับแล้ว"/>}
+                    {s.assigned_to && <span title="มีคนรับแล้ว"><CheckCircle2 className="size-3 text-emerald-500"/></span>}
                   </div>
                 </div>
                 {hasUnread && (
