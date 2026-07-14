@@ -288,8 +288,25 @@ export const createFAQuotationDraft = createServerFn({ method: "POST" })
           `สร้าง Contact ใน FlowAccount ไม่สำเร็จ (${createRes.status}): ${createRes.text.slice(0, 200)}`,
         );
       }
-      contactId = createRes.body?.data?.contactId ?? createRes.body?.contactId ?? createRes.body?.id ?? null;
-      if (!contactId) throw new Error("ไม่พบ contactId จาก FlowAccount response");
+      // FlowAccount create contact returns various shapes — handle all
+      const cb = createRes.body;
+      contactId =
+        cb?.data?.contactId ??
+        cb?.data?.id ??
+        cb?.contactId ??
+        cb?.id ??
+        cb?.data?.contact_id ??
+        cb?.contact_id ??
+        // some versions return array
+        (Array.isArray(cb?.data) ? cb.data[0]?.contactId ?? cb.data[0]?.id : null) ??
+        null;
+      if (!contactId) {
+        // log actual response to help debug
+        console.error("[FA] createContact response:", JSON.stringify(cb).slice(0, 500));
+        throw new Error(
+          `ไม่พบ contactId จาก FlowAccount response: ${JSON.stringify(cb).slice(0, 200)}`
+        );
+      }
     }
 
     // ── 2. Build items ──────────────────────────────────────────────────────
