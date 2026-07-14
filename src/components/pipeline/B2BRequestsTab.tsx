@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Loader2, RefreshCw, AlertTriangle, CheckCircle2, Plus,
-  Building2, Phone, Mail, ShoppingCart, ChevronDown, ChevronUp,
+  Building2, Phone, Mail, ShoppingCart, ChevronDown, ChevronUp, FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   STATUS_LABEL, type B2BQuoteRequest,
 } from "@/lib/b2b-client";
 import { Pagination } from "./LineRequestsTab";
+import { CreateFAQuotationDialog } from "./CreateFAQuotationDialog";
 
 const PAGE_SIZE = 10;
 
