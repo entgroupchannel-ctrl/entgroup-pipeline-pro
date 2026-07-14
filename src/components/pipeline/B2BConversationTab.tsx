@@ -508,7 +508,7 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
                       : "bg-muted text-muted-foreground"}`}>
                       {s.status}
                     </span>
-                    {s.assigned_to && <CheckCircle2 className="size-3 text-emerald-500" title="มีคนรับแล้ว"/>}
+                    {s.assigned_to && <span title="มีคนรับแล้ว"><CheckCircle2 className="size-3 text-emerald-500"/></span>}
                   </div>
                 </div>
                 {hasUnread && (
