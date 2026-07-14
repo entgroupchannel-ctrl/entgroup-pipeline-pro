@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { KanbanBoard } from "@/components/pipeline/KanbanBoard";
 import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
 import { crmDb } from "@/lib/crm";
@@ -8,6 +9,7 @@ import { B2BRequestsTab } from "@/components/pipeline/B2BRequestsTab";
 import { LineRequestsTab } from "@/components/pipeline/LineRequestsTab";
 import { B2BConversationTab } from "@/components/pipeline/B2BConversationTab";
 import { supabase } from "@/integrations/supabase/client";
+import { callB2BLiveChat } from "@/lib/b2b-live-chat.functions";
 
 
 export const Route = createFileRoute("/_authenticated/pipeline")({
@@ -15,6 +17,7 @@ export const Route = createFileRoute("/_authenticated/pipeline")({
 });
 
 function PipelinePage() {
+  const callLiveChat = useServerFn(callB2BLiveChat);
   const [tab, setTab] = useState<"all" | "line" | "b2b" | "messages">("all");
   const [msgUnread, setMsgUnread] = useState({ b2b: 0, web: 0, general: 0 });
   const totalMsgUnread = msgUnread.b2b + msgUnread.web + msgUnread.general;
@@ -47,27 +50,23 @@ function PipelinePage() {
 
   // Poll unread counts every 30s — b2b-live-chat returns unread_count per session
   useEffect(() => {
-    const LC = "https://ugzdwmyylqmirrljtuej.supabase.co/functions/v1/b2b-live-chat";
-    const SK = "entgroup-crm-secret-2026";
-    const poll = async () => {
+    const safeList = async (action: "b2b" | "web" | "general") => {
       try {
-        const [wb, ww, wg] = await Promise.all([
-          fetch(`${LC}?action=b2b`, { headers: { "x-crm-secret": SK } }).then(r=>r.json()),
-          fetch(`${LC}?action=web`, { headers: { "x-crm-secret": SK } }).then(r=>r.json()),
-          fetch(`${LC}?action=general`, { headers: { "x-crm-secret": SK } }).then(r=>r.json()),
-        ]);
-        const sumUnread = (d: any[]) => d.reduce((s: number, c: any) => s + (c.unread_count ?? 0), 0);
-        setMsgUnread({
-          b2b:     sumUnread(wb?.data  ?? []),
-          web:     sumUnread(ww?.data  ?? []),
-          general: sumUnread(wg?.data  ?? []),
-        });
-      } catch { /* silent */ }
+        const result = await callLiveChat({ data: { method: "GET", params: { action } } });
+        return Array.isArray(result?.data) ? result.data : [];
+      } catch {
+        return [];
+      }
+    };
+    const poll = async () => {
+      const [b2b, web, general] = await Promise.all([safeList("b2b"), safeList("web"), safeList("general")]);
+      const sumUnread = (d: any[]) => d.reduce((s: number, c: any) => s + (c.unread_count ?? 0), 0);
+      setMsgUnread({ b2b: sumUnread(b2b), web: sumUnread(web), general: sumUnread(general) });
     };
     poll();
     const t = setInterval(poll, 30_000);
     return () => clearInterval(t);
-  }, []);
+  }, [callLiveChat]);
 
   const handleQuickLog = (leadId: string, type: ActivityKind) => {
     setLogLeadId(leadId);
