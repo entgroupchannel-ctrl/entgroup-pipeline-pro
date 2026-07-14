@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw, MessageCircle, ChevronLeft, ChevronRight, ExternalLink, Plus, CheckCircle2 } from "lucide-react";
+import { Loader2, RefreshCw, MessageCircle, ChevronLeft, ChevronRight, ExternalLink, Plus, CheckCircle2, MessageSquarePlus } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { crmDb, STAGE_LABEL_TH, type Lead, type LeadStage, type Account } from "
 import { useAuth } from "@/lib/auth-context";
 import { formatBaht } from "@/lib/format";
 import { useLineRealtime } from "@/hooks/useLineRealtime";
+import { LineReplyDialog } from "./LineReplyDialog";
 
 interface LineLead extends Lead {
   account?: Account | null;
@@ -41,7 +42,9 @@ export function LineRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void 
   const [search, setSearch] = useState("");
   const [subFilter, setSubFilter] = useState<"all" | "unclaimed" | "mine">("all");
   const [page, setPage] = useState(0);
-  const [claiming, setClaiming] = useState<string | null>(null);
+  const [claiming,   setClaiming]   = useState<string | null>(null);
+  const [replyLead,  setReplyLead]  = useState<LineLead | null>(null);
+  const [contactMap, setContactMap] = useState<Record<string, { line_id: string|null; phone: string|null }>>({});
   const { unreadCounts } = useLineRealtime();
 
   const load = async () => {
@@ -59,6 +62,19 @@ export function LineRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void 
       owner: l.owner_id ? profilesMap.get(l.owner_id) ?? null : null,
     })) as LineLead[];
     setLeads(merged);
+
+    // Load contact line_id + phone สำหรับ reply dialog
+    const contactIds = merged.map((l) => l.contact_id).filter(Boolean) as string[];
+    if (contactIds.length) {
+      const { data: contacts } = await crmDb()
+        .from("contacts").select("id, line_id, mobile_phone, office_phone")
+        .in("id", contactIds);
+      const cm: Record<string, { line_id: string|null; phone: string|null }> = {};
+      for (const c of (contacts ?? []) as any[]) {
+        cm[c.id] = { line_id: c.line_id ?? null, phone: c.mobile_phone ?? c.office_phone ?? null };
+      }
+      setContactMap(cm);
+    }
 
     const ids = merged.map((l) => l.id);
     if (ids.length) {
@@ -122,8 +138,21 @@ export function LineRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void 
     onLeadCreated?.();
   };
 
+  const getContact = (lead: LineLead) => lead.contact_id ? (contactMap[lead.contact_id] ?? null) : null;
+
   return (
     <div className="flex h-full flex-col">
+      {replyLead && (
+        <LineReplyDialog
+          leadId={replyLead.id}
+          leadTitle={replyLead.title ?? "(ไม่มีชื่อ)"}
+          contactName={replyLead.account?.name ?? replyLead.title}
+          contactLineId={getContact(replyLead)?.line_id ?? null}
+          contactPhone={getContact(replyLead)?.phone ?? null}
+          onClose={() => setReplyLead(null)}
+          onLogged={() => { setReplyLead(null); load(); }}
+        />
+      )}
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b bg-background">
         <div>
@@ -250,6 +279,13 @@ export function LineRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void 
                         </td>
                         <td className="px-4 py-4 w-36">
                           <div className="inline-flex items-center rounded-lg border bg-muted/30 p-0.5 gap-0.5">
+                            <Button
+                              variant="ghost" size="icon" className="h-7 w-7 text-[#06C755] hover:text-[#06C755] hover:bg-[#06C755]/10"
+                              title="ตอบกลับทาง LINE"
+                              onClick={() => setReplyLead(lead)}
+                            >
+                              <MessageSquarePlus className="h-3.5 w-3.5" />
+                            </Button>
                             <Button asChild variant="ghost" size="icon" className="h-7 w-7" title="เปิดดีล">
                               <Link to="/leads/$leadId" params={{ leadId: lead.id }}>
                                 <ExternalLink className="h-3.5 w-3.5" />
