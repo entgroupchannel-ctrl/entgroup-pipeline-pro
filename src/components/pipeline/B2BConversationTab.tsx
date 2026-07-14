@@ -129,7 +129,7 @@ function ThreadPanel({ title, subtitle, infoRows, children, replyPlaceholder, on
     await onSend(t); setReply("");
   };
   return (
-    <div className="flex flex-col h-full border-l border-border bg-background">
+    <div className="flex flex-col h-full min-h-0 border-l border-border bg-background">
       <div className="flex items-start gap-3 px-5 py-4 border-b bg-muted/10 shrink-0">
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm">{title}</p>
@@ -144,8 +144,8 @@ function ThreadPanel({ title, subtitle, infoRows, children, replyPlaceholder, on
           {infoRows}
         </div>
       )}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">{children}</div>
-      <div className="flex items-end gap-2.5 px-4 py-3 border-t bg-background shrink-0">
+      <div className="flex-1 overflow-y-auto min-h-0 px-5 py-4 space-y-4">{children}</div>
+      <div className="flex items-end gap-2.5 px-4 py-3 border-t bg-background shrink-0 mt-auto">
         <textarea value={reply} onChange={e=>setReply(e.target.value)}
           onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleSend();} }}
           placeholder={replyPlaceholder} rows={2}
@@ -165,7 +165,7 @@ function ConvoList<T>({ items, selectedId, loading, error, search, onSelect, onR
   renderItem: (item: T, isActive: boolean) => React.ReactNode;
 }) {
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto min-h-0">
       {loading && items.length === 0 ? (
         <div className="flex justify-center py-12"><Loader2 className="size-5 animate-spin text-muted-foreground"/></div>
       ) : error ? (
@@ -256,9 +256,9 @@ function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) 
   const totalUnread = convos.reduce((s,c)=>s+c.unread_count,0);
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden min-h-0">
       {/* List */}
-      <div className={`flex flex-col border-r border-border bg-background ${selected?"hidden md:flex w-[380px] shrink-0":"flex flex-1"}`}>
+      <div className={`flex flex-col min-h-0 border-r border-border bg-background ${selected?"hidden md:flex w-[380px] shrink-0":"flex flex-1"}`}>
         <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
           <span className="text-xs text-muted-foreground flex-1">
             {convos.length} รายการ {totalUnread>0 && <span className="text-red-500 font-medium">· {totalUnread} ใหม่</span>}
@@ -313,7 +313,7 @@ function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) 
 
       {/* Thread */}
       {selected ? (
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 min-h-0">
           <ThreadPanel
             title={selected.customer_company||selected.customer_name}
             subtitle={`${selected.quote_number} · ${formatBaht(selected.grand_total)}`}
@@ -340,7 +340,7 @@ function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) 
           </ThreadPanel>
         </div>
       ) : (
-        <div className="hidden md:flex flex-1 items-center justify-center text-muted-foreground flex-col gap-2">
+        <div className="hidden md:flex flex-1 min-h-0 items-center justify-center text-muted-foreground flex-col gap-2">
           <ShoppingCart className="size-10 opacity-20"/>
           <p className="text-sm">เลือกการสนทนาจากรายการ</p>
         </div>
@@ -416,9 +416,9 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
     s.guest_name ?? s.guest_email ?? (s.user_id ? "สมาชิก" : "ผู้เยี่ยมชม");
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden min-h-0">
       {/* List */}
-      <div className={`flex flex-col border-r border-border bg-background ${selected?"hidden md:flex w-[380px] shrink-0":"flex flex-1"}`}>
+      <div className={`flex flex-col min-h-0 border-r border-border bg-background ${selected?"hidden md:flex w-[380px] shrink-0":"flex flex-1"}`}>
         <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
           <span className="text-xs text-muted-foreground flex-1">
             {sessions.length} รายการ {totalUnread>0 && <span className="text-red-500 font-medium">· {totalUnread} ใหม่</span>}
@@ -480,7 +480,7 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
 
       {/* Thread */}
       {selected ? (
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 min-h-0">
           <ThreadPanel
             title={displayName(selected)}
             subtitle={isGuest ? "ผู้เยี่ยมชมหน้าเว็บ" : "สมาชิก / ผู้ใช้ที่ล็อกอิน"}
@@ -510,7 +510,7 @@ function WebChatTab({ isGuest, staffName }: { isGuest: boolean; staffName: strin
           </ThreadPanel>
         </div>
       ) : (
-        <div className="hidden md:flex flex-1 items-center justify-center text-muted-foreground flex-col gap-2">
+        <div className="hidden md:flex flex-1 min-h-0 items-center justify-center text-muted-foreground flex-col gap-2">
           {isGuest ? <Globe className="size-10 opacity-20"/> : <Users className="size-10 opacity-20"/>}
           <p className="text-sm">เลือกการสนทนาจากรายการ</p>
         </div>
@@ -531,7 +531,7 @@ export function B2BConversationTab() {
   const tabOrder: ChatTab[] = ["b2b", "web", "general"];
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col min-h-0">
       {/* Sub-tab bar */}
       <div className="flex items-center gap-1 px-4 py-2 border-b bg-background/80 shrink-0 overflow-x-auto">
         {tabOrder.map(t => {
