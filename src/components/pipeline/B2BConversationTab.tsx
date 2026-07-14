@@ -9,12 +9,13 @@
  * Tab 2-3 ใช้ table เดียวกัน แยกด้วย user_id NULL/NOT NULL
  * Authorized by: therdpoom@entgroup.co.th
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Loader2, RefreshCw, MessageSquare, Send, Building2,
   Phone, Mail, Search, CheckCircle2, AlertTriangle,
-  ShoppingCart, Globe, Users, X,
+  ShoppingCart, Globe, Users, X, Paperclip, Image as ImageIcon, FileText, CornerDownLeft,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
