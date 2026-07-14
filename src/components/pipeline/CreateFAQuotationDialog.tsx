@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { formatBaht } from "@/lib/format";
 import { createFAQuotationDraft } from "@/lib/flowaccount.functions";
-import type { B2BQuoteRequest } from "@/lib/b2b-client";
+import { fetchQuoteDetail, type B2BQuoteRequest } from "@/lib/b2b-client";
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function plusDaysISO(days: number) {
