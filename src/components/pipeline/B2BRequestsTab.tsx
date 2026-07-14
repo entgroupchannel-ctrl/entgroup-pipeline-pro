@@ -233,7 +233,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                               <span className="truncate">{STATUS_LABEL[req.status] ?? req.status}</span>
                             </span>
                           </td>
-                          <td className="px-4 py-4 w-36">
+                          <td className="px-4 py-4 w-52">
                             <div className="inline-flex items-center rounded-lg border bg-muted/30 p-0.5 gap-0.5">
                               {req.items && req.items.length > 0 && (
                                 <Button
@@ -246,14 +246,23 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                                   {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs gap-1 text-primary hover:bg-primary/10"
+                                onClick={() => setFaDialogReq(req)}
+                                title="สร้างใบเสนอราคาที่ FlowAccount"
+                              >
+                                <FileText className="h-3 w-3" /> สร้าง QT
+                              </Button>
                               {claimedIds.has(req.id) ? (
-                                <span className="inline-flex items-center gap-1 h-7 px-2.5 text-xs text-muted-foreground">
-                                  <CheckCircle2 className="h-3 w-3 text-emerald-500" /> รับงานแล้ว
+                                <span className="inline-flex items-center gap-1 h-7 px-2 text-xs text-muted-foreground">
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-500" /> รับแล้ว
                                 </span>
                               ) : (
                                 <Button
                                   size="sm"
-                                  className="h-7 px-2.5 text-xs gap-1"
+                                  className="h-7 px-2 text-xs gap-1"
                                   onClick={() => setConfirmReq(req)}
                                   disabled={claiming === req.id}
                                 >
@@ -264,6 +273,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                               )}
                             </div>
                           </td>
+
                         </tr>
 
                         {isExpanded && req.items && req.items.length > 0 && (
