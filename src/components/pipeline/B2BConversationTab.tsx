@@ -478,7 +478,9 @@ export function B2BConversationTab() {
                               {STATUS_LABEL[req.status] ?? req.status}
                             </span>
                             {lead_id && (
-                              <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" title="มี Lead ใน CRM แล้ว" />
+                              <span title="มี Lead ใน CRM แล้ว" className="inline-flex">
+                                <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
+                              </span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
