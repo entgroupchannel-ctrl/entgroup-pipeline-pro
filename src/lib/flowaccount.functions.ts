@@ -352,7 +352,7 @@ export const createFAQuotationDraft = createServerFn({ method: "POST" })
       : `https://app.flowaccount.com/documents/quotations`;
 
     // ── 4. Insert into crm.quotations ──────────────────────────────────────
-    const { error: insErr } = await context.supabase
+    const { error: insErr } = await (context.supabase as any)
       .schema("crm")
       .from("quotations")
       .insert({
