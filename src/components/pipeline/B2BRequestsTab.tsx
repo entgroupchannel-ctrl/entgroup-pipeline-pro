@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Loader2, RefreshCw, AlertTriangle, CheckCircle2, Plus,
-  Building2, Phone, Mail, ShoppingCart, ChevronDown, ChevronUp,
+  Building2, Phone, Mail, ShoppingCart, ChevronDown, ChevronUp, FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   STATUS_LABEL, type B2BQuoteRequest,
 } from "@/lib/b2b-client";
 import { Pagination } from "./LineRequestsTab";
+import { CreateFAQuotationDialog } from "./CreateFAQuotationDialog";
 
 const PAGE_SIZE = 10;
 
@@ -44,6 +45,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
   const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
+  const [faDialogReq, setFaDialogReq] = useState<B2BQuoteRequest | null>(null);
 
 
   const load = async () => {
@@ -187,7 +189,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                     <th className="px-5 py-3 text-left font-normal w-44">ผู้ติดต่อ</th>
                     <th className="px-5 py-3 text-right font-normal w-32">มูลค่ารวม</th>
                     <th className="px-5 py-3 text-left font-normal w-36">สถานะ</th>
-                    <th className="px-4 py-3 w-36" />
+                    <th className="px-4 py-3 w-52" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -231,7 +233,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                               <span className="truncate">{STATUS_LABEL[req.status] ?? req.status}</span>
                             </span>
                           </td>
-                          <td className="px-4 py-4 w-36">
+                          <td className="px-4 py-4 w-52">
                             <div className="inline-flex items-center rounded-lg border bg-muted/30 p-0.5 gap-0.5">
                               {req.items && req.items.length > 0 && (
                                 <Button
@@ -244,14 +246,23 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                                   {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs gap-1 text-primary hover:bg-primary/10"
+                                onClick={() => setFaDialogReq(req)}
+                                title="สร้างใบเสนอราคาที่ FlowAccount"
+                              >
+                                <FileText className="h-3 w-3" /> สร้าง QT
+                              </Button>
                               {claimedIds.has(req.id) ? (
-                                <span className="inline-flex items-center gap-1 h-7 px-2.5 text-xs text-muted-foreground">
-                                  <CheckCircle2 className="h-3 w-3 text-emerald-500" /> รับงานแล้ว
+                                <span className="inline-flex items-center gap-1 h-7 px-2 text-xs text-muted-foreground">
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-500" /> รับแล้ว
                                 </span>
                               ) : (
                                 <Button
                                   size="sm"
-                                  className="h-7 px-2.5 text-xs gap-1"
+                                  className="h-7 px-2 text-xs gap-1"
                                   onClick={() => setConfirmReq(req)}
                                   disabled={claiming === req.id}
                                 >
@@ -262,6 +273,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                               )}
                             </div>
                           </td>
+
                         </tr>
 
                         {isExpanded && req.items && req.items.length > 0 && (
@@ -403,6 +415,13 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Create FA Quotation dialog */}
+      <CreateFAQuotationDialog
+        open={!!faDialogReq}
+        onOpenChange={(v) => { if (!v) setFaDialogReq(null); }}
+        request={faDialogReq}
+      />
     </div>
   );
 }
