@@ -9,7 +9,7 @@ import { crmDb, STAGE_LABEL_TH, type Lead, type LeadStage, type Account } from "
 import { useAuth } from "@/lib/auth-context";
 import { formatBaht } from "@/lib/format";
 import { useLineRealtime } from "@/hooks/useLineRealtime";
-import { LineReplyDialog } from "./LineReplyDialog";
+import { LinePushDialog } from "./LinePushDialog";
 
 interface LineLead extends Lead {
   account?: Account | null;
@@ -143,14 +143,11 @@ export function LineRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void 
   return (
     <div className="flex h-full flex-col">
       {replyLead && (
-        <LineReplyDialog
+        <LinePushDialog
           leadId={replyLead.id}
-          leadTitle={replyLead.title ?? "(ไม่มีชื่อ)"}
-          contactName={replyLead.account?.name ?? replyLead.title}
-          contactLineId={getContact(replyLead)?.line_id ?? null}
-          contactPhone={getContact(replyLead)?.phone ?? null}
+          leadTitle={replyLead.account?.name ?? replyLead.title ?? "(ไม่มีชื่อ)"}
           onClose={() => setReplyLead(null)}
-          onLogged={() => { setReplyLead(null); load(); }}
+          onSent={() => { setReplyLead(null); load(); }}
         />
       )}
       {/* Header */}
