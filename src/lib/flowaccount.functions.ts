@@ -244,6 +244,7 @@ export const createFAQuotationDraft = createServerFn({ method: "POST" })
       vat_rate: z.number().min(0).max(20).default(7),
       lead_id: z.string().uuid().optional(),
       b2b_request_id: z.string().optional(),
+      b2b_quote_number: z.string().optional(),
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -354,7 +355,7 @@ export const createFAQuotationDraft = createServerFn({ method: "POST" })
       contactPerson: data.customer.contact_name || "",
       publishedOn: data.issued_date,
       dueDate: data.valid_until,
-      reference: data.b2b_request_id || "",
+      reference: data.b2b_quote_number || data.b2b_request_id || "",
       remark: data.note || "",
       items: faItems,
       vatType,
