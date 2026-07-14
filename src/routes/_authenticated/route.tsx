@@ -56,8 +56,10 @@ function AuthenticatedLayout() {
             <div className="ml-2 text-sm font-medium text-muted-foreground">ENTGROUP CRM</div>
             <div className="ml-auto"><PreferencesToggle /></div>
           </header>
-          <main className="min-w-0 flex-1 overflow-auto">
-            <Outlet />
+          <main className="min-w-0 flex-1 overflow-hidden flex flex-col">
+            <div className="flex flex-col flex-1 min-h-0">
+              <Outlet />
+            </div>
           </main>
         </SidebarInset>
       </div>
