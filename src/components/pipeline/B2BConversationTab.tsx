@@ -491,6 +491,7 @@ function B2BTab({ staffName, staffId }: { staffName: string; staffId: string }) 
       {selected ? (
         <div className="flex-1 min-w-0">
           <ThreadPanel
+            draftKey={`b2b:${selected.id}`}
             title={selected.customer_company||selected.customer_name}
             subtitle={`${selected.quote_number} · ${formatBaht(selected.grand_total)}`}
             infoRows={<>
