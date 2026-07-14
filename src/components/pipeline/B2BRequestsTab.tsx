@@ -415,6 +415,16 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Create FA Quotation dialog */}
+      <CreateFAQuotationDialog
+        open={!!faDialogReq}
+        onOpenChange={(v) => { if (!v) setFaDialogReq(null); }}
+        request={faDialogReq}
+      />
+    </div>
+  );
+}
     </div>
   );
 }
