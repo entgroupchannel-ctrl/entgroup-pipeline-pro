@@ -189,7 +189,7 @@ export function B2BRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }
                     <th className="px-5 py-3 text-left font-normal w-44">ผู้ติดต่อ</th>
                     <th className="px-5 py-3 text-right font-normal w-32">มูลค่ารวม</th>
                     <th className="px-5 py-3 text-left font-normal w-36">สถานะ</th>
-                    <th className="px-4 py-3 w-36" />
+                    <th className="px-4 py-3 w-52" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
