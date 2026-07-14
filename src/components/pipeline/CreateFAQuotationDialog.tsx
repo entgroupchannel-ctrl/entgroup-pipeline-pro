@@ -153,20 +153,22 @@ export function CreateFAQuotationDialog({ open, onOpenChange, request, leadId, o
 
   return (
     <Dialog open={open} onOpenChange={(v) => !submitting && onOpenChange(v)}>
-      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
-            สร้างใบเสนอราคาที่ FlowAccount
+      <DialogContent className="max-w-none w-screen h-screen m-0 rounded-none p-0 flex flex-col gap-0">
+        <DialogHeader className="flex-row items-center gap-4 px-6 py-4 border-b bg-background shrink-0">
+          <FileText className="h-5 w-5 text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <DialogTitle className="text-base font-semibold leading-tight">
+              สร้างใบเสนอราคาที่ FlowAccount
+            </DialogTitle>
             {request?.quote_number && (
-              <span className="ml-2 rounded-md bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
+              <p className="text-lg font-bold text-primary font-mono mt-0.5 tracking-wide">
                 {request.quote_number}
-              </span>
+              </p>
             )}
-          </DialogTitle>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-5">
+        <div className="flex-1 min-h-0 overflow-hidden"><div className="h-full overflow-y-auto"><div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
           {/* Customer */}
           <section className="rounded-xl border p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
@@ -201,7 +203,8 @@ export function CreateFAQuotationDialog({ open, onOpenChange, request, leadId, o
             </div>
           </section>
 
-          {/* Items */}
+          {/* Items + totals — right column on lg */}
+          <div className="space-y-5 lg:col-start-2 lg:row-start-1 lg:row-span-2">
           <section className="rounded-xl border p-4">
             <div className="mb-3 flex items-center justify-between">
               <div className="text-sm font-semibold">รายการสินค้า</div>
@@ -271,8 +274,8 @@ export function CreateFAQuotationDialog({ open, onOpenChange, request, leadId, o
             </div>
           </section>
 
-          {/* Meta + totals */}
-          <section className="grid gap-4 sm:grid-cols-3">
+          {/* Meta */}
+          <section className="rounded-xl border p-4"><div className="grid gap-4 sm:grid-cols-3">
             <div>
               <Label className="text-xs">วันที่ออก</Label>
               <Input type="date" value={issuedDate} onChange={(e) => setIssuedDate(e.target.value)} className="h-9" />
@@ -289,7 +292,7 @@ export function CreateFAQuotationDialog({ open, onOpenChange, request, leadId, o
               <Label className="text-xs">หมายเหตุ</Label>
               <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="text-sm" />
             </div>
-          </section>
+</div>          </section>
 
           {/* Totals summary */}
           <div className="rounded-xl border bg-muted/30 p-4 text-sm">
@@ -308,7 +311,8 @@ export function CreateFAQuotationDialog({ open, onOpenChange, request, leadId, o
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+</div></div></div>
+        <DialogFooter className="gap-2 px-6 py-4 border-t bg-background shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
             ยกเลิก
           </Button>
