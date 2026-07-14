@@ -66,11 +66,16 @@ function tf(iso: string) {
 function isImg(n?: string | null) { return /\.(jpg|jpeg|png|gif|webp)$/i.test(n ?? ""); }
 
 async function lcGet(p: Record<string,string>) {
-  const u = new URL(LC);
-  Object.entries(p).forEach(([k,v]) => u.searchParams.set(k,v));
-  const r = await fetch(u.toString(), { headers: { "x-crm-secret": SK } });
-  if (!r.ok) throw new Error(`${r.status}`);
-  return r.json();
+  try {
+    const u = new URL(LC);
+    Object.entries(p).forEach(([k,v]) => u.searchParams.set(k,v));
+    const r = await fetch(u.toString(), { headers: { "x-crm-secret": SK } });
+    if (!r.ok) { console.warn("[b2b-live-chat] HTTP", r.status); return { data: [] }; }
+    return await r.json();
+  } catch (e) {
+    console.warn("[b2b-live-chat] network error", e);
+    return { data: [] };
+  }
 }
 async function lcPost(b: Record<string,any>) {
   const r = await fetch(LC, {
@@ -81,6 +86,7 @@ async function lcPost(b: Record<string,any>) {
   if (!r.ok) throw new Error(`${r.status}`);
   return r.json();
 }
+
 
 // ─── Bubble ───────────────────────────────────────────────────────────────────
 function Bubble({ msg }: { msg: Msg }) {
