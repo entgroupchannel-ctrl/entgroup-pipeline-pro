@@ -308,13 +308,13 @@ export function LineOATab() {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 border-t pt-4">
+        <div className="flex flex-wrap items-center gap-2 border-t pt-4">
           <Button variant="outline" onClick={handleTest} disabled={testing}>
             {testing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Zap className="mr-1.5 h-4 w-4" />}
             ทดสอบการเชื่อมต่อ
           </Button>
           {settings?.last_tested_at && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground min-w-0 flex-1 truncate">
               ทดสอบล่าสุด: {new Date(settings.last_tested_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}
               {settings.test_error && <span className="ml-1 text-destructive">— {settings.test_error}</span>}
             </span>
@@ -327,6 +327,7 @@ export function LineOATab() {
           </div>
         </div>
       </div>
+
 
       {/* ── Behavior toggles ── */}
       <div className="rounded-xl border bg-card p-5 space-y-4">
