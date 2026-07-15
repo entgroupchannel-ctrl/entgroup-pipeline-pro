@@ -473,7 +473,7 @@ function EmailsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadMediaFiles = async () => {
-    const { data } = await crmDb().from("email_attachments").select("id,name,filename,size,mime_type,public_url").order("created_at", { ascending: false });
+    const { data } = await crmDb().from("email_attachments").select("id,name,filename,size,mime_type,public_url,storage_path").order("created_at", { ascending: false });
     setMediaFiles((data ?? []) as any[]);
   };
   useEffect(() => { loadMediaFiles(); }, []);
