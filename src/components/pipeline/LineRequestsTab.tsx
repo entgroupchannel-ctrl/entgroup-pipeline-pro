@@ -61,18 +61,23 @@ function parseBody(body: string): string {
 
 // ─── Thread panel ─────────────────────────────────────────────────────────────
 function ThreadPanel({
-  lead, activities, loadingAct, onClaim, onReply, isMine, claiming, onClose,
+  lead, activities, loadingAct, onClaim, onReply, isMine, claiming, onClose, preview,
 }: {
   lead: LineLead; activities: LineActivity[]; loadingAct: boolean;
   onClaim: () => void; onReply: () => void;
-  isMine: boolean; claiming: boolean; onClose: () => void;
+  isMine: boolean; claiming: boolean; onClose: () => void; preview?: string;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activities]);
 
-  const displayName = lead.account?.name || lead.title || "(ไม่มีชื่อ)";
+  const rawName = lead.account?.name || lead.title || "";
+  const isDefault = !rawName || rawName === "LINE Contacts" || rawName === "LINE Contact";
+  const previewParsed = preview ? parseBody(preview) : "";
+  const displayName = isDefault && previewParsed
+    ? previewParsed.length > 20 ? previewParsed.slice(0, 20) + "…" : previewParsed
+    : rawName || "(ไม่มีชื่อ)";
 
   return (
     <div className="flex flex-col bg-background" style={{ flex: 1, minWidth: 0, height: "100%", overflow: "hidden" }}>
@@ -190,7 +195,12 @@ function ConvoRow({ lead, preview, unread, isActive, isMine, onClick }: {
   isActive: boolean; isMine: boolean; onClick: () => void;
 }) {
   const hasNew = unread > 0;
-  const displayName = lead.account?.name || lead.title || "(ไม่มีชื่อ)";
+  const rawName = lead.account?.name || lead.title || "";
+  const isDefault = !rawName || rawName === "LINE Contacts" || rawName === "LINE Contact";
+  const previewText = preview ? parseBody(preview) : "";
+  const displayName = isDefault && previewText
+    ? previewText.length > 22 ? previewText.slice(0, 22) + "…" : previewText
+    : rawName || "(ไม่มีชื่อ)";
 
   return (
     <button
@@ -443,6 +453,7 @@ export function LineRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void 
             isMine={selected.owner_id === user?.id}
             claiming={claiming}
             onClose={() => setSelected(null)}
+            preview={previews[selected.id]}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground flex-col gap-3" style={{ background: "#f7f7f7" }}>
