@@ -114,9 +114,15 @@ export function AccountEmailDialog({ open, onOpenChange, accountId, accountName 
     setSending(true);
     try {
       const attachments: { filename: string; content: string; type: string }[] = [];
+      const { supabase } = await import("@/integrations/supabase/client");
       for (const att of pendingAtts) {
         try {
-          const resp = await fetch(att.public_url);
+          let url = att.public_url;
+          if (att.storage_path && !url.startsWith("blob:")) {
+            const { data: s } = await supabase.storage.from("email-attachments").createSignedUrl(att.storage_path, 60 * 5);
+            url = s?.signedUrl ?? url;
+          }
+          const resp = await fetch(url);
           const blob = await resp.blob();
           const b64 = await new Promise<string>((res) => {
             const r = new FileReader(); r.onload = () => res((r.result as string).split(",")[1]); r.readAsDataURL(blob);
