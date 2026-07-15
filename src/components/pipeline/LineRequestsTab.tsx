@@ -72,12 +72,16 @@ function ThreadPanel({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activities]);
 
-  const rawName = lead.account?.name || lead.title || "";
-  const isDefault = !rawName || rawName === "LINE Contacts" || rawName === "LINE Contact";
+  const accountName = lead.account?.name || "";
+  const titleName   = lead.title || "";
+  const cleanTitle  = titleName.startsWith("LINE: ") ? titleName.slice(6) : titleName;
+  const isGenericTitle = !cleanTitle || cleanTitle === "LINE Contacts" || cleanTitle === "LINE Contact";
   const previewParsed = preview ? parseBody(preview) : "";
-  const displayName = isDefault && previewParsed
-    ? previewParsed.length > 20 ? previewParsed.slice(0, 20) + "…" : previewParsed
-    : rawName || "(ไม่มีชื่อ)";
+  const displayName = accountName
+    ? accountName
+    : isGenericTitle && previewParsed
+    ? previewParsed.slice(0, 20) + (previewParsed.length > 20 ? "…" : "")
+    : cleanTitle || "(ไม่มีชื่อ)";
 
   return (
     <div className="flex flex-col bg-background" style={{ flex: 1, minWidth: 0, height: "100%", overflow: "hidden" }}>
@@ -195,12 +199,18 @@ function ConvoRow({ lead, preview, unread, isActive, isMine, onClick }: {
   isActive: boolean; isMine: boolean; onClick: () => void;
 }) {
   const hasNew = unread > 0;
-  const rawName = lead.account?.name || lead.title || "";
-  const isDefault = !rawName || rawName === "LINE Contacts" || rawName === "LINE Contact";
-  const previewText = preview ? parseBody(preview) : "";
-  const displayName = isDefault && previewText
-    ? previewText.length > 22 ? previewText.slice(0, 22) + "…" : previewText
-    : rawName || "(ไม่มีชื่อ)";
+  // ใช้ชื่อบริษัท (account) เป็นหลัก ถ้ามี
+  const accountName = lead.account?.name || "";
+  const titleName   = lead.title || "";
+  // title ที่มาจาก LINE มักเป็นข้อความ เช่น "LINE: ครับผม" — ตัด prefix ออก
+  const cleanTitle  = titleName.startsWith("LINE: ") ? titleName.slice(6) : titleName;
+  const isGenericTitle = !cleanTitle || cleanTitle === "LINE Contacts" || cleanTitle === "LINE Contact";
+  // ถ้ามีชื่อบริษัทจริงๆ ใช้เลย ถ้าไม่มีค่อยใช้ preview
+  const displayName = accountName
+    ? accountName
+    : isGenericTitle && preview
+    ? parseBody(preview).slice(0, 22) + (parseBody(preview).length > 22 ? "…" : "")
+    : cleanTitle || "(ไม่มีชื่อ)";
 
   return (
     <button
