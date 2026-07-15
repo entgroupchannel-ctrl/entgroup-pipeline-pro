@@ -463,7 +463,7 @@ function EmailsPage() {
   const [saveOpen, setSaveOpen]           = useState(false);
   const [tplName, setTplName]             = useState("");
   const [tplSearch, setTplSearch]         = useState("");
-  const [pendingAttachments, setPendingAttachments] = useState<{id:string;filename:string;mime_type:string;public_url:string;size:number}[]>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<{id:string;filename:string;mime_type:string;public_url:string;size:number;storage_path?:string}[]>([]);
   const [cc,  setCc]  = useState("");
   const [bcc, setBcc] = useState("");
   const [showCcBcc, setShowCcBcc] = useState(false);
