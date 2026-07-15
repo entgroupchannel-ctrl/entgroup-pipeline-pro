@@ -83,7 +83,7 @@ async function lcPost(b: Record<string,any>) {
 }
 
 // ─── Bubble ───────────────────────────────────────────────────────────────────
-function Bubble({ msg }: { msg: Msg }) {
+function Bubble({ msg, onImageClick }: { msg: Msg; onImageClick?: (url: string, name?: string | null) => void }) {
   return (
     <div className={`flex gap-2 ${msg.isMe ? "flex-row-reverse" : ""}`}>
       <div className={`size-6 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold mt-1 ${
@@ -95,8 +95,9 @@ function Bubble({ msg }: { msg: Msg }) {
         {!msg.isMe && <span className="text-[10px] text-muted-foreground px-0.5">{msg.senderName}</span>}
         {msg.attachUrl && (
           isImg(msg.attachName)
-            ? <img src={msg.attachUrl} alt={msg.attachName ?? ""} onClick={() => window.open(msg.attachUrl!, "_blank")}
-                className="max-w-[200px] rounded-xl border cursor-pointer hover:opacity-90" />
+            ? <img src={msg.attachUrl} alt={msg.attachName ?? ""}
+                onClick={() => onImageClick ? onImageClick(msg.attachUrl!, msg.attachName) : window.open(msg.attachUrl!, "_blank")}
+                className="max-w-[220px] rounded-xl border cursor-pointer hover:opacity-90 hover:scale-[1.02] transition-transform" />
             : <a href={msg.attachUrl} target="_blank" rel="noreferrer"
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs border ${
                   msg.isMe ? "bg-primary/80 text-primary-foreground border-primary/50" : "bg-muted border-border"}`}>
@@ -168,11 +169,12 @@ function ConvoRow({ c, isActive, accent, onClick }: {
 }
 
 // ─── ThreadPane (right side — full height) ────────────────────────────────────
-function ThreadPane({ convo, msgs, loading, draft, setDraft, onSend, sending, onBack, tab }: {
+function ThreadPane({ convo, msgs, loading, draft, setDraft, onSend, sending, onBack, tab, onImageClick }: {
   convo: Convo; msgs: Msg[]; loading: boolean;
   draft: string; setDraft: (v: string) => void;
   onSend: (text: string, file?: File) => Promise<void>;
   sending: boolean; onBack: () => void; tab: ChatTab;
+  onImageClick?: (url: string, name?: string | null) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef   = useRef<HTMLInputElement>(null);
@@ -242,7 +244,7 @@ function ThreadPane({ convo, msgs, loading, draft, setDraft, onSend, sending, on
             <p className="text-sm font-medium">ยังไม่มีข้อความ</p>
             <p className="text-xs opacity-60">พิมพ์ด้านล่างเพื่อเริ่มบทสนทนา</p>
           </div>
-        ) : msgs.map(m => <Bubble key={m.id} msg={m}/>)}
+        ) : msgs.map(m => <Bubble key={m.id} msg={m} onImageClick={onImageClick}/>)}
         <div ref={bottomRef}/>
       </div>
 
@@ -303,8 +305,9 @@ function ThreadPane({ convo, msgs, loading, draft, setDraft, onSend, sending, on
 }
 
 // ─── B2B Tab ──────────────────────────────────────────────────────────────────
-function B2BTab({ sName, sId, draft, setDraft }: {
+function B2BTab({ sName, sId, draft, setDraft, onImageClick }: {
   sName: string; sId: string; draft: string; setDraft: (v: string) => void;
+  onImageClick?: (url: string, name?: string | null) => void;
 }) {
   const [convos,   setConvos]   = useState<Convo[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -368,7 +371,7 @@ function B2BTab({ sName, sId, draft, setDraft }: {
       let attachUrl: string | null = null;
       let attachName: string | null = null;
       if (file) {
-        // Upload to pipeline-pro Supabase Storage (email-attachments bucket, public)
+        // Upload to pipeline-pro Supabase Storage (documents bucket, public)
         const { supabase: sb } = await import("@/integrations/supabase/client");
         const ext  = file.name.split(".").pop() ?? "bin";
         const path = `chat/${sel.id}/${Date.now()}.${ext}`;
@@ -428,7 +431,7 @@ function B2BTab({ sName, sId, draft, setDraft }: {
       {sel ? (
         <ThreadPane convo={sel} msgs={msgs} loading={msgLoad}
           draft={draft} setDraft={setDraft} onSend={handleSend}
-          sending={sending} onBack={()=>setSel(null)} tab="b2b"/>
+          sending={sending} onBack={()=>setSel(null)} tab="b2b" onImageClick={onImageClick}/>
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground flex-col gap-3" style={{background:"#f7f7f7"}}>
           <MessageSquare className="size-12 opacity-20"/>
@@ -441,8 +444,9 @@ function B2BTab({ sName, sId, draft, setDraft }: {
 }
 
 // ─── Web/General Tab ──────────────────────────────────────────────────────────
-function WebTab({ isGuest, sName, sId, draft, setDraft }: {
+function WebTab({ isGuest, sName, sId, draft, setDraft, onImageClick }: {
   isGuest: boolean; sName: string; sId: string; draft: string; setDraft: (v: string) => void;
+  onImageClick?: (url: string, name?: string | null) => void;
 }) {
   const act = isGuest ? "web" : "general";
   const [convos,   setConvos]   = useState<Convo[]>([]);
@@ -561,7 +565,7 @@ function WebTab({ isGuest, sName, sId, draft, setDraft }: {
       {sel ? (
         <ThreadPane convo={sel} msgs={msgs} loading={msgLoad}
           draft={draft} setDraft={setDraft} onSend={handleSend}
-          sending={sending} onBack={()=>setSel(null)} tab={act as ChatTab}/>
+          sending={sending} onBack={()=>setSel(null)} tab={act as ChatTab} onImageClick={onImageClick}/>
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground flex-col gap-3" style={{background:"#f7f7f7"}}>
           <Icon className="size-12 opacity-20"/>
@@ -573,6 +577,31 @@ function WebTab({ isGuest, sName, sId, draft, setDraft }: {
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
+// ─── Image Preview Modal ─────────────────────────────────────────────────────
+function ImagePreviewModal({ url, name, onClose }: { url: string; name?: string | null; onClose: () => void }) {
+  return (
+    <div
+      style={{ position:"fixed", inset:0, zIndex:100, background:"rgba(0,0,0,0.85)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}
+      onClick={onClose}
+    >
+      <div className="absolute top-4 right-4 flex items-center gap-3">
+        {name && <span className="text-white/70 text-sm">{name}</span>}
+        <a href={url} download={name ?? "image"} target="_blank" rel="noreferrer"
+          onClick={e => e.stopPropagation()}
+          className="text-white/70 hover:text-white text-xs px-3 py-1.5 rounded-lg border border-white/20 hover:bg-white/10 transition">
+          ดาวน์โหลด
+        </a>
+        <button type="button" onClick={onClose} className="text-white/70 hover:text-white text-2xl leading-none">×</button>
+      </div>
+      <img
+        src={url} alt={name ?? "image"}
+        onClick={e => e.stopPropagation()}
+        className="max-w-[90vw] max-h-[85vh] object-contain rounded-xl shadow-2xl"
+      />
+    </div>
+  );
+}
+
 export function B2BConversationTab({
   unreadCounts = { b2b: 0, web: 0, general: 0 },
 }: {
@@ -582,6 +611,7 @@ export function B2BConversationTab({
   const sName = (user as any)?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Sales";
   const sId   = user?.id ?? "staff";
   const [tab, setTab]   = useState<ChatTab>("b2b");
+  const [previewImg, setPreviewImg] = useState<{ url: string; name?: string | null } | null>(null);
   const [drafts, setDrafts] = useState<Record<ChatTab,string>>({ b2b:"", web:"", general:"" });
   const setDraft = (t: ChatTab) => (v: string) => setDrafts(p => ({ ...p, [t]: v }));
 
@@ -593,6 +623,7 @@ export function B2BConversationTab({
 
   return (
     <div style={{ display:"flex", flexDirection:"column", height:"100%", minHeight:0, overflow:"hidden" }}>
+      {previewImg && <ImagePreviewModal url={previewImg.url} name={previewImg.name} onClose={() => setPreviewImg(null)} />}
       {/* sub-tab strip */}
       <div className="flex items-center gap-1 px-4 py-1.5 border-b bg-muted/20 shrink-0">
         {TABS.map(({ key, label, Icon }) => {
@@ -627,9 +658,9 @@ export function B2BConversationTab({
 
       {/* content — fills remaining height */}
       <div style={{ flex:1, minHeight:0, overflow:"hidden" }}>
-        {tab==="b2b"     && <B2BTab sName={sName} sId={sId} draft={drafts.b2b}     setDraft={setDraft("b2b")}/>}
-        {tab==="web"     && <WebTab isGuest={true}  sName={sName} sId={sId} draft={drafts.web}     setDraft={setDraft("web")}/>}
-        {tab==="general" && <WebTab isGuest={false} sName={sName} sId={sId} draft={drafts.general} setDraft={setDraft("general")}/>}
+        {tab==="b2b"     && <B2BTab sName={sName} sId={sId} draft={drafts.b2b}     setDraft={setDraft("b2b")}     onImageClick={(url,name)=>setPreviewImg({url,name})}/>}
+        {tab==="web"     && <WebTab isGuest={true}  sName={sName} sId={sId} draft={drafts.web}     setDraft={setDraft("web")}     onImageClick={(url,name)=>setPreviewImg({url,name})}/>}
+        {tab==="general" && <WebTab isGuest={false} sName={sName} sId={sId} draft={drafts.general} setDraft={setDraft("general")} onImageClick={(url,name)=>setPreviewImg({url,name})}/>}
       </div>
     </div>
   );
