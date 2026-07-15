@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { KanbanBoard } from "@/components/pipeline/KanbanBoard";
 import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
 import { crmDb } from "@/lib/crm";
@@ -9,7 +8,6 @@ import { B2BRequestsTab } from "@/components/pipeline/B2BRequestsTab";
 import { LineRequestsTab } from "@/components/pipeline/LineRequestsTab";
 import { B2BConversationTab } from "@/components/pipeline/B2BConversationTab";
 import { supabase } from "@/integrations/supabase/client";
-import { callB2BLiveChat } from "@/lib/b2b-live-chat.functions";
 
 
 export const Route = createFileRoute("/_authenticated/pipeline")({
@@ -17,10 +15,11 @@ export const Route = createFileRoute("/_authenticated/pipeline")({
 });
 
 function PipelinePage() {
-  const callLiveChat = useServerFn(callB2BLiveChat);
   const [tab, setTab] = useState<"all" | "line" | "b2b" | "messages">("all");
   const [msgUnread, setMsgUnread] = useState({ b2b: 0, web: 0, general: 0 });
   const totalMsgUnread = msgUnread.b2b + msgUnread.web + msgUnread.general;
+  const prevUnread = useRef({ line: 0, b2b: 0, web: 0, general: 0, total: 0 });
+  const audioCtx = useRef<AudioContext | null>(null);
   const [b2bCount, setB2bCount] = useState(0);
   const [unassignedLine, setUnassignedLine] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -48,25 +47,101 @@ function PipelinePage() {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
+  // ── Sound + Browser Notification helpers ──────────────────────────────────
+  const playChime = () => {
+    try {
+      if (!audioCtx.current) audioCtx.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const ctx = audioCtx.current;
+      // สร้าง chime เสียงแจ้งเตือน (2 โน้ต)
+      [[880, 0], [1100, 0.15]].forEach(([freq, delay]) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = "sine";
+        gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+        gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + delay + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.4);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.4);
+      });
+    } catch { /* silent — user hasn't interacted yet */ }
+  };
+
+  const showNotification = (title: string, body: string, tab: string) => {
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "granted") {
+      const n = new Notification(title, {
+        body,
+        icon: "/favicon.ico",
+        tag: `crm-msg-${tab}`,  // ทับ notification เดิมถ้า tab เดิม
+        requireInteraction: false,
+        silent: true,  // เสียงเราจัดการเอง
+      });
+      n.onclick = () => { window.focus(); n.close(); };
+      setTimeout(() => n.close(), 6000);
+    } else if (Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  };
+
+  const checkAndNotify = (
+    newCounts: { b2b: number; web: number; general: number },
+    newLine: number,
+  ) => {
+    const prev = prevUnread.current;
+    const newTotal = newCounts.b2b + newCounts.web + newCounts.general + newLine;
+    const oldTotal = prev.b2b + prev.web + prev.general + prev.line;
+
+    if (newTotal > oldTotal) {
+      playChime();
+      // แจ้งเตือนแยกตาม tab ที่มีข้อความใหม่
+      if (newCounts.b2b > prev.b2b)
+        showNotification("📩 ข้อความใหม่ — B2B", `มี ${newCounts.b2b - prev.b2b} ข้อความใหม่จากลูกค้า B2B`, "b2b");
+      if (newCounts.web > prev.web)
+        showNotification("📩 ข้อความใหม่ — Chat หน้าเว็บ", `มี ${newCounts.web - prev.web} ข้อความใหม่`, "web");
+      if (newCounts.general > prev.general)
+        showNotification("📩 ข้อความใหม่ — General Chat", `มี ${newCounts.general - prev.general} ข้อความใหม่`, "general");
+      if (newLine > prev.line)
+        showNotification("💬 ข้อความใหม่ — LINE", `มี ${newLine - prev.line} ดีล LINE ใหม่`, "line");
+    }
+
+    prevUnread.current = { ...newCounts, line: newLine, total: newTotal };
+  };
+
+  // ขอ permission เมื่อ component mount
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
   // Poll unread counts every 30s — b2b-live-chat returns unread_count per session
   useEffect(() => {
-    const safeList = async (action: "b2b" | "web" | "general") => {
-      try {
-        const result = await callLiveChat({ data: { method: "GET", params: { action } } });
-        return Array.isArray(result?.data) ? result.data : [];
-      } catch {
-        return [];
-      }
-    };
+    const LC = "https://ugzdwmyylqmirrljtuej.supabase.co/functions/v1/b2b-live-chat";
+    const SK = "entgroup-crm-secret-2026";
     const poll = async () => {
-      const [b2b, web, general] = await Promise.all([safeList("b2b"), safeList("web"), safeList("general")]);
-      const sumUnread = (d: any[]) => d.reduce((s: number, c: any) => s + (c.unread_count ?? 0), 0);
-      setMsgUnread({ b2b: sumUnread(b2b), web: sumUnread(web), general: sumUnread(general) });
+      try {
+        const [wb, ww, wg] = await Promise.all([
+          fetch(`${LC}?action=b2b`, { headers: { "x-crm-secret": SK } }).then(r=>r.json()),
+          fetch(`${LC}?action=web`, { headers: { "x-crm-secret": SK } }).then(r=>r.json()),
+          fetch(`${LC}?action=general`, { headers: { "x-crm-secret": SK } }).then(r=>r.json()),
+        ]);
+        const sumUnread = (d: any[]) => d.reduce((s: number, c: any) => s + (c.unread_count ?? 0), 0);
+        const newCounts = {
+          b2b:     sumUnread(wb?.data  ?? []),
+          web:     sumUnread(ww?.data  ?? []),
+          general: sumUnread(wg?.data  ?? []),
+        };
+        setMsgUnread(newCounts);
+        checkAndNotify(newCounts, unassignedLine);
+      } catch { /* silent */ }
     };
     poll();
     const t = setInterval(poll, 30_000);
     return () => clearInterval(t);
-  }, [callLiveChat]);
+  }, []);
 
   const handleQuickLog = (leadId: string, type: ActivityKind) => {
     setLogLeadId(leadId);
