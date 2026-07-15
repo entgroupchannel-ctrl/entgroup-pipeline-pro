@@ -16,13 +16,12 @@ import { useAuth } from "@/lib/auth-context";
 import { formatBaht } from "@/lib/format";
 import { crmDb } from "@/lib/crm";
 import { STATUS_LABEL, STATUS_COLOR, fetchUnmatchedQuotes } from "@/lib/b2b-client";
-import { useServerFn } from "@tanstack/react-start";
-import { callB2BLiveChat, type LiveChatResponse } from "@/lib/b2b-live-chat.functions";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
+const LC = "https://ugzdwmyylqmirrljtuej.supabase.co/functions/v1/b2b-live-chat";
+const SK = "entgroup-crm-secret-2026";
+
 type ChatTab = "b2b" | "web" | "general";
-type LcGet = (p: Record<string, string>) => Promise<LiveChatResponse>;
-type LcPost = (b: Record<string, any>) => Promise<LiveChatResponse>;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Convo {
@@ -65,6 +64,23 @@ function tf(iso: string) {
   return `${d.getDate()} ${MO[d.getMonth()]} ${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`;
 }
 function isImg(n?: string | null) { return /\.(jpg|jpeg|png|gif|webp)$/i.test(n ?? ""); }
+
+async function lcGet(p: Record<string,string>) {
+  const u = new URL(LC);
+  Object.entries(p).forEach(([k,v]) => u.searchParams.set(k,v));
+  const r = await fetch(u.toString(), { headers: { "x-crm-secret": SK } });
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
+}
+async function lcPost(b: Record<string,any>) {
+  const r = await fetch(LC, {
+    method: "POST",
+    headers: { "x-crm-secret": SK, "content-type": "application/json" },
+    body: JSON.stringify(b),
+  });
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
+}
 
 // ─── Bubble ───────────────────────────────────────────────────────────────────
 function Bubble({ msg }: { msg: Msg }) {
@@ -287,9 +303,8 @@ function ThreadPane({ convo, msgs, loading, draft, setDraft, onSend, sending, on
 }
 
 // ─── B2B Tab ──────────────────────────────────────────────────────────────────
-function B2BTab({ sName, sId, draft, setDraft, lcGet, lcPost }: {
+function B2BTab({ sName, sId, draft, setDraft }: {
   sName: string; sId: string; draft: string; setDraft: (v: string) => void;
-  lcGet: LcGet; lcPost: LcPost;
 }) {
   const [convos,   setConvos]   = useState<Convo[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -408,9 +423,8 @@ function B2BTab({ sName, sId, draft, setDraft, lcGet, lcPost }: {
 }
 
 // ─── Web/General Tab ──────────────────────────────────────────────────────────
-function WebTab({ isGuest, sName, sId, draft, setDraft, lcGet, lcPost }: {
+function WebTab({ isGuest, sName, sId, draft, setDraft }: {
   isGuest: boolean; sName: string; sId: string; draft: string; setDraft: (v: string) => void;
-  lcGet: LcGet; lcPost: LcPost;
 }) {
   const act = isGuest ? "web" : "general";
   const [convos,   setConvos]   = useState<Convo[]>([]);
@@ -433,7 +447,7 @@ function WebTab({ isGuest, sName, sId, draft, setDraft, lcGet, lcPost }: {
         name: s.guest_name ?? s.guest_email ?? (s.user_id ? "สมาชิก" : "ผู้เยี่ยมชม"),
         subName: s.guest_email ?? undefined,
         lastMsg: s.last_message?.content,
-        lastMsgIsMe: s.last_message?.sender_type === "agent",
+        lastMsgIsMe: s.last_message?.sender_type === "staff",
         lastAt: s.last_message_at ?? s.created_at,
         unread: s.unread_count ?? 0,
         status: s.status,
@@ -451,7 +465,7 @@ function WebTab({ isGuest, sName, sId, draft, setDraft, lcGet, lcPost }: {
       const { data } = await lcGet({ action:act, session_id:id });
       setMsgs((data??[]).map((m:any) => ({
         id: m.id, content: m.content, senderName: m.sender_name,
-        isMe: m.sender_type === "agent", createdAt: m.created_at,
+        isMe: m.sender_type === "staff", createdAt: m.created_at,
         attachUrl: m.attachment_url, attachName: m.attachment_name,
       })));
       lcPost({ action:`${act}_read`, session_id:id }).catch(()=>{});
@@ -530,27 +544,11 @@ export function B2BConversationTab({
   unreadCounts?: Record<ChatTab, number>;
 }) {
   const { user } = useAuth();
-  const callLiveChat = useServerFn(callB2BLiveChat);
   const sName = (user as any)?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "Sales";
   const sId   = user?.id ?? "staff";
   const [tab, setTab]   = useState<ChatTab>("b2b");
   const [drafts, setDrafts] = useState<Record<ChatTab,string>>({ b2b:"", web:"", general:"" });
   const setDraft = (t: ChatTab) => (v: string) => setDrafts(p => ({ ...p, [t]: v }));
-  const lcGet = useCallback<LcGet>(async (params) => {
-    try {
-      return await callLiveChat({ data: { method: "GET", params } });
-    } catch (e) {
-      console.warn("[b2b-live-chat] proxy get failed", e);
-      return { data: [], fallback: true, error: "B2B live chat temporarily unavailable" };
-    }
-  }, [callLiveChat]);
-  const lcPost = useCallback<LcPost>(async (body) => {
-    const result = await callLiveChat({ data: { method: "POST", body } });
-    if (result?.fallback || (result?.ok === false && result?.error)) {
-      throw new Error(result.error ?? "B2B live chat temporarily unavailable");
-    }
-    return result;
-  }, [callLiveChat]);
 
   const TABS: { key: ChatTab; label: string; Icon: typeof MessageSquare }[] = [
     { key:"b2b",     label:"ใบเสนอราคา B2B", Icon:ShoppingCart },
@@ -594,9 +592,9 @@ export function B2BConversationTab({
 
       {/* content — fills remaining height */}
       <div style={{ flex:1, minHeight:0, overflow:"hidden" }}>
-        {tab==="b2b"     && <B2BTab sName={sName} sId={sId} draft={drafts.b2b}     setDraft={setDraft("b2b")} lcGet={lcGet} lcPost={lcPost}/>} 
-        {tab==="web"     && <WebTab isGuest={true}  sName={sName} sId={sId} draft={drafts.web}     setDraft={setDraft("web")} lcGet={lcGet} lcPost={lcPost}/>} 
-        {tab==="general" && <WebTab isGuest={false} sName={sName} sId={sId} draft={drafts.general} setDraft={setDraft("general")} lcGet={lcGet} lcPost={lcPost}/>} 
+        {tab==="b2b"     && <B2BTab sName={sName} sId={sId} draft={drafts.b2b}     setDraft={setDraft("b2b")}/>}
+        {tab==="web"     && <WebTab isGuest={true}  sName={sName} sId={sId} draft={drafts.web}     setDraft={setDraft("web")}/>}
+        {tab==="general" && <WebTab isGuest={false} sName={sName} sId={sId} draft={drafts.general} setDraft={setDraft("general")}/>}
       </div>
     </div>
   );
