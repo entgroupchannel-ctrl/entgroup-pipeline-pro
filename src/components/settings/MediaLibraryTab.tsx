@@ -51,7 +51,13 @@ export function MediaLibraryTab() {
   const load = async () => {
     setLoading(true);
     const { data } = await crmDb().from("email_attachments").select("*").order("created_at", { ascending: false });
-    setFiles((data ?? []) as MediaFile[]);
+    const rows = (data ?? []) as MediaFile[];
+    // Bucket is private — sign each URL for display/copy (1 hour)
+    const signed = await Promise.all(rows.map(async (f) => {
+      const { data: s } = await supabase.storage.from(BUCKET).createSignedUrl(f.storage_path, 60 * 60);
+      return { ...f, public_url: s?.signedUrl ?? "" };
+    }));
+    setFiles(signed);
     setLoading(false);
   };
 
@@ -77,9 +83,8 @@ export function MediaLibraryTab() {
       });
       if (upErr) throw new Error(upErr.message);
 
-      // Get public URL
-      const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      const publicUrl = urlData.publicUrl;
+      // Private bucket — persist only storage_path; sign URLs on demand.
+      const publicUrl = "";
 
       // Save metadata to DB
       const { error: dbErr } = await crmDb().from("email_attachments").insert({
@@ -113,10 +118,13 @@ export function MediaLibraryTab() {
     load();
   };
 
-  const copyUrl = (f: MediaFile) => {
-    navigator.clipboard.writeText(f.public_url);
+  const copyUrl = async (f: MediaFile) => {
+    // Regenerate a fresh 24h signed URL for sharing.
+    const { data: s } = await supabase.storage.from(BUCKET).createSignedUrl(f.storage_path, 60 * 60 * 24);
+    const url = s?.signedUrl ?? f.public_url;
+    navigator.clipboard.writeText(url);
     setCopiedId(f.id);
-    toast.success("คัดลอก URL แล้ว");
+    toast.success("คัดลอก URL แล้ว (หมดอายุใน 24 ชม.)");
     setTimeout(() => setCopiedId(null), 2000);
   };
 

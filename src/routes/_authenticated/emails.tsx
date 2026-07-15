@@ -463,17 +463,17 @@ function EmailsPage() {
   const [saveOpen, setSaveOpen]           = useState(false);
   const [tplName, setTplName]             = useState("");
   const [tplSearch, setTplSearch]         = useState("");
-  const [pendingAttachments, setPendingAttachments] = useState<{id:string;filename:string;mime_type:string;public_url:string;size:number}[]>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<{id:string;filename:string;mime_type:string;public_url:string;size:number;storage_path?:string}[]>([]);
   const [cc,  setCc]  = useState("");
   const [bcc, setBcc] = useState("");
   const [showCcBcc, setShowCcBcc] = useState(false);
-  const [mediaFiles, setMediaFiles] = useState<{id:string;name:string;filename:string;size:number;mime_type:string;public_url:string}[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<{id:string;name:string;filename:string;size:number;mime_type:string;public_url:string;storage_path:string}[]>([]);
   const [showAttachPicker, setShowAttachPicker] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadMediaFiles = async () => {
-    const { data } = await crmDb().from("email_attachments").select("id,name,filename,size,mime_type,public_url").order("created_at", { ascending: false });
+    const { data } = await crmDb().from("email_attachments").select("id,name,filename,size,mime_type,public_url,storage_path").order("created_at", { ascending: false });
     setMediaFiles((data ?? []) as any[]);
   };
   useEffect(() => { loadMediaFiles(); }, []);
@@ -501,7 +501,7 @@ function EmailsPage() {
     setBody(applyMergeTags(t.body, vars));
     const attachIds = (t as any).attachments ?? [];
     if (attachIds.length > 0) {
-      const { data } = await crmDb().from("email_attachments").select("id,filename,mime_type,public_url,size").in("id", attachIds);
+      const { data } = await crmDb().from("email_attachments").select("id,filename,mime_type,public_url,size,storage_path").in("id", attachIds);
       setPendingAttachments((data ?? []) as any[]);
     } else {
       setPendingAttachments([]);
@@ -596,9 +596,15 @@ function EmailsPage() {
     setSending(true);
     try {
       const attachments: { filename: string; content: string; type: string }[] = [];
+      const { supabase: sbClient } = await import("@/integrations/supabase/client");
       for (const att of pendingAttachments) {
         try {
-          const resp = await fetch(att.public_url);
+          let url = att.public_url;
+          if (att.storage_path && !url.startsWith("blob:")) {
+            const { data: s } = await sbClient.storage.from("email-attachments").createSignedUrl(att.storage_path, 60 * 5);
+            url = s?.signedUrl ?? url;
+          }
+          const resp = await fetch(url);
           const blob = await resp.blob();
           const b64 = await new Promise<string>((res) => {
             const reader = new FileReader();

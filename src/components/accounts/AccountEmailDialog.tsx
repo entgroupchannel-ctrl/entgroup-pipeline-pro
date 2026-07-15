@@ -23,8 +23,8 @@ interface EmailTemplate {
   is_system: boolean; attachments: string[];
 }
 interface Contact { id: string; name: string; email: string | null; position: string | null; }
-interface MediaFile { id: string; name: string; filename: string; size: number; mime_type: string; public_url: string; }
-interface PendingAttachment { id: string; filename: string; mime_type: string; public_url: string; size: number; }
+interface MediaFile { id: string; name: string; filename: string; size: number; mime_type: string; public_url: string; storage_path: string; }
+interface PendingAttachment { id: string; filename: string; mime_type: string; public_url: string; size: number; storage_path?: string; }
 
 const CATS = ["แนะนำองค์กร","ใบเสนอราคา","Follow Up","สินค้าและบริการ","โปรโมชัน","ทั่วไป"];
 
@@ -70,7 +70,7 @@ export function AccountEmailDialog({ open, onOpenChange, accountId, accountName 
       crmDb().from("email_templates").select("*").eq("is_active", true)
         .order("is_system", { ascending: false }).order("category").order("name"),
       crmDb().from("contacts").select("id,name,email,position").eq("account_id", accountId).order("name"),
-      crmDb().from("email_attachments").select("id,name,filename,size,mime_type,public_url").order("created_at", { ascending: false }),
+      crmDb().from("email_attachments").select("id,name,filename,size,mime_type,public_url,storage_path").order("created_at", { ascending: false }),
     ]).then(([tpl, ct, med]) => {
       setTemplates((tpl.data ?? []) as EmailTemplate[]);
       const loadedContacts = (ct.data ?? []) as Contact[];
@@ -100,7 +100,7 @@ export function AccountEmailDialog({ open, onOpenChange, accountId, accountName 
     setTab("compose");
     const ids = t.attachments ?? [];
     if (ids.length) {
-      const { data } = await crmDb().from("email_attachments").select("id,filename,mime_type,public_url,size").in("id", ids);
+      const { data } = await crmDb().from("email_attachments").select("id,filename,mime_type,public_url,size,storage_path").in("id", ids);
       setPendingAtts((data ?? []) as PendingAttachment[]);
     }
     toast.success(`โหลด: ${t.name}`);
@@ -114,9 +114,15 @@ export function AccountEmailDialog({ open, onOpenChange, accountId, accountName 
     setSending(true);
     try {
       const attachments: { filename: string; content: string; type: string }[] = [];
+      const { supabase } = await import("@/integrations/supabase/client");
       for (const att of pendingAtts) {
         try {
-          const resp = await fetch(att.public_url);
+          let url = att.public_url;
+          if (att.storage_path && !url.startsWith("blob:")) {
+            const { data: s } = await supabase.storage.from("email-attachments").createSignedUrl(att.storage_path, 60 * 5);
+            url = s?.signedUrl ?? url;
+          }
+          const resp = await fetch(url);
           const blob = await resp.blob();
           const b64 = await new Promise<string>((res) => {
             const r = new FileReader(); r.onload = () => res((r.result as string).split(",")[1]); r.readAsDataURL(blob);
