@@ -1,52 +1,264 @@
-import { useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw, MessageCircle, ChevronLeft, ChevronRight, ExternalLink, Plus, CheckCircle2, MessageSquarePlus } from "lucide-react";
+/**
+ * LineRequestsTab v2 — LINE Official style
+ * 2-column: conversation list (left) | thread detail (right)
+ * ชื่อลูกค้า + ข้อความรวมกันในแถวเดียว ไม่เปิด user ใหม่
+ * Authorized by: therdpoom@entgroup.co.th
+ */
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Loader2, RefreshCw, MessageCircle, ExternalLink,
+  Plus, CheckCircle2, MessageSquarePlus, Search,
+  Phone, Mail, Building2, User, X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
 import { crmDb, STAGE_LABEL_TH, type Lead, type LeadStage, type Account } from "@/lib/crm";
 import { useAuth } from "@/lib/auth-context";
-import { formatBaht } from "@/lib/format";
+import { supabase } from "@/integrations/supabase/client";
 import { useLineRealtime } from "@/hooks/useLineRealtime";
 import { LinePushDialog } from "./LinePushDialog";
+export { Pagination } from "./LineRequestsTabPagination";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface LineLead extends Lead {
   account?: Account | null;
   owner?: { id: string; full_name: string | null } | null;
 }
-
-const MONTHS_TH = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
-function fmtDate(iso: string) {
-  const d = new Date(iso);
-  return `${d.getDate()} ${MONTHS_TH[d.getMonth()]} ${String(d.getFullYear() + 543).slice(-2)}`;
+interface LineActivity {
+  id: string;
+  lead_id: string;
+  body: string;
+  created_at: string;
+  subject?: string | null;
 }
 
-const STAGE_DOT: Record<LeadStage, string> = {
-  new: "bg-sky-500",
-  qualified: "bg-blue-500",
-  proposal: "bg-violet-500",
-  negotiation: "bg-amber-500",
-  closing: "bg-orange-500",
-  won: "bg-emerald-500",
-  lost: "bg-red-500",
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const MO = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+function fmtShort(iso: string) {
+  const d = new Date(iso), n = new Date();
+  const diff = Math.floor((n.getTime() - d.getTime()) / 86400000);
+  if (diff === 0) return d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+  if (diff < 7) return `${diff}ว.`;
+  return `${d.getDate()} ${MO[d.getMonth()]}`;
+}
+function fmtFull(iso: string) {
+  const d = new Date(iso);
+  return `${d.getDate()} ${MO[d.getMonth()]} ${d.getFullYear()+543} ${d.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"})}`;
+}
+
+const STAGE_COLOR: Record<LeadStage, string> = {
+  new: "bg-sky-500", qualified: "bg-blue-500", proposal: "bg-violet-500",
+  negotiation: "bg-amber-500", closing: "bg-orange-500", won: "bg-emerald-500", lost: "bg-red-500",
 };
 
-const PAGE_SIZE = 10;
+function parseBody(body: string): string {
+  try {
+    const j = JSON.parse(body);
+    return j?.sent_text ?? j?.message ?? j?.text ?? body;
+  } catch { return body; }
+}
 
+// ─── Thread panel ─────────────────────────────────────────────────────────────
+function ThreadPanel({
+  lead, activities, loadingAct, onClaim, onReply, isMine, claiming, onClose,
+}: {
+  lead: LineLead; activities: LineActivity[]; loadingAct: boolean;
+  onClaim: () => void; onReply: () => void;
+  isMine: boolean; claiming: boolean; onClose: () => void;
+}) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [activities]);
+
+  const displayName = lead.account?.name || lead.title || "(ไม่มีชื่อ)";
+
+  return (
+    <div className="flex flex-col bg-background" style={{ flex: 1, minWidth: 0, height: "100%", overflow: "hidden" }}>
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 py-3.5 border-b bg-muted/5 shrink-0">
+        <div className="size-9 rounded-full bg-[#06C755]/10 flex items-center justify-center font-semibold text-sm text-[#06C755] shrink-0">
+          {displayName[0]?.toUpperCase() ?? "L"}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm truncate">{displayName}</p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap mt-0.5">
+            {lead.owner ? (
+              <span className="flex items-center gap-1">
+                <User className="size-3" />{lead.owner.full_name ?? "—"}
+              </span>
+            ) : (
+              <span className="text-amber-600 font-medium">ยังไม่มีผู้รับงาน</span>
+            )}
+            <span className={`flex items-center gap-1`}>
+              <span className={`size-1.5 rounded-full ${STAGE_COLOR[lead.stage]}`}/>
+              {STAGE_LABEL_TH[lead.stage] ?? lead.stage}
+            </span>
+            <span className="text-muted-foreground/60">{fmtShort(lead.updated_at)}</span>
+          </div>
+        </div>
+        {/* Actions */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2.5 text-xs gap-1.5 text-[#06C755] border-[#06C755]/30 hover:bg-[#06C755]/5"
+            onClick={onReply}
+          >
+            <MessageSquarePlus className="size-3.5" />
+            ส่ง LINE
+          </Button>
+          {!lead.owner_id && (
+            <Button size="sm" className="h-7 px-2.5 text-xs gap-1" onClick={onClaim} disabled={claiming}>
+              {claiming ? <Loader2 className="size-3 animate-spin" /> : <><Plus className="size-3" />รับงาน</>}
+            </Button>
+          )}
+          <Button asChild variant="ghost" size="icon" className="h-7 w-7" title="เปิดดีล">
+            <Link to="/leads/$leadId" params={{ leadId: lead.id }}>
+              <ExternalLink className="size-3.5" />
+            </Link>
+          </Button>
+          <button type="button" onClick={onClose} className="md:hidden text-muted-foreground hover:text-foreground">
+            <X className="size-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4" style={{ background: "#f7f7f7" }}>
+        {loadingAct ? (
+          <div className="flex justify-center py-8"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>
+        ) : activities.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground py-12">
+            <MessageCircle className="size-10 opacity-20" />
+            <p className="text-sm">ยังไม่มีข้อความที่บันทึกไว้</p>
+            <p className="text-xs opacity-60">กด "ส่ง LINE" เพื่อส่งข้อความหาลูกค้า</p>
+          </div>
+        ) : (
+          activities.map((a) => {
+            const text = parseBody(a.body);
+            const isMe = a.subject?.includes("ส่งข้อความ") || a.subject?.includes("staff");
+            return (
+              <div key={a.id} className={`flex gap-2 ${isMe ? "flex-row-reverse" : ""}`}>
+                <div className={`size-6 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold mt-1 ${
+                  isMe ? "bg-[#06C755] text-white" : "bg-muted text-muted-foreground"
+                }`}>
+                  {isMe ? "S" : displayName[0]?.toUpperCase() ?? "L"}
+                </div>
+                <div className={`max-w-[72%] flex flex-col gap-1 ${isMe ? "items-end" : "items-start"}`}>
+                  <div className={`rounded-2xl px-3.5 py-2.5 text-sm ${
+                    isMe
+                      ? "bg-[#06C755] text-white rounded-tr-sm"
+                      : "bg-white text-foreground rounded-tl-sm shadow-sm"
+                  }`}>
+                    <p className="whitespace-pre-wrap break-words">{text}</p>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground px-1">{fmtFull(a.created_at)}</span>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Compose hint */}
+      <div className="shrink-0 border-t bg-background px-4 py-3 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onReply}
+          className="flex-1 rounded-2xl border border-border bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground text-left hover:bg-muted/60 transition-colors"
+        >
+          ส่งข้อความถึง {displayName}...
+        </button>
+        <button
+          type="button"
+          onClick={onReply}
+          className="size-10 rounded-full bg-[#06C755] text-white flex items-center justify-center hover:bg-[#05b34d] transition-colors"
+        >
+          <MessageSquarePlus className="size-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── ConvoRow ─────────────────────────────────────────────────────────────────
+function ConvoRow({ lead, preview, unread, isActive, isMine, onClick }: {
+  lead: LineLead; preview?: string; unread: number;
+  isActive: boolean; isMine: boolean; onClick: () => void;
+}) {
+  const hasNew = unread > 0;
+  const displayName = lead.account?.name || lead.title || "(ไม่มีชื่อ)";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full text-left flex items-center gap-3 px-4 py-3.5 border-b border-border/30 transition-colors ${
+        isActive ? "bg-[#06C755]/5 border-l-[3px] border-l-[#06C755]" : "hover:bg-muted/30"
+      }`}
+    >
+      {/* Avatar */}
+      <div className={`size-11 rounded-full flex-shrink-0 flex items-center justify-center font-semibold ${
+        hasNew ? "bg-[#06C755] text-white" : "bg-[#06C755]/10 text-[#06C755]"
+      }`}>
+        {displayName[0]?.toUpperCase() ?? "L"}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline justify-between gap-1">
+          <span className={`text-sm truncate ${hasNew ? "font-bold" : "font-medium"}`}>
+            {displayName}
+          </span>
+          <span className="text-[11px] text-muted-foreground shrink-0">{fmtShort(lead.updated_at)}</span>
+        </div>
+        {/* preview message */}
+        <p className={`text-xs truncate mt-0.5 ${hasNew ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+          {preview ? parseBody(preview) : (
+            lead.owner_id
+              ? `ผู้ดูแล: ${lead.owner?.full_name ?? "—"}`
+              : "รอรับงาน"
+          )}
+        </p>
+        {/* status dot */}
+        <div className="flex items-center gap-1.5 mt-1">
+          <span className={`size-1.5 rounded-full ${STAGE_COLOR[lead.stage]}`}/>
+          <span className="text-[10px] text-muted-foreground">{STAGE_LABEL_TH[lead.stage]}</span>
+          {!lead.owner_id && (
+            <span className="text-[10px] text-amber-600 font-medium ml-1">• รอรับงาน</span>
+          )}
+        </div>
+      </div>
+
+      {/* Unread */}
+      {hasNew && (
+        <span className="size-5 rounded-full bg-[#06C755] text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+    </button>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export function LineRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void }) {
   const { user } = useAuth();
-  const [leads, setLeads] = useState<LineLead[]>([]);
-  const [previews, setPreviews] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [leads, setLeads]         = useState<LineLead[]>([]);
+  const [previews, setPreviews]   = useState<Record<string, string>>({});
+  const [activities, setActs]     = useState<LineActivity[]>([]);
+  const [loadingAct, setLoadAct]  = useState(false);
+  const [loading, setLoading]     = useState(true);
+  const [search, setSearch]       = useState("");
   const [subFilter, setSubFilter] = useState<"all" | "unclaimed" | "mine">("all");
-  const [page, setPage] = useState(0);
-  const [claiming,   setClaiming]   = useState<string | null>(null);
-  const [replyLead,  setReplyLead]  = useState<LineLead | null>(null);
-  const [contactMap, setContactMap] = useState<Record<string, { line_id: string|null; phone: string|null }>>({});
-  const { unreadCounts } = useLineRealtime();
+  const [selected, setSelected]   = useState<LineLead | null>(null);
+  const [claiming, setClaiming]   = useState(false);
+  const [replyLead, setReplyLead] = useState<LineLead | null>(null);
+  const { unreadCounts, clearBadge } = useLineRealtime();
 
+  // ── Load leads ──────────────────────────────────────────────────────────────
   const load = async () => {
     setLoading(true);
     const [leadsRes, accountsRes, profilesRes] = await Promise.all([
@@ -54,28 +266,16 @@ export function LineRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void 
       crmDb().from("accounts").select("id,name,industry"),
       crmDb().from("user_profiles").select("id,full_name,role"),
     ]);
-    const accountsMap = new Map((accountsRes.data ?? []).map((a: any) => [a.id, a]));
-    const profilesMap = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p]));
+    const aMap = new Map((accountsRes.data ?? []).map((a: any) => [a.id, a]));
+    const pMap = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p]));
     const merged = (leadsRes.data ?? []).map((l: any) => ({
       ...l,
-      account: l.account_id ? accountsMap.get(l.account_id) ?? null : null,
-      owner: l.owner_id ? profilesMap.get(l.owner_id) ?? null : null,
+      account: l.account_id ? aMap.get(l.account_id) ?? null : null,
+      owner:   l.owner_id   ? pMap.get(l.owner_id)   ?? null : null,
     })) as LineLead[];
     setLeads(merged);
 
-    // Load contact line_id + phone สำหรับ reply dialog
-    const contactIds = merged.map((l) => l.contact_id).filter(Boolean) as string[];
-    if (contactIds.length) {
-      const { data: contacts } = await crmDb()
-        .from("contacts").select("id, line_id, mobile_phone, office_phone")
-        .in("id", contactIds);
-      const cm: Record<string, { line_id: string|null; phone: string|null }> = {};
-      for (const c of (contacts ?? []) as any[]) {
-        cm[c.id] = { line_id: c.line_id ?? null, phone: c.mobile_phone ?? c.office_phone ?? null };
-      }
-      setContactMap(cm);
-    }
-
+    // load last message preview per lead
     const ids = merged.map((l) => l.id);
     if (ids.length) {
       const { data } = await crmDb()
@@ -93,8 +293,21 @@ export function LineRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void 
     setLoading(false);
   };
 
+  // ── Load thread activities ───────────────────────────────────────────────────
+  const loadThread = async (leadId: string) => {
+    setLoadAct(true);
+    const { data } = await crmDb()
+      .from("activities")
+      .select("id, lead_id, body, subject, created_at")
+      .eq("lead_id", leadId)
+      .eq("type", "line")
+      .order("created_at", { ascending: true });
+    setActs((data ?? []) as LineActivity[]);
+    setLoadAct(false);
+  };
+
+  useEffect(() => { load(); }, []);
   useEffect(() => {
-    load();
     const ch = supabase
       .channel("line-requests-tab")
       .on("postgres_changes", { event: "*", schema: "crm", table: "leads" }, () => load())
@@ -102,10 +315,32 @@ export function LineRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void 
     return () => { supabase.removeChannel(ch); };
   }, []);
 
+  const onSelect = (lead: LineLead) => {
+    setSelected(lead);
+    loadThread(lead.id);
+    clearBadge(lead.id);
+  };
+
+  // ── Claim ───────────────────────────────────────────────────────────────────
+  const claim = async () => {
+    if (!selected) return;
+    setClaiming(true);
+    const { error } = await crmDb().from("leads").update({ owner_id: user?.id }).eq("id", selected.id);
+    setClaiming(false);
+    if (error) { toast.error("รับงานไม่สำเร็จ"); return; }
+    toast.success("รับงานแล้ว ✅");
+    setLeads((prev) => prev.map((l) => l.id === selected.id
+      ? { ...l, owner_id: user?.id ?? null, owner: user ? { id: user.id, full_name: (user as any).user_metadata?.full_name ?? "ฉัน" } : null }
+      : l));
+    setSelected((s) => s ? { ...s, owner_id: user?.id ?? null } : s);
+    onLeadCreated?.();
+  };
+
+  // ── Counts ──────────────────────────────────────────────────────────────────
   const counts = useMemo(() => ({
-    all: leads.length,
+    all:       leads.length,
     unclaimed: leads.filter((l) => !l.owner_id).length,
-    mine: leads.filter((l) => l.owner_id === user?.id).length,
+    mine:      leads.filter((l) => l.owner_id === user?.id).length,
   }), [leads, user?.id]);
 
   const filtered = useMemo(() => {
@@ -117,250 +352,107 @@ export function LineRequestsTab({ onLeadCreated }: { onLeadCreated?: () => void 
       list = list.filter((l) =>
         (l.title ?? "").toLowerCase().includes(q) ||
         (l.account?.name ?? "").toLowerCase().includes(q) ||
-        (l.owner?.full_name ?? "").toLowerCase().includes(q),
+        (l.owner?.full_name ?? "").toLowerCase().includes(q)
       );
     }
     return list;
   }, [leads, subFilter, search, user?.id]);
 
-  useEffect(() => { setPage(0); }, [subFilter, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageLeads = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
-  const claim = async (lead: LineLead) => {
-    setClaiming(lead.id);
-    const { error } = await crmDb().from("leads").update({ owner_id: user?.id }).eq("id", lead.id);
-    setClaiming(null);
-    if (error) { toast.error("รับงานไม่สำเร็จ", { description: error.message }); return; }
-    toast.success("รับงานแล้ว ✅");
-    setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, owner_id: user?.id ?? null, owner: user ? { id: user.id, full_name: (user as any).user_metadata?.full_name ?? "ฉัน" } : null } : l)));
-    onLeadCreated?.();
-  };
-
-  const getContact = (lead: LineLead) => lead.contact_id ? (contactMap[lead.contact_id] ?? null) : null;
+  const totalUnread = Object.values(unreadCounts).reduce((s, n) => s + n, 0);
 
   return (
-    <div className="flex h-full flex-col">
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden" }}>
+
+      {/* Push dialog */}
       {replyLead && (
         <LinePushDialog
           leadId={replyLead.id}
           leadTitle={replyLead.account?.name ?? replyLead.title ?? "(ไม่มีชื่อ)"}
           onClose={() => setReplyLead(null)}
-          onSent={() => { setReplyLead(null); load(); }}
+          onSent={() => { setReplyLead(null); if (selected?.id === replyLead.id) loadThread(replyLead.id); load(); }}
         />
       )}
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b bg-background">
-        <div>
-          <h2 className="text-sm font-semibold flex items-center gap-2">
-            LINE Requests
-            {!loading && leads.length > 0 && (
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#06C755]/10 px-1.5 text-[10px] font-bold text-[#06C755]">
-                {leads.length}
-              </span>
-            )}
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">ดีลที่เข้ามาจาก LINE Official Account</p>
-        </div>
-        <div className="flex gap-2">
-          <Input
-            placeholder="ค้นหาชื่อ / บริษัท..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-8 w-56 pl-3 text-xs"
-          />
-          <Button variant="ghost" size="sm" onClick={load} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          </Button>
-        </div>
-      </div>
 
-      {/* Sub-filter chips */}
-      <div className="flex flex-wrap items-center gap-2 border-b bg-background px-6 py-2.5">
-        {([
-          ["all", "ทั้งหมด", counts.all],
-          ["unclaimed", "รอรับงาน", counts.unclaimed],
-          ["mine", "ของฉัน", counts.mine],
-        ] as const).map(([key, label, count]) => (
-          <button
-            key={key}
-            onClick={() => setSubFilter(key)}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-              subFilter === key ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
-            }`}
-          >
-            {label} <span className="ml-1 opacity-70">({count})</span>
-          </button>
-        ))}
-      </div>
+      {/* Body: 2 column */}
+      <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-            <MessageCircle className="h-10 w-10 mb-3 opacity-20" />
-            <p className="text-sm font-medium">{search ? "ไม่พบรายการที่ค้นหา" : "ยังไม่มีดีลจาก LINE"}</p>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm table-fixed">
-                <thead>
-                  <tr className="border-b bg-muted/30 text-xs text-muted-foreground">
-                    <th className="px-5 py-3 text-left font-normal w-28">วันที่</th>
-                    <th className="px-5 py-3 text-left font-normal min-w-40">ดีล / ข้อความล่าสุด</th>
-                    <th className="px-5 py-3 text-left font-normal w-44">บริษัท</th>
-                    <th className="px-5 py-3 text-left font-normal w-40">ผู้ดูแล</th>
-                    <th className="px-5 py-3 text-right font-normal w-32">มูลค่า</th>
-                    <th className="px-5 py-3 text-left font-normal w-36">สถานะ</th>
-                    <th className="px-4 py-3 w-36" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {pageLeads.map((lead) => {
-                    const unread = unreadCounts[lead.id] ?? 0;
-                    const preview = previews[lead.id];
-                    const isMine = lead.owner_id === user?.id;
-                    return (
-                      <tr key={lead.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-5 py-4 text-muted-foreground whitespace-nowrap">
-                          {fmtDate(lead.updated_at)}
-                        </td>
-                        <td className="px-5 py-4 overflow-hidden">
-                          <div className="flex items-center gap-2 min-w-0">
-                            {unread > 0 && (
-                              <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[#06C755] animate-pulse" />
-                            )}
-                            <span className="font-medium truncate">{lead.title ?? "(ไม่มีชื่อ)"}</span>
-                          </div>
-                          {preview && (
-                            <div className="text-xs text-muted-foreground truncate max-w-full mt-0.5">
-                              {preview}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="text-sm truncate">{lead.account?.name ?? <span className="text-muted-foreground">—</span>}</div>
-                          {lead.account?.industry && (
-                            <div className="text-xs text-muted-foreground mt-0.5 truncate">{lead.account.industry}</div>
-                          )}
-                        </td>
-                        <td className="px-5 py-4">
-                          {lead.owner ? (
-                            <span className="inline-flex items-center gap-1.5 text-sm">
-                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isMine ? "bg-emerald-500" : "bg-slate-400"}`} />
-                              <span className="truncate">{lead.owner.full_name ?? "—"}</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 text-sm text-amber-600">
-                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                              รอรับงาน
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-5 py-4 text-right whitespace-nowrap tabular-nums">
-                          {Number(lead.expected_value ?? 0) > 0
-                            ? formatBaht(Number(lead.expected_value))
-                            : <span className="text-muted-foreground">—</span>}
-                        </td>
-                        <td className="px-5 py-4 w-36">
-                          <span className="inline-flex items-center gap-1.5 text-xs text-foreground w-full">
-                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STAGE_DOT[lead.stage] ?? "bg-muted-foreground"}`} />
-                            <span className="truncate">{STAGE_LABEL_TH[lead.stage] ?? lead.stage}</span>
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 w-36">
-                          <div className="inline-flex items-center rounded-lg border bg-muted/30 p-0.5 gap-0.5">
-                            <Button
-                              variant="ghost" size="icon" className="h-7 w-7 text-[#06C755] hover:text-[#06C755] hover:bg-[#06C755]/10"
-                              title="ตอบกลับทาง LINE"
-                              onClick={() => setReplyLead(lead)}
-                            >
-                              <MessageSquarePlus className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button asChild variant="ghost" size="icon" className="h-7 w-7" title="เปิดดีล">
-                              <Link to="/leads/$leadId" params={{ leadId: lead.id }}>
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </Link>
-                            </Button>
-                            {!lead.owner_id ? (
-                              <Button
-                                size="sm"
-                                className="h-7 px-2.5 text-xs gap-1"
-                                onClick={() => claim(lead)}
-                                disabled={claiming === lead.id}
-                              >
-                                {claiming === lead.id
-                                  ? <Loader2 className="h-3 w-3 animate-spin" />
-                                  : <><Plus className="h-3 w-3" /> รับงาน</>}
-                              </Button>
-                            ) : isMine ? (
-                              <span className="inline-flex items-center gap-1 h-7 px-2.5 text-xs text-muted-foreground">
-                                <CheckCircle2 className="h-3 w-3 text-emerald-500" /> ของฉัน
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center h-7 px-2.5 text-xs text-muted-foreground">
-                                รับแล้ว
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <Pagination
-                page={page}
-                totalPages={totalPages}
-                total={filtered.length}
-                pageSize={PAGE_SIZE}
-                onChange={setPage}
+        {/* ── Left: conversation list ── */}
+        <div style={{
+          width: 340, minWidth: 280, display: "flex", flexDirection: "column",
+          height: "100%", overflow: "hidden", borderRight: "1px solid var(--border)",
+        }}>
+          {/* Search + filter */}
+          <div className="px-3 py-2.5 border-b bg-background space-y-2 shrink-0">
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
+              <Search className="size-3.5 text-muted-foreground shrink-0" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="ค้นหา..."
+                className="flex-1 bg-transparent text-xs focus:outline-none"
               />
-            )}
+              {totalUnread > 0 && (
+                <span className="size-5 rounded-full bg-[#06C755] text-white text-[10px] font-bold flex items-center justify-center">
+                  {totalUnread}
+                </span>
+              )}
+            </div>
+            <div className="flex gap-1.5">
+              {([ ["all","ทั้งหมด",counts.all], ["unclaimed","รอรับงาน",counts.unclaimed], ["mine","ของฉัน",counts.mine] ] as const).map(([k,l,c]) => (
+                <button key={k} type="button" onClick={() => setSubFilter(k)}
+                  className={`flex-1 rounded-lg py-1 text-[11px] font-medium transition-colors ${
+                    subFilter===k ? "bg-[#06C755] text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}>
+                  {l} ({c})
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="flex justify-center py-10"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center py-12 text-muted-foreground gap-2">
+                <MessageCircle className="size-8 opacity-20" />
+                <p className="text-xs">{search ? "ไม่พบ" : "ยังไม่มีดีลจาก LINE"}</p>
+              </div>
+            ) : filtered.map((lead) => (
+              <ConvoRow
+                key={lead.id}
+                lead={lead}
+                preview={previews[lead.id]}
+                unread={unreadCounts[lead.id] ?? 0}
+                isActive={selected?.id === lead.id}
+                isMine={lead.owner_id === user?.id}
+                onClick={() => onSelect(lead)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* ── Right: thread or empty ── */}
+        {selected ? (
+          <ThreadPanel
+            lead={selected}
+            activities={activities}
+            loadingAct={loadingAct}
+            onClaim={claim}
+            onReply={() => setReplyLead(selected)}
+            isMine={selected.owner_id === user?.id}
+            claiming={claiming}
+            onClose={() => setSelected(null)}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground flex-col gap-3" style={{ background: "#f7f7f7" }}>
+            <MessageCircle className="size-12 opacity-20" />
+            <div className="text-center">
+              <p className="font-medium text-sm">เลือกการสนทนาจากรายการด้านซ้าย</p>
+              <p className="text-xs opacity-60 mt-1">หรือรอข้อความใหม่จากลูกค้า</p>
+            </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-export function Pagination({
-  page, totalPages, total, pageSize, onChange,
-}: {
-  page: number; totalPages: number; total: number; pageSize: number;
-  onChange: (p: number) => void;
-}) {
-  const from = page * pageSize + 1;
-  const to = Math.min((page + 1) * pageSize, total);
-  return (
-    <div className="flex items-center justify-between border-t bg-muted/20 px-5 py-3 text-xs text-muted-foreground">
-      <span>แสดง {from}–{to} จาก {total}</span>
-      <div className="flex items-center gap-1">
-        <Button
-          variant="ghost" size="icon" className="h-7 w-7"
-          onClick={() => onChange(Math.max(0, page - 1))}
-          disabled={page === 0}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <span className="tabular-nums px-2">{page + 1} / {totalPages}</span>
-        <Button
-          variant="ghost" size="icon" className="h-7 w-7"
-          onClick={() => onChange(Math.min(totalPages - 1, page + 1))}
-          disabled={page >= totalPages - 1}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
       </div>
     </div>
   );
