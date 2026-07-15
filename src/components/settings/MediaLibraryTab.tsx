@@ -118,10 +118,13 @@ export function MediaLibraryTab() {
     load();
   };
 
-  const copyUrl = (f: MediaFile) => {
-    navigator.clipboard.writeText(f.public_url);
+  const copyUrl = async (f: MediaFile) => {
+    // Regenerate a fresh 24h signed URL for sharing.
+    const { data: s } = await supabase.storage.from(BUCKET).createSignedUrl(f.storage_path, 60 * 60 * 24);
+    const url = s?.signedUrl ?? f.public_url;
+    navigator.clipboard.writeText(url);
     setCopiedId(f.id);
-    toast.success("คัดลอก URL แล้ว");
+    toast.success("คัดลอก URL แล้ว (หมดอายุใน 24 ชม.)");
     setTimeout(() => setCopiedId(null), 2000);
   };
 
