@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { KanbanBoard } from "@/components/pipeline/KanbanBoard";
 import { ActivityLogDialog, type ActivityKind } from "@/components/activities/ActivityLogDialog";
 import { crmDb } from "@/lib/crm";
