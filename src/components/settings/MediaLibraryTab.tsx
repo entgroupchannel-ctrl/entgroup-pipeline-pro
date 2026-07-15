@@ -51,7 +51,13 @@ export function MediaLibraryTab() {
   const load = async () => {
     setLoading(true);
     const { data } = await crmDb().from("email_attachments").select("*").order("created_at", { ascending: false });
-    setFiles((data ?? []) as MediaFile[]);
+    const rows = (data ?? []) as MediaFile[];
+    // Bucket is private — sign each URL for display/copy (1 hour)
+    const signed = await Promise.all(rows.map(async (f) => {
+      const { data: s } = await supabase.storage.from(BUCKET).createSignedUrl(f.storage_path, 60 * 60);
+      return { ...f, public_url: s?.signedUrl ?? "" };
+    }));
+    setFiles(signed);
     setLoading(false);
   };
 
