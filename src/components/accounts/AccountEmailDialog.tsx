@@ -70,7 +70,7 @@ export function AccountEmailDialog({ open, onOpenChange, accountId, accountName 
       crmDb().from("email_templates").select("*").eq("is_active", true)
         .order("is_system", { ascending: false }).order("category").order("name"),
       crmDb().from("contacts").select("id,name,email,position").eq("account_id", accountId).order("name"),
-      crmDb().from("email_attachments").select("id,name,filename,size,mime_type,public_url").order("created_at", { ascending: false }),
+      crmDb().from("email_attachments").select("id,name,filename,size,mime_type,public_url,storage_path").order("created_at", { ascending: false }),
     ]).then(([tpl, ct, med]) => {
       setTemplates((tpl.data ?? []) as EmailTemplate[]);
       const loadedContacts = (ct.data ?? []) as Contact[];
