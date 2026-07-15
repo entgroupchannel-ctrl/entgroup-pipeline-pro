@@ -501,7 +501,7 @@ function EmailsPage() {
     setBody(applyMergeTags(t.body, vars));
     const attachIds = (t as any).attachments ?? [];
     if (attachIds.length > 0) {
-      const { data } = await crmDb().from("email_attachments").select("id,filename,mime_type,public_url,size").in("id", attachIds);
+      const { data } = await crmDb().from("email_attachments").select("id,filename,mime_type,public_url,size,storage_path").in("id", attachIds);
       setPendingAttachments((data ?? []) as any[]);
     } else {
       setPendingAttachments([]);
