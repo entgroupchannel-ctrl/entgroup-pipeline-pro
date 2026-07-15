@@ -248,7 +248,9 @@ export function LineOATab() {
             </Button>
           </div>
           {settings?.channel_access_token_masked && !form.channel_access_token && (
-            <p className="text-xs text-muted-foreground">ใช้ค่าเดิม ({settings.channel_access_token_masked}) — กรอกเพื่อเปลี่ยน</p>
+            <p className="text-xs text-muted-foreground truncate" title={settings.channel_access_token_masked}>
+              ใช้ค่าเดิม — กรอกเพื่อเปลี่ยน
+            </p>
           )}
         </div>
 
