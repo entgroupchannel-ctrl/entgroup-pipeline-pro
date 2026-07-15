@@ -71,11 +71,15 @@ Deno.serve(async (req) => {
     if (postAction === "b2b") {
       if (!body.quote_id || !body.content) return json({ error: "quote_id and content required" }, 400);
       const { data, error } = await admin.from("quote_messages").insert({
-        quote_id:     body.quote_id,
-        sender_name:  body.sender_name ?? "ENT Sales",
-        sender_role:  "staff",
-        content:      body.content,
-        message_type: body.message_type ?? "text",
+        quote_id:        body.quote_id,
+        sender_name:     body.sender_name ?? "ENT Sales",
+        sender_role:     "staff",
+        content:         body.content,
+        message_type:    body.attachment_url ? "file" : (body.message_type ?? "text"),
+        ...(body.attachment_url ? {
+          attachment_url:  body.attachment_url,
+          attachment_name: body.attachment_name ?? null,
+        } : {}),
       }).select().single();
       if (error) return json({ error: error.message }, 400);
       return json({ ok: true, data });
@@ -96,11 +100,15 @@ Deno.serve(async (req) => {
     if (postAction === "web_send" || postAction === "general_send") {
       if (!body.session_id || !body.content) return json({ error: "session_id and content required" }, 400);
       const { data, error } = await admin.from("chat_messages").insert({
-        session_id:   body.session_id,
-        content:      body.content,
-        sender_name:  body.sender_name ?? "ENT Support",
-        sender_type:  "staff",   // constraint: guest|customer|staff|system
-        message_type: "text",
+        session_id:      body.session_id,
+        content:         body.content,
+        sender_name:     body.sender_name ?? "ENT Support",
+        sender_type:     "staff",
+        message_type:    body.attachment_url ? "file" : "text",
+        ...(body.attachment_url ? {
+          attachment_url:  body.attachment_url,
+          attachment_name: body.attachment_name ?? null,
+        } : {}),
       }).select().single();
       if (error) return json({ error: error.message }, 400);
       return json({ ok: true, data });
