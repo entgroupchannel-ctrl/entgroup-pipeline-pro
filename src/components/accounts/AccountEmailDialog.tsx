@@ -100,7 +100,7 @@ export function AccountEmailDialog({ open, onOpenChange, accountId, accountName 
     setTab("compose");
     const ids = t.attachments ?? [];
     if (ids.length) {
-      const { data } = await crmDb().from("email_attachments").select("id,filename,mime_type,public_url,size").in("id", ids);
+      const { data } = await crmDb().from("email_attachments").select("id,filename,mime_type,public_url,size,storage_path").in("id", ids);
       setPendingAtts((data ?? []) as PendingAttachment[]);
     }
     toast.success(`โหลด: ${t.name}`);
