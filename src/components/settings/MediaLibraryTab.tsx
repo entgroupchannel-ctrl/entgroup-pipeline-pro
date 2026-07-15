@@ -83,9 +83,8 @@ export function MediaLibraryTab() {
       });
       if (upErr) throw new Error(upErr.message);
 
-      // Get public URL
-      const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      const publicUrl = urlData.publicUrl;
+      // Private bucket — persist only storage_path; sign URLs on demand.
+      const publicUrl = "";
 
       // Save metadata to DB
       const { error: dbErr } = await crmDb().from("email_attachments").insert({
