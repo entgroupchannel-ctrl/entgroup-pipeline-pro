@@ -467,7 +467,7 @@ function EmailsPage() {
   const [cc,  setCc]  = useState("");
   const [bcc, setBcc] = useState("");
   const [showCcBcc, setShowCcBcc] = useState(false);
-  const [mediaFiles, setMediaFiles] = useState<{id:string;name:string;filename:string;size:number;mime_type:string;public_url:string}[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<{id:string;name:string;filename:string;size:number;mime_type:string;public_url:string;storage_path:string}[]>([]);
   const [showAttachPicker, setShowAttachPicker] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
