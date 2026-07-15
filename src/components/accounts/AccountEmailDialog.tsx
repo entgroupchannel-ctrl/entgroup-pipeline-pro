@@ -23,8 +23,8 @@ interface EmailTemplate {
   is_system: boolean; attachments: string[];
 }
 interface Contact { id: string; name: string; email: string | null; position: string | null; }
-interface MediaFile { id: string; name: string; filename: string; size: number; mime_type: string; public_url: string; }
-interface PendingAttachment { id: string; filename: string; mime_type: string; public_url: string; size: number; }
+interface MediaFile { id: string; name: string; filename: string; size: number; mime_type: string; public_url: string; storage_path: string; }
+interface PendingAttachment { id: string; filename: string; mime_type: string; public_url: string; size: number; storage_path?: string; }
 
 const CATS = ["แนะนำองค์กร","ใบเสนอราคา","Follow Up","สินค้าและบริการ","โปรโมชัน","ทั่วไป"];
 
