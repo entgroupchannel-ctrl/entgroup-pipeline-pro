@@ -20,7 +20,7 @@ async function loadRow(supabaseAdmin: any) {
 
 function mask(v: string | null | undefined) {
   if (!v) return null;
-  return v.length > 8 ? `${"•".repeat(v.length - 4)}${v.slice(-4)}` : "••••";
+  return v.length > 8 ? `••••${v.slice(-4)}` : "••••";
 }
 
 // ── Load LINE settings ────────────────────────────────────────────────────────
