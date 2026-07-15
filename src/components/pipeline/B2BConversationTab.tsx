@@ -507,9 +507,9 @@ function WebTab({ isGuest, sName, sId, draft, setDraft }: {
         const ext  = file.name.split(".").pop() ?? "bin";
         const path = `chat/${sel.id}/${Date.now()}.${ext}`;
         const { data: up, error: upErr } = await (sb as any).storage
-          .from("documents").upload(path, file, { upsert: true, contentType: file.type });
+          .from("email-attachments").upload(path, file, { upsert: true, contentType: file.type });
         if (upErr) { toast.error("อัปโหลดไฟล์ไม่สำเร็จ: " + upErr.message); setSending(false); return; }
-        const { data: { publicUrl } } = (sb as any).storage.from("documents").getPublicUrl(path);
+        const { data: { publicUrl } } = (sb as any).storage.from("email-attachments").getPublicUrl(path);
         attachUrl  = publicUrl;
         attachName = file.name;
       }
